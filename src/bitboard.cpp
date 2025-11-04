@@ -19,7 +19,7 @@ void print(BB bb) {
     std::cout << sep;
 
     for (Rank r = Rank8; r >= Rank1; --r) {
-        std::cout << "  " << r << "  |";
+        std::cout << "  " << r << "   |";
         for (File f = FileA; f <= FileH; ++f) {
             Square sq = make_square(f, r);
             std::cout << ((bb & from(sq)) ? " 1 " : " . ") << "|";
@@ -52,11 +52,6 @@ constexpr BB ray(Square sq, BB occ) {
 template <Direction D1, Direction D2, Direction... Ds>
 constexpr BB ray(Square sq, BB occ) {
     return ray<D1>(sq, occ) | ray<D2, Ds...>(sq, occ);
-}
-
-template <Direction D1, Direction D2, Direction... Ds>
-constexpr BB shift(BB b) {
-    return shift<D1>(b) | shift<D2, Ds...>(b);
 }
 
 /******************************************\
@@ -92,8 +87,8 @@ NDArray<Magic, NSquare>       ROOK_ATK;
 NDArray<BB, NSquare, NSquare> BTWN_BB;
 NDArray<BB, NSquare, NSquare> CHECK_BB;
 
-BB BISHOP_TBL[0x1480];
-BB ROOK_TBL[0x19000];
+static BB BISHOP_TBL[0x1480];
+static BB ROOK_TBL[0x19000];
 
 /******************************************\
 |==========================================|
@@ -168,11 +163,11 @@ void init_magics(Square sq, BB table[], NDArray<Magic, NSquare>& entries) {
     m.attacks  = &table[offset];
     offset    += 1 << count(m.mask);
     // Calculate the attacks for each possible occupancy bitboard and store it at the index
-    BB occ     = EmptyBB;
+    BB occ = EmptyBB;
     do {
         m.attacks[m.index(occ)] = naive_slider_attacks<pt>(sq, occ);
         // Carry Rippler Trick
-        occ                     = (occ - m.mask) & m.mask;
+        occ = (occ - m.mask) & m.mask;
     } while (occ);
 }
 
@@ -182,24 +177,14 @@ void init_magics(Square sq, BB table[], NDArray<Magic, NSquare>& entries) {
 |==========================================|
 \******************************************/
 
-template <Direction D>
-void init_between_and_check_bb(Square src) {
-    loop(ray<D>(src, EmptyBB), [&](Square dst) {
-        BTWN_BB[src][dst]  = ray<D>(src, from(dst)) ^ from(dst);
-        CHECK_BB[src][dst] = BTWN_BB[src][dst] | from(src) | shift<~D>(from(src));
-    });
-}
-
 void init() {
     for (Square src = A1; src <= H8; ++src) {
-        init_between_and_check_bb<N>(src);
-        init_between_and_check_bb<NE>(src);
-        init_between_and_check_bb<E>(src);
-        init_between_and_check_bb<SE>(src);
-        init_between_and_check_bb<S>(src);
-        init_between_and_check_bb<SW>(src);
-        init_between_and_check_bb<W>(src);
-        init_between_and_check_bb<NW>(src);
+        for (Square dst = A1; dst <= H8; ++dst) {
+            if (naive_slider_attacks<B>(src, EmptyBB) & from(dst))
+                BTWN_BB[src][dst] = naive_slider_attacks<B>(src, from(dst)) & naive_slider_attacks<B>(dst, from(src));
+            if (naive_slider_attacks<R>(src, EmptyBB) & from(dst))
+                BTWN_BB[src][dst] = naive_slider_attacks<R>(src, from(dst)) & naive_slider_attacks<R>(dst, from(src));
+        }
     }
 
     for (Square sq = A1; sq <= H8; ++sq) {

@@ -1,41 +1,11 @@
-#pragma once
+#include "move.hpp"
 
 #include "board.hpp"
 #include "defs.hpp"
-#include "move_defs.hpp"
+#include "mask.hpp"
 #include "zobrist.hpp"
 
 namespace Lyra {
-
-/******************************************\
-|==========================================|
-|            Piece Manipulation            |
-|==========================================|
-\******************************************/
-
-template <Colour C>
-constexpr void Board::set_piece(Piece pc, Square sq) {
-    colourBB[C]        |= BBUtils::from(sq);
-    pieceBB[pt_of(pc)] |= BBUtils::from(sq);
-    board[sq]           = pc;
-}
-
-template <Colour C>
-constexpr void Board::pop_piece(Square sq) {
-    const Piece pc      = board[sq];
-    colourBB[C]        &= ~BBUtils::from(sq);
-    pieceBB[pt_of(pc)] &= ~BBUtils::from(sq);
-    board[sq]           = NoPiece;
-}
-
-template <Colour C>
-constexpr void Board::move_piece(Square src, Square dst) {
-    const Piece pc      = board[src];
-    colourBB[C]        ^= BBUtils::from(src) ^ BBUtils::from(dst);
-    pieceBB[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
-    board[src]          = NoPiece;
-    board[dst]          = pc;
-}
 
 /******************************************\
 |==========================================|
@@ -44,7 +14,7 @@ constexpr void Board::move_piece(Square src, Square dst) {
 \******************************************/
 
 template <Colour Us>
-constexpr void Board::do_move(Move move) {
+void Board::do_move(Move move) {
     constexpr Colour Them = ~Us;
     constexpr Piece  King = make_piece(Us, K);
     constexpr Piece  Rook = make_piece(Us, R);
@@ -57,7 +27,7 @@ constexpr void Board::do_move(Move move) {
     Square           rook_dst, king_dst, ep_sq;
     bool             queen_side;
 
-    half_mv += 1;
+    _half_mv++;
 
     // Initialise new state
     UndoState* prev  = _state++;
@@ -65,8 +35,9 @@ constexpr void Board::do_move(Move move) {
     _state->castling = prev->castling;
     _state->fifty_mv = prev->fifty_mv + 1;
     //
-    Piece cap = _state->cap = on(dst);
-    Key   key               = prev->key;
+    Piece cap        = on(dst);
+    _state->cap      = cap;
+    Zobrist::Key key = prev->key;
     // Update key if enpassant is reset
     key        ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
     _state->ep  = NoSquare;
@@ -76,8 +47,7 @@ constexpr void Board::do_move(Move move) {
         move_piece<Us>(src, dst);
         key ^= Zobrist::PIECE_KEYS[src][pc];
         key ^= Zobrist::PIECE_KEYS[dst][pc];
-        if (pc == Pawn)
-            _state->fifty_mv = 0;
+        if (pc == Pawn) _state->fifty_mv = 0;
         break;
     case Cap:
         pop_piece<Them>(dst);
@@ -92,7 +62,7 @@ constexpr void Board::do_move(Move move) {
         key              ^= Zobrist::PIECE_KEYS[src][pc];
         key              ^= Zobrist::PIECE_KEYS[dst][pc];
         _state->ep        = forward<Us>(src);
-        _state->key      ^= Zobrist::EP_KEYS[file_of(_state->ep)];
+        key              ^= Zobrist::EP_KEYS[file_of(_state->ep)];
         _state->fifty_mv  = 0;
         break;
     case KingCastle:
@@ -147,10 +117,12 @@ constexpr void Board::do_move(Move move) {
     // Update side to move and keys
     _state->key = key ^ Zobrist::SIDE_KEY;
     _stm        = ~_stm;
+
+    update_masks<Them>();
 }
 
 template <Colour Us>
-constexpr void Board::undo_move() {
+void Board::undo_move() {
     constexpr Colour Them = ~Us;
     constexpr Piece  King = make_piece(Us, K);
     constexpr Piece  Pawn = make_piece(Us, P);
@@ -204,7 +176,12 @@ constexpr void Board::undo_move() {
 
     _state--;
     _stm = ~_stm;
-    half_mv--;
+    _half_mv--;
 }
+
+template void Board::do_move<White>(Move move);
+template void Board::do_move<Black>(Move move);
+template void Board::undo_move<White>();
+template void Board::undo_move<Black>();
 
 }  // namespace Lyra

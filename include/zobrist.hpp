@@ -5,6 +5,8 @@
 
 namespace Lyra::Zobrist {
 
+using Key = U64;
+
 static NDArray<Key, NSquare, NPiece> PIECE_KEYS;
 static Key                           SIDE_KEY;
 static NDArray<Key, NCastling>       CASTLE_KEYS;

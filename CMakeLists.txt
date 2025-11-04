@@ -12,10 +12,12 @@ set(
     src/main.cpp
     src/bitboard.cpp
     src/board.cpp
+    src/move.cpp
+    src/perft.cpp
 )
 
 add_executable(Lyra ${SOURCES})
 
 target_compile_options(Lyra PRIVATE
- -g -std=c++20
+ -g -O3 -DUSE_PEXT -Wall -std=c++20 -flto -fno-rtti -msse2 -msse3 -msse4 -msse4.1 -mpopcnt -mavx2 -mbmi -mbmi2 -mmmx -funroll-loops -finline -fomit-frame-pointer
 )

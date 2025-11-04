@@ -1,5 +1,7 @@
 #pragma once
 
+#include <immintrin.h>
+
 #include "defs.hpp"
 #include "immintrin.h"
 #include "utils.hpp"
@@ -40,9 +42,12 @@ constexpr BB from(Square sq) { return 1ULL << sq; }
 constexpr BB from(Rank r) { return Rank1BB << (r * 8); }
 constexpr BB from(File f) { return FileABB << f; }
 
-inline U64    pext(BB bb, BB mask) { return _pext_u64(bb, mask); }
-inline Square lsb(BB bb) { return static_cast<Square>(__builtin_ctzll(bb)); }
-inline int    count(BB bb) { return __builtin_popcountll(bb); }
+#ifdef USE_PEXT
+inline U64 pext(BB bb, BB mask) { return _pext_u64(bb, mask); }
+#endif
+inline Square lsb(BB bb) { return static_cast<Square>(_tzcnt_u64(bb)); }
+inline int    count(BB bb) { return _mm_popcnt_u64(bb); }
+constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>
 constexpr void loop(BB bb, Func&& func) {
@@ -62,13 +67,18 @@ constexpr BB shift(BB b) {
     switch (D) {
     case N: return b << 8;
     case S: return b >> 8;
-    case E: return (b & ~from(File::FileH)) << 1;
-    case W: return (b & ~from(File::FileA)) >> 1;
-    case NE: return (b & ~from(File::FileH)) << 9;
-    case NW: return (b & ~from(File::FileA)) << 7;
-    case SE: return (b & ~from(File::FileH)) >> 7;
-    case SW: return (b & ~from(File::FileA)) >> 9;
+    case E: return (b & ~from(FileH)) << 1;
+    case W: return (b & ~from(FileA)) >> 1;
+    case NE: return (b & ~from(FileH)) << 9;
+    case NW: return (b & ~from(FileA)) << 7;
+    case SE: return (b & ~from(FileH)) >> 7;
+    case SW: return (b & ~from(FileA)) >> 9;
     }
+}
+
+template <Direction D1, Direction D2, Direction... Ds>
+constexpr BB shift(BB b) {
+    return shift<D1>(b) | shift<D2, Ds...>(b);
 }
 
 /******************************************\
@@ -97,6 +107,12 @@ extern NDArray<Magic, NSquare>       BISHOP_ATK;
 extern NDArray<Magic, NSquare>       ROOK_ATK;
 extern NDArray<BB, NSquare, NSquare> BTWN_BB;
 extern NDArray<BB, NSquare, NSquare> CHECK_BB;
+
+template <Colour C>
+constexpr BB pawn_attack(BB bb) {
+    using enum Direction;
+    return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
+}
 
 }  // namespace BBUtils
 

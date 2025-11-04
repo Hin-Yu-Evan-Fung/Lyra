@@ -3,7 +3,7 @@
 #include "bitboard.hpp"
 #include "castling.hpp"
 #include "defs.hpp"
-#include "move_defs.hpp"
+#include "move.hpp"
 #include "utils.hpp"
 #include "zobrist.hpp"
 
@@ -16,18 +16,18 @@ namespace Lyra {
 \******************************************/
 
 // Undo state, used for do_move and undo_move
-struct UndoState {
+struct alignas(64) UndoState {
     Piece  cap;
     Castle castling;
     Square ep;
 
-    I8   fifty_mv;
-    Move mv;
-    Key  key;
-    Key  pawn_key;
+    I8           fifty_mv;
+    Move         mv;
+    Zobrist::Key key;
+    Zobrist::Key pawn_key;
 
     BB   check_mask, diag_pin, hv_pin, attacked;
-    bool can_ep;
+    bool ep_pin;
 };
 
 /******************************************\
@@ -43,11 +43,11 @@ private:
     NDArray<Piece, NSquare> board;
 
     Colour     _stm;
-    U16        half_mv;
+    U16        _half_mv;
     CastleMask _castling_mask;
 
     UndoState* _state;
-    UndoState* history;
+    UndoState* _history;
 
     template <Colour C>
     constexpr void set_piece(Piece pc, Square sq);
@@ -56,10 +56,16 @@ private:
     template <Colour C>
     constexpr void move_piece(Square src, Square dst);
 
-    template <Colour C>
+    template <Colour Us>
     constexpr void update_masks();
-    template <Colour C>
+    template <Colour Us, bool inCheck>
+    constexpr void update_pin_and_check_masks();
+    template <Colour Us>
+    constexpr void update_ep_pin();
+    template <Colour Us>
     constexpr BB checkers();
+    template <Colour Us>
+    constexpr BB threatened();
 
 public:
     Board();
@@ -73,9 +79,12 @@ public:
     std::string fen() const;
 
     template <Colour Us>
-    constexpr void do_move(Move move);
+    void do_move(Move move);
     template <Colour Us>
-    constexpr void undo_move();
+    void undo_move();
+
+    Zobrist::Key compute_key() const;
+    Zobrist::Key compute_pawn_key() const;
 
     constexpr BB bb() const;
     constexpr BB bb(Colour c) const;
@@ -111,7 +120,7 @@ constexpr CastleMask Board::castling_mask() const { return _castling_mask; }
 |==========================================|
 \******************************************/
 
-constexpr BB Board::bb() const { return colourBB[White] & colourBB[Black]; }
+constexpr BB Board::bb() const { return colourBB[White] | colourBB[Black]; }
 constexpr BB Board::bb(Colour c) const { return colourBB[c]; }
 constexpr BB Board::bb(PieceType pt) const { return pieceBB[pt]; }
 constexpr BB Board::bb(Piece pc) const { return bb(colour_of(pc)) & bb(pt_of(pc)); }
@@ -129,6 +138,34 @@ constexpr Square Board::ksq() const {
     return BBUtils::lsb(bb(make_piece(C, K)));
 }
 
-}  // namespace Lyra
+/******************************************\
+|==========================================|
+|            Piece Manipulation            |
+|==========================================|
+\******************************************/
 
-#include "move_impl.hpp"
+template <Colour C>
+constexpr void Board::set_piece(Piece pc, Square sq) {
+    colourBB[C]        |= BBUtils::from(sq);
+    pieceBB[pt_of(pc)] |= BBUtils::from(sq);
+    board[sq]           = pc;
+}
+
+template <Colour C>
+constexpr void Board::pop_piece(Square sq) {
+    const Piece pc      = board[sq];
+    colourBB[C]        &= ~BBUtils::from(sq);
+    pieceBB[pt_of(pc)] &= ~BBUtils::from(sq);
+    board[sq]           = NoPiece;
+}
+
+template <Colour C>
+constexpr void Board::move_piece(Square src, Square dst) {
+    const Piece pc      = board[src];
+    colourBB[C]        ^= BBUtils::from(src) ^ BBUtils::from(dst);
+    pieceBB[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
+    board[src]          = NoPiece;
+    board[dst]          = pc;
+}
+
+}  // namespace Lyra

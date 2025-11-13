@@ -11,6 +11,14 @@ namespace Lyra {
 
 /******************************************\
 |==========================================|
+|            Useful fen strings            |
+|==========================================|
+\******************************************/
+
+constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ";
+
+/******************************************\
+|==========================================|
 |                Undo State                |
 |==========================================|
 \******************************************/
@@ -78,6 +86,7 @@ public:
     void        print() const;
     std::string fen() const;
 
+    void do_move(Move move);
     template <Colour Us>
     void do_move(Move move);
     template <Colour Us>

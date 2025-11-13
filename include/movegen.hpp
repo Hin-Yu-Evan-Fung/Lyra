@@ -249,4 +249,14 @@ constexpr void enum_moves(const Board& board, Handler&& handler) {
     }
 }
 
+constexpr std::vector<Move> list_moves(const Board& board) {
+    std::vector<Move> moves;
+
+    auto append = [&](Move move) { moves.push_back(move); };
+
+    board.stm() == White ? enum_moves<White, GenAll>(board, append) : enum_moves<Black, GenAll>(board, append);
+
+    return moves;
+}
+
 }  // namespace Lyra

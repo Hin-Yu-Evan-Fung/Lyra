@@ -1,15 +1,11 @@
-#include "bitboard.hpp"
-#include "perft.hpp"
-#include "zobrist.hpp"
+#include "uci.hpp"
 
 using namespace Lyra;
 
 int main() {
-    BBUtils::init();
-    Zobrist::init();
+    UCI uci;
 
-    for (int i = 0; i < 10; i++)
-        perft_bench();
+    uci.loop();
 
     return 0;
 }

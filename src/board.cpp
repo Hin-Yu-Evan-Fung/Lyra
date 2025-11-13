@@ -1,5 +1,6 @@
 #include "board.hpp"
 
+#include <cassert>
 #include <ios>
 #include <iostream>
 #include <sstream>
@@ -118,6 +119,11 @@ void Board::set(const std::string& fen) {
     _half_mv         = I8(full_mv - 1) * 2 + I8(_stm);
 
     _state->key      = compute_key();
+
+    // Basic board legality checks
+    if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
+    if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
+
     _stm == White ? update_masks<White>() : update_masks<Black>();
 }
 

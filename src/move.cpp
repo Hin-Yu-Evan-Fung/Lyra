@@ -13,6 +13,8 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
+void Board::do_move(Move move) { return _stm == White ? do_move<White>(move) : do_move<Black>(move); }
+
 template <Colour Us>
 void Board::do_move(Move move) {
     constexpr Colour Them = ~Us;

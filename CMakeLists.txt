@@ -14,6 +14,8 @@ set(
     src/board.cpp
     src/move.cpp
     src/perft.cpp
+    src/engine.cpp
+    src/uci.cpp
 )
 
 add_executable(Lyra ${SOURCES})

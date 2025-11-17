@@ -5,8 +5,7 @@
 
 namespace Lyra {
 
-template <bool Div, Colour Us>
-U64 perft(Board& board, Depth depth);
+void perft(Board& board, Depth d);
 
 void perft_bench();
 

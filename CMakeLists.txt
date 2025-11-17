@@ -14,6 +14,7 @@ set(
     src/board.cpp
     src/move.cpp
     src/perft.cpp
+    src/thread.cpp
     src/engine.cpp
     src/uci.cpp
 )

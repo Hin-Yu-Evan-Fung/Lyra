@@ -20,24 +20,19 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-Board::Board() {
-    _history = new UndoState[MAX_DEPTH];
-    reset();
-}
-
-Board::~Board() { delete[] _history; }
+Board::Board() { reset(); }
 
 void Board::reset() {
-    _half_mv         = 0;
-    _state           = _history;
-    _state->castling = NoCastle;
-    _state->ep       = NoSquare;
-    _state->fifty_mv = 0;
+    half_mv_         = 0;
+    state_           = history_.data();
+    state_->castling = NoCastle;
+    state_->ep       = NoSquare;
+    state_->fifty_mv = 0;
 
-    pieceBB.fill(BBUtils::EmptyBB);
-    colourBB.fill(BBUtils::EmptyBB);
-    board.fill(NoPiece);
-    _castling_mask.reset();
+    pieceBB_.fill(BBUtils::EmptyBB);
+    colourBB_.fill(BBUtils::EmptyBB);
+    board_.fill(NoPiece);
+    castling_mask_.reset();
 }
 
 void Board::set(const std::string& fen) {
@@ -72,7 +67,7 @@ void Board::set(const std::string& fen) {
 
     // 2. Parse side to move
     ss >> std::skipws >> part;
-    _stm = part[0] == 'w' ? White : Black;
+    stm_ = part[0] == 'w' ? White : Black;
 
     // 3. Parse castling
     ss >> std::skipws >> part;
@@ -90,41 +85,41 @@ void Board::set(const std::string& fen) {
             while (on(rsq) != rook)
                 --rsq;
             castling = CastleMask::get_mask(s, false);
-            _castling_mask.add_rights(ksq, rsq, castling);
+            castling_mask_.add_rights(ksq, rsq, castling);
         } else if (upper == 'Q') {
             rsq = relative(s, A1);
             while (on(rsq) != rook)
                 ++rsq;
             castling = CastleMask::get_mask(s, true);
-            _castling_mask.add_rights(ksq, rsq, castling);
+            castling_mask_.add_rights(ksq, rsq, castling);
         } else if (upper >= 'A' && upper <= 'H') {
             rsq      = relative(s, make_square(char2file(upper), Rank1));
             castling = CastleMask::get_mask(s, ksq > rsq);
-            _castling_mask.add_rights(ksq, rsq, castling);
+            castling_mask_.add_rights(ksq, rsq, castling);
         }
 
-        _state->castling |= castling;
+        state_->castling |= castling;
     }
 
     // 4. Parse enpassant
     ss >> std::skipws >> part;
-    _state->ep = NoSquare;
-    if (part.length() == 2) { _state->ep = str2sq(part); }
+    state_->ep = NoSquare;
+    if (part.length() == 2) { state_->ep = str2sq(part); }
 
     int fifty_mv, full_mv;
     ss >> std::skipws >> fifty_mv;
     ss >> std::skipws >> full_mv;
 
-    _state->fifty_mv = I8(fifty_mv);
-    _half_mv         = I8(full_mv - 1) * 2 + I8(_stm);
+    state_->fifty_mv = I8(fifty_mv);
+    half_mv_         = I8(full_mv - 1) * 2 + I8(stm_);
 
-    _state->key      = compute_key();
+    state_->key      = compute_key();
 
     // Basic board legality checks
     if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
     if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
 
-    _stm == White ? update_masks<White>() : update_masks<Black>();
+    stm_ == White ? update_masks<White>() : update_masks<Black>();
 }
 
 void Board::print() const {
@@ -143,10 +138,10 @@ void Board::print() const {
     std::cout << "\n";
     std::cout << "       A   B   C   D   E   F   G   H\n\n";
     std::cout << "Fen: " << fen() << "\n";
-    std::cout << "Side to move: " << (_stm == Colour::White ? "White" : "Black") << "\n";
-    std::cout << "Castling rights: " << _castling_mask.to_str(_state->castling) << "\n";
-    std::cout << "Enpassant square: " << to_str(_state->ep) << "\n";
-    std::cout << "Hash key: " << std::hex << _state->key << std::dec << "\n";
+    std::cout << "Side to move: " << (stm_ == Colour::White ? "White" : "Black") << "\n";
+    std::cout << "Castling rights: " << castling_mask_.to_str(state_->castling) << "\n";
+    std::cout << "Enpassant square: " << to_str(state_->ep) << "\n";
+    std::cout << "Hash key: " << std::hex << state_->key << std::dec << "\n";
 }
 
 std::string Board::fen() const {
@@ -173,11 +168,11 @@ std::string Board::fen() const {
             out << '/';
     }
 
-    out << " " << (_stm == Colour::White ? "w" : "b");
-    out << " " << _castling_mask.to_str(_state->castling);
-    out << " " << (_state->ep != NoSquare ? to_str(_state->ep) : "-");
-    out << " " << int(_state->fifty_mv);
-    out << " " << _half_mv / 2 + 1;
+    out << " " << (stm_ == Colour::White ? "w" : "b");
+    out << " " << castling_mask_.to_str(state_->castling);
+    out << " " << (state_->ep != NoSquare ? to_str(state_->ep) : "-");
+    out << " " << int(state_->fifty_mv);
+    out << " " << half_mv_ / 2 + 1;
 
     return out.str();
 }
@@ -196,10 +191,10 @@ Zobrist::Key Board::compute_key() const {
         if (pc != NoPiece) key ^= Zobrist::PIECE_KEYS[sq][pc];
     }
 
-    if (_stm == Black) key ^= Zobrist::SIDE_KEY;
-    if (_state->ep != NoSquare) key ^= Zobrist::EP_KEYS[_state->ep];
+    if (stm_ == Black) key ^= Zobrist::SIDE_KEY;
+    if (state_->ep != NoSquare) key ^= Zobrist::EP_KEYS[state_->ep];
 
-    key ^= Zobrist::CASTLE_KEYS[_state->castling];
+    key ^= Zobrist::CASTLE_KEYS[state_->castling];
 
     return key;
 }

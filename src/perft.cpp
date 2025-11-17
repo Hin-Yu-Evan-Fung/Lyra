@@ -29,16 +29,27 @@ U64 perft(Board& board, Depth depth) {
 
         total += n;
 
-        if (Div && n > 0) std::cout << to_str(move) << ": " << n << "\n";
+        if (Div && n > 0) printf("       %s: %lu\n", to_str(move).data(), n);
     });
 
     return total;
 }
 
-template U64 perft<true, Colour::White>(Board&, Depth);
-template U64 perft<true, Colour::Black>(Board&, Depth);
-template U64 perft<false, Colour::White>(Board&, Depth);
-template U64 perft<false, Colour::Black>(Board&, Depth);
+void perft(Board& board, Depth d) {
+    printf("========   PERFT   ========\n\n");
+
+    Time start   = now();
+    U64  nodes   = board.stm() == White ? perft<true, White>(board, d) : perft<true, Black>(board, d);
+    Time elapsed = now() - start;
+
+    int nps      = 0;
+    if (elapsed > 0) { nps = nodes * 1000 / elapsed; }
+
+    printf("\n========  RESULTS  ========\n");
+    printf("       time: %lu ms          \n", elapsed);
+    printf("        nps: %.1f Mnps         \n", (float)nps / 1e6);
+    printf("===========================  \n");
+}
 
 struct BenchTestCase {
     std::string fen;
@@ -98,16 +109,14 @@ BenchTestCase tests[] = {
 void perft_bench() {
     Board board;
     U64   nodes;
-    std::cout << "=========================  START BENCH  =========================\n";
+    std::cout << "==================================================  START BENCH  "
+                 "==================================================\n";
     for (auto& [fen, depth, validation] : tests) {
         board.set(fen);
 
-        Time start = now();
+        Time start   = now();
 
-        if (board.stm() == Colour::White)
-            nodes = perft<false, Colour::White>(board, depth);
-        else
-            nodes = perft<false, Colour::Black>(board, depth);
+        nodes        = board.stm() == White ? perft<false, White>(board, depth) : perft<false, Black>(board, depth);
 
         Time elapsed = now() - start;
 
@@ -120,6 +129,10 @@ void perft_bench() {
                   << ", nps: " << nps << ", Fen: " << fen
                   << "\n";
         // clang-format on
+
+        if (nodes != validation) return;
     }
+    std::cout << "==================================================  ALL PASSED  "
+                 "==================================================\n";
 }
 }  // namespace Lyra

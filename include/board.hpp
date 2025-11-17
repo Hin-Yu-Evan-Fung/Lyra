@@ -24,7 +24,7 @@ constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK
 \******************************************/
 
 // Undo state, used for do_move and undo_move
-struct alignas(64) UndoState {
+struct alignas(64) Undo {
     Piece  cap;
     Castle castling;
     Square ep;
@@ -46,16 +46,16 @@ struct alignas(64) UndoState {
 
 struct Board {
 private:
-    NDArray<BB, NPieceType> pieceBB;
-    NDArray<BB, NColour>    colourBB;
-    NDArray<Piece, NSquare> board;
+    NDArray<BB, NPieceType> pieceBB_;
+    NDArray<BB, NColour>    colourBB_;
+    NDArray<Piece, NSquare> board_;
 
-    Colour     _stm;
-    U16        _half_mv;
-    CastleMask _castling_mask;
+    Colour     stm_;
+    U16        half_mv_;
+    CastleMask castling_mask_;
 
-    UndoState* _state;
-    UndoState* _history;
+    Undo*                    state_;
+    NDArray<Undo, MAX_DEPTH> history_;
 
     template <Colour C>
     constexpr void set_piece(Piece pc, Square sq);
@@ -77,8 +77,9 @@ private:
 
 public:
     Board();
-    ~Board();
-    Board(Board& board) = delete;  // No Copying
+
+    Board(const Board& board)      = delete;  // No Copying
+    Board& operator=(const Board&) = delete;
 
     void set(const std::string& fen);
     void reset();
@@ -108,8 +109,8 @@ public:
     constexpr Colour     stm() const;
     constexpr CastleMask castling_mask() const;
 
-    constexpr UndoState* state();
-    constexpr UndoState* state() const;
+    constexpr Undo* state();
+    constexpr Undo* state() const;
 };
 
 /******************************************\
@@ -118,10 +119,10 @@ public:
 |==========================================|
 \******************************************/
 
-constexpr UndoState* Board::state() { return _state; }
-constexpr UndoState* Board::state() const { return _state; }
-constexpr Colour     Board::stm() const { return _stm; }
-constexpr CastleMask Board::castling_mask() const { return _castling_mask; }
+constexpr Undo*      Board::state() { return state_; }
+constexpr Undo*      Board::state() const { return state_; }
+constexpr Colour     Board::stm() const { return stm_; }
+constexpr CastleMask Board::castling_mask() const { return castling_mask_; }
 
 /******************************************\
 |==========================================|
@@ -129,9 +130,9 @@ constexpr CastleMask Board::castling_mask() const { return _castling_mask; }
 |==========================================|
 \******************************************/
 
-constexpr BB Board::bb() const { return colourBB[White] | colourBB[Black]; }
-constexpr BB Board::bb(Colour c) const { return colourBB[c]; }
-constexpr BB Board::bb(PieceType pt) const { return pieceBB[pt]; }
+constexpr BB Board::bb() const { return colourBB_[White] | colourBB_[Black]; }
+constexpr BB Board::bb(Colour c) const { return colourBB_[c]; }
+constexpr BB Board::bb(PieceType pt) const { return pieceBB_[pt]; }
 constexpr BB Board::bb(Piece pc) const { return bb(colour_of(pc)) & bb(pt_of(pc)); }
 constexpr BB Board::bb(Piece pc1, Piece pc2) const { return bb(pc1) | bb(pc2); }
 
@@ -141,7 +142,7 @@ constexpr BB Board::bb(Piece pc1, Piece pc2) const { return bb(pc1) | bb(pc2); }
 |==========================================|
 \******************************************/
 
-constexpr Piece Board::on(Square sq) const { return board[sq]; }
+constexpr Piece Board::on(Square sq) const { return board_[sq]; }
 template <Colour C>
 constexpr Square Board::ksq() const {
     return BBUtils::lsb(bb(make_piece(C, K)));
@@ -155,26 +156,26 @@ constexpr Square Board::ksq() const {
 
 template <Colour C>
 constexpr void Board::set_piece(Piece pc, Square sq) {
-    colourBB[C]        |= BBUtils::from(sq);
-    pieceBB[pt_of(pc)] |= BBUtils::from(sq);
-    board[sq]           = pc;
+    colourBB_[C]        |= BBUtils::from(sq);
+    pieceBB_[pt_of(pc)] |= BBUtils::from(sq);
+    board_[sq]           = pc;
 }
 
 template <Colour C>
 constexpr void Board::pop_piece(Square sq) {
-    const Piece pc      = board[sq];
-    colourBB[C]        &= ~BBUtils::from(sq);
-    pieceBB[pt_of(pc)] &= ~BBUtils::from(sq);
-    board[sq]           = NoPiece;
+    const Piece pc       = board_[sq];
+    colourBB_[C]        &= ~BBUtils::from(sq);
+    pieceBB_[pt_of(pc)] &= ~BBUtils::from(sq);
+    board_[sq]           = NoPiece;
 }
 
 template <Colour C>
 constexpr void Board::move_piece(Square src, Square dst) {
-    const Piece pc      = board[src];
-    colourBB[C]        ^= BBUtils::from(src) ^ BBUtils::from(dst);
-    pieceBB[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
-    board[src]          = NoPiece;
-    board[dst]          = pc;
+    const Piece pc       = board_[src];
+    colourBB_[C]        ^= BBUtils::from(src) ^ BBUtils::from(dst);
+    pieceBB_[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
+    board_[src]          = NoPiece;
+    board_[dst]          = pc;
 }
 
 }  // namespace Lyra

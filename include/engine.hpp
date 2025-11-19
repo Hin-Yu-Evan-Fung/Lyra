@@ -5,6 +5,7 @@
 
 #include "board.hpp"
 #include "defs.hpp"
+#include "perft.hpp"
 #include "search.hpp"
 #include "thread.hpp"
 
@@ -21,25 +22,31 @@ constexpr std::string_view AUTHOR  = "Evan Fung";
 constexpr std::string_view VERSION = "1.0";
 
 constexpr size_t HASH_SIZE         = 32;
-constexpr size_t THREADS           = 64;
+constexpr size_t THREADS           = 1;
 constexpr int    MOVE_OVERHEAD     = 300;
+constexpr U64    CLOCK_FREQ        = 2048;
 
 class Engine {
-public:
-    Engine();
+ public:
+  Engine();
 
-    void wait_for_search_finish();
-    void set_pos(const std::string fen, const std::vector<std::string>& moves);
-    void print_pos();
+  void wait() { pool_.wait(); }
+  bool is_busy() { return pool_.is_busy(); }
+  void set_pos(const std::string fen, const std::vector<std::string>& moves);
+  void print_pos() { board_.print(); }
 
-    void perft(Depth d);
-    void go(SearchConfig sc);
-    void stop();
-    void newgame();
+  template <PerftMode PM>
+  void perft(Depth d);
+  void perft_bench();
+  void go(const TimeControl& tc);
+  void newgame();
+  void stop() { pool_.stop(); }
 
-private:
-    Board      board_;
-    ThreadPool pool_;
+  void set_threads(size_t num);
+
+ private:
+  Board      board_;
+  ThreadPool pool_;
 };
 
 }  // namespace Lyra

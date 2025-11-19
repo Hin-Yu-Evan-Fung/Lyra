@@ -3,44 +3,52 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <vector>
+
+#include "search.hpp"
 
 namespace Lyra {
 
-struct Thread {
-public:
-    Thread() : stop_(false), running_(false), thread_(&Thread::loop, this) {}
-    Thread(Thread&& th) : stop_(th.stop_.load()), running_(th.running_.load()), thread_(std::move(th.thread_)) {}
-    ~Thread() { stop(); }
+class Thread {
+ public:
+  Thread(std::atomic_bool& stop, size_t id);
+  ~Thread();
 
-    void wait();
-    void stop();
-    void exec(std::function<void()> func);
+  void wait();
+  void exec(std::function<void(Thread&)> func);
 
-private:
-    void loop();
+  bool is_main() { return id_ == 0; }
+  bool is_busy() { return busy_; }
 
-    std::condition_variable cv_;
-    std::mutex              mtx_;
-    std::atomic_bool        stop_;
-    std::atomic_bool        running_;
-    std::thread             thread_;
-    std::function<void()>   func_;
+  size_t id_;
+  Worker worker_;
+
+ private:
+  void loop();
+
+  std::condition_variable      cv_;
+  std::mutex                   mtx_;
+  std::atomic_bool             exit_;
+  std::atomic_bool             busy_;
+  std::thread                  thread_;
+  std::function<void(Thread&)> func_;
 };
 
-struct ThreadPool {
-public:
-    ThreadPool(size_t num) : threads_(num) {}
-    ~ThreadPool() { stop(); }
+class ThreadPool {
+ public:
+  ThreadPool(size_t num);
+  ~ThreadPool() { threads_.clear(); }
 
-    void resize(size_t num);
-    void exec_all(std::function<void()> func);
-    void stop();
-    void wait();
+  void resize(size_t num);
+  void wait();
+  void exec(std::function<void(Thread&)> func);
+  void stop();
+  bool is_busy();
 
-private:
-    std::vector<Thread> threads_;
-    std::atomic_bool    stop_;
+  std::atomic_bool stop_;  // Used by main worker and clock
+ private:
+  std::vector<std::unique_ptr<Thread>> threads_;
 };
 
 }  // namespace Lyra

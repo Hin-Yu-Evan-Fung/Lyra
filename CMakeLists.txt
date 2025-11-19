@@ -15,6 +15,10 @@ set(
     src/move.cpp
     src/perft.cpp
     src/thread.cpp
+    src/movepick.cpp
+    src/clock.cpp
+    src/eval.cpp
+    src/search.cpp
     src/engine.cpp
     src/uci.cpp
 )

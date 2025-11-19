@@ -1,24 +1,10 @@
 #pragma once
 
-#include <array>
 #include <chrono>
-#include <cstddef>
 
 #include "defs.hpp"
 
 namespace Lyra {
-
-/******************************************\
-|==========================================|
-|                 ND Array                 |
-|==========================================|
-\******************************************/
-
-template <typename T, size_t A, size_t... B>
-struct NDArray : public std::array<NDArray<T, B...>, A> {};
-
-template <typename T, size_t A>
-struct NDArray<T, A> : public std::array<T, A> {};
 
 /******************************************\
 |==========================================|
@@ -27,29 +13,29 @@ struct NDArray<T, A> : public std::array<T, A> {};
 \******************************************/
 
 struct PRNG {
-public:
-    PRNG() : PRNG(0x6B51FF299F6A3AEE) {}
-    PRNG(U64 seed) {
-        s0 = seed;
-        s1 = seed * 2;
-        s2 = seed / 5;
-        s3 = seed + seed / 2;
-    }
+ public:
+  PRNG() : PRNG(0x6B51FF299F6A3AEE) {}
+  PRNG(U64 seed) {
+    s0 = seed;
+    s1 = seed * 2;
+    s2 = seed / 5;
+    s3 = seed + seed / 2;
+  }
 
-    U64 random() {
-        U64 tmp  = s1 << 17;
-        s2      ^= s0;
-        s3      ^= s1;
-        s1      ^= s2;
-        s0      ^= s3;
-        s2      ^= tmp;
-        s3       = std::rotl(s3, 45);
+  U64 random() {
+    U64 tmp  = s1 << 17;
+    s2      ^= s0;
+    s3      ^= s1;
+    s1      ^= s2;
+    s0      ^= s3;
+    s2      ^= tmp;
+    s3       = std::rotl(s3, 45);
 
-        return s0;
-    }
+    return s0;
+  }
 
-private:
-    U64 s0, s1, s2, s3;
+ private:
+  U64 s0, s1, s2, s3;
 };
 
 /******************************************\
@@ -61,10 +47,10 @@ private:
 using Time = uint64_t;
 
 inline Time now() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::high_resolution_clock::now().time_since_epoch()
-    )
-        .count();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+           std::chrono::high_resolution_clock::now().time_since_epoch()
+  )
+    .count();
 }
 
 /******************************************\
@@ -75,12 +61,10 @@ inline Time now() {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
-constexpr std::string to_str(File f) { return {static_cast<char>(f + 'a')}; }
-constexpr std::string to_str(Rank r) { return {static_cast<char>(r + '1')}; }
-constexpr std::string to_str(Square sq) { return to_str(file_of(sq)) + to_str(rank_of(sq)); }
-constexpr std::string to_str(Piece pc) { return {PIECE_STR.at(pc)}; }
-constexpr std::string to_str(PieceType pt) { return to_str(make_piece(Colour::Black, pt)); }
-constexpr std::string to_str(Colour c) { return (c == Colour::White ? "white" : "black"); }
+constexpr char        to_char(File f) { return static_cast<char>(f + 'a'); }
+constexpr char        to_char(Rank r) { return static_cast<char>(r + '1'); }
+constexpr std::string to_str(Square sq) { return {to_char(file_of(sq)), to_char(rank_of(sq))}; }
+constexpr char        to_char(Piece pc) { return PIECE_STR.at(pc); }
 
 constexpr File   char2file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
 constexpr Rank   char2rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }

@@ -1,11 +1,16 @@
+#include "eval.hpp"
 #include "uci.hpp"
 
 using namespace Lyra;
 
 int main() {
-    UCI uci;
+  BBUtils::init();
+  Zobrist::init();
+  EvalUtils::init();
 
-    uci.loop();
+  UCI uci;
 
-    return 0;
+  uci.loop();
+
+  return 0;
 }

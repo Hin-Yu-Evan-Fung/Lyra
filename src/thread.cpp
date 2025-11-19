@@ -1,7 +1,6 @@
 #include "thread.hpp"
 
 #include <functional>
-#include <memory>
 #include <mutex>
 
 namespace Lyra {
@@ -12,42 +11,46 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
+Thread::Thread(std::atomic_bool& stop, size_t id)
+  : id_(id), worker_(stop, id), exit_(false), busy_(false), thread_(&Thread::loop, this) {}
+
+Thread::~Thread() {
+  exit_ = true;
+  cv_.notify_one();  // Notify the idle loop that the loop must exit as soon as possible
+  if (thread_.joinable()) thread_.join();
+}
+
 void Thread::wait() {
+  std::unique_lock<std::mutex> lock(mtx_);
+  cv_.wait(lock, [&] { return !busy_; });
+}
+
+void Thread::exec(std::function<void(Thread&)> func) {
+  {
     std::unique_lock<std::mutex> lock(mtx_);
-    cv_.wait(lock, [&] { return !running_; });
-}
-
-void Thread::stop() {
-    stop_ = true;
-    cv_.notify_all();  // Stop threads with stop == true;
-    if (thread_.joinable()) thread_.join();
-}
-
-void Thread::exec(std::function<void()> func) {
-    {
-        std::unique_lock<std::mutex> lock(mtx_);
-        func_ = std::move(func);
-    }
-    cv_.notify_one();
+    func_ = std::move(func);
+  }
+  cv_.notify_one();
 }
 
 void Thread::loop() {
-    while (!stop_) {
-        std::function<void()> func;
-        {
-            std::unique_lock<std::mutex> lock(mtx_);
-            cv_.wait(lock, [this] { return func_ != nullptr || stop_; });
-            if (stop_) return;
-            func  = std::move(func_);
-            func_ = nullptr;
-        }
-
-        if (func) {
-            running_ = true;
-            func();
-            running_ = false;
-        }
+  while (!exit_) {
+    std::function<void(Thread&)> func;
+    {
+      std::unique_lock<std::mutex> lock(mtx_);
+      cv_.notify_one();  // Notify any wait calls that the function is finished
+      cv_.wait(lock, [this] { return func_ != nullptr || exit_; });  // Wait for new job or exit command
+      if (exit_) return;
+      func  = std::move(func_);
+      func_ = nullptr;  // Reset the loop
     }
+
+    if (func) {
+      busy_ = true;
+      func(*this);
+      busy_ = false;
+    }
+  }
 }
 
 /******************************************\
@@ -56,32 +59,41 @@ void Thread::loop() {
 |==========================================|
 \******************************************/
 
+ThreadPool::ThreadPool(size_t num) : stop_(false) { resize(num); }
+
 void ThreadPool::resize(size_t num) {
-    wait();
+  wait();
 
-    threads_.clear();
-    threads_.reserve(num);
+  if (threads_.size() > 0) threads_.clear();
 
-    while (threads_.size() < num)
-        threads_.emplace_back();
+  threads_.reserve(num);
 
-    wait();
+  while (threads_.size() < num)
+    threads_.emplace_back(std::make_unique<Thread>(stop_, threads_.size()));
+
+  wait();
 }
 
-void ThreadPool::exec_all(std::function<void()> func) {
-    for (Thread& thread : threads_)
-        thread.exec(func);
-}
-
-void ThreadPool::stop() {
-    stop_ = true;
-    for (Thread& thread : threads_)
-        thread.stop();
+void ThreadPool::exec(std::function<void(Thread&)> func) {
+  for (auto& thread : threads_)
+    thread->exec(func);
 }
 
 void ThreadPool::wait() {
-    for (Thread& thread : threads_)
-        thread.wait();
+  for (auto& thread : threads_)
+    thread->wait();
+}
+
+bool ThreadPool::is_busy() {
+  for (auto& thread : threads_)
+    if (thread->is_busy()) return true;
+  return false;
+}
+
+void ThreadPool::stop() {
+  stop_ = true;
+  wait();
+  stop_ = false;
 }
 
 }  // namespace Lyra

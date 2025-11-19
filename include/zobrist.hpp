@@ -7,24 +7,24 @@ namespace Lyra::Zobrist {
 
 using Key = U64;
 
-static NDArray<Key, NSquare, NPiece> PIECE_KEYS;
-static Key                           SIDE_KEY;
-static NDArray<Key, NCastling>       CASTLE_KEYS;
-static NDArray<Key, NFile>           EP_KEYS;
+inline Key PIECE_KEYS[NPiece][NSquare];
+inline Key SIDE_KEY;
+inline Key CASTLE_KEYS[NCastling];
+inline Key EP_KEYS[NFile];
 
 inline void init() {
-    PRNG prng;
+  PRNG prng;
 
-    for (Square sq = A1; sq <= H8; ++sq)
-        for (Piece pc = wP; pc <= bK; ++pc)
-            PIECE_KEYS[sq][pc] = prng.random();
+  for (Square sq = A1; sq <= H8; ++sq)
+    for (Piece pc = wP; pc <= bK; ++pc)
+      PIECE_KEYS[pc][sq] = prng.random();
 
-    SIDE_KEY = prng.random();
+  SIDE_KEY = prng.random();
 
-    for (Castle cr = NoCastle; cr <= AnyCastle; ++cr)
-        CASTLE_KEYS[cr] = prng.random();
-    for (File f = FileA; f <= FileH; ++f)
-        EP_KEYS[f] = prng.random();
+  for (Castle cr = NoCastle; cr <= AnyCastle; ++cr)
+    CASTLE_KEYS[cr] = prng.random();
+  for (File f = FileA; f <= FileH; ++f)
+    EP_KEYS[f] = prng.random();
 }
 
 }  // namespace Lyra::Zobrist

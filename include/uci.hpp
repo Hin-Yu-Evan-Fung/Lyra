@@ -1,8 +1,7 @@
 #pragma once
 
-#include <string>
+#include <sstream>
 
-#include "defs.hpp"
 #include "engine.hpp"
 
 namespace Lyra {
@@ -13,17 +12,16 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-struct UCI {
-public:
-    UCI();
+class UCI {
+ public:
+  void loop();
 
-    void loop();
+ private:
+  Engine engine_;
 
-private:
-    Engine engine;
-
-    void parse_go(std::istringstream& is);
-    void parse_pos(std::istringstream& is);
+  void parse_go(std::istringstream& is);
+  void parse_pos(std::istringstream& is);
+  void parse_perft(std::istringstream& is);
 };
 
 }  // namespace Lyra

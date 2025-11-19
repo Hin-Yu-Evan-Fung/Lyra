@@ -12,11 +12,14 @@ namespace Lyra {
 
 using I8    = int8_t;
 using I16   = int16_t;
+using I32   = int32_t;
 using U8    = uint8_t;
 using U16   = uint16_t;
 using U64   = uint64_t;
 
 using Depth = I16;
+using Ply   = U16;
+using Eval  = I32;
 
 /******************************************\
 |==========================================|
@@ -24,7 +27,10 @@ using Depth = I16;
 |==========================================|
 \******************************************/
 
-constexpr std::size_t MAX_DEPTH = 256;
+constexpr Depth       MAX_DEPTH = 256;
+constexpr std::size_t MAX_MOVES = 256;
+constexpr Eval        INF       = 30000;
+constexpr Eval        DRAW      = 0;
 
 /******************************************\
 |==========================================|
@@ -84,6 +90,13 @@ enum class Direction : I8 {
     NW = 9, NE = 7, SW = -7, SE = -9,
     NoDir = 0
 };
+
+enum GamePhase : I8 {
+  MidGame,
+  Endgame,
+  NGamePhase,
+};
+
 // clang-format on
 
 /******************************************\
@@ -120,6 +133,29 @@ constexpr Piece     make_piece(Colour c, PieceType pt) noexcept { return static_
 
 /******************************************\
 |==========================================|
+|                  Score                   |
+|==========================================|
+\******************************************/
+
+struct Score {
+  Eval mg;
+  Eval eg;
+
+  constexpr Eval to_eval(int mg_phase) const {
+    if (mg_phase > 24) mg_phase = 24;
+    int eg_phase = 24 - mg_phase;
+    return (mg * mg_phase + eg * eg_phase) / 24;
+  }
+};
+
+constexpr Score  operator-(Score s) { return {-s.mg, -s.eg}; }
+constexpr Score  operator+(Score s1, Score s2) { return {s1.mg + s2.mg, s1.eg + s2.eg}; }
+constexpr Score  operator-(Score s1, Score s2) { return {s1.mg - s2.mg, s1.eg - s2.eg}; }
+constexpr Score& operator+=(Score& s1, Score s2) { return s1 = s1 + s2; }
+constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
+
+/******************************************\
+|==========================================|
 |              Misc Functions              |
 |==========================================|
 \******************************************/
@@ -130,7 +166,7 @@ constexpr Castle relative(Colour c, Castle cr) noexcept { return c == White ? cr
 
 template <Colour C>
 constexpr Square forward(Square sq) noexcept {
-    return static_cast<Square>(C == White ? sq + I8(Direction::N) : sq + I8(Direction::S));
+  return static_cast<Square>(C == White ? sq + I8(Direction::N) : sq + I8(Direction::S));
 }
 
 }  // namespace Lyra

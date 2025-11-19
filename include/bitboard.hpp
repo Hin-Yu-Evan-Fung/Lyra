@@ -4,7 +4,6 @@
 
 #include "defs.hpp"
 #include "immintrin.h"
-#include "utils.hpp"
 
 namespace Lyra {
 
@@ -51,8 +50,8 @@ constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>
 constexpr void loop(BB bb, Func&& func) {
-    for (; bb; bb &= bb - 1)
-        func(lsb(bb));
+  for (; bb; bb &= bb - 1)
+    func(lsb(bb));
 }
 
 /******************************************\
@@ -63,22 +62,22 @@ constexpr void loop(BB bb, Func&& func) {
 
 template <Direction D>
 constexpr BB shift(BB b) {
-    using enum Direction;
-    switch (D) {
-    case N: return b << 8;
-    case S: return b >> 8;
-    case E: return (b & ~from(FileH)) << 1;
-    case W: return (b & ~from(FileA)) >> 1;
-    case NE: return (b & ~from(FileH)) << 9;
-    case NW: return (b & ~from(FileA)) << 7;
-    case SE: return (b & ~from(FileH)) >> 7;
-    case SW: return (b & ~from(FileA)) >> 9;
-    }
+  using enum Direction;
+  switch (D) {
+  case N: return b << 8;
+  case S: return b >> 8;
+  case E: return (b & ~from(FileH)) << 1;
+  case W: return (b & ~from(FileA)) >> 1;
+  case NE: return (b & ~from(FileH)) << 9;
+  case NW: return (b & ~from(FileA)) << 7;
+  case SE: return (b & ~from(FileH)) >> 7;
+  case SW: return (b & ~from(FileA)) >> 9;
+  }
 }
 
 template <Direction D1, Direction D2, Direction... Ds>
 constexpr BB shift(BB b) {
-    return shift<D1>(b) | shift<D2, Ds...>(b);
+  return shift<D1>(b) | shift<D2, Ds...>(b);
 }
 
 /******************************************\
@@ -88,30 +87,30 @@ constexpr BB shift(BB b) {
 \******************************************/
 
 struct Magic {
-    BB* attacks;
-    BB  mask;
-    BB  operator[](BB occ) { return attacks[index(occ)]; }
+  BB* attacks;
+  BB  mask;
+  BB  operator[](BB occ) { return attacks[index(occ)]; }
 #ifdef USE_PEXT
-    U64 index(BB occ) { return pext(occ, mask); }
+  U64 index(BB occ) { return pext(occ, mask); }
 #else
-    U64 magic;
-    int shift;
-    U64 index(BB occ) { return ((occ & mask) * magic) >> shift; }
+  U64 magic;
+  int shift;
+  U64 index(BB occ) { return ((occ & mask) * magic) >> shift; }
 #endif
 };
 
-extern NDArray<BB, NColour, NSquare> PAWN_ATK;
-extern NDArray<BB, NSquare>          KNIGHT_ATK;
-extern NDArray<BB, NSquare>          KING_ATK;
-extern NDArray<Magic, NSquare>       BISHOP_ATK;
-extern NDArray<Magic, NSquare>       ROOK_ATK;
-extern NDArray<BB, NSquare, NSquare> BTWN_BB;
-extern NDArray<BB, NSquare, NSquare> CHECK_BB;
+extern BB    PAWN_ATK[NColour][NSquare];
+extern BB    KNIGHT_ATK[NSquare];
+extern BB    KING_ATK[NSquare];
+extern Magic BISHOP_ATK[NSquare];
+extern Magic ROOK_ATK[NSquare];
+extern BB    BTWN_BB[NSquare][NSquare];
+extern BB    CHECK_BB[NSquare][NSquare];
 
 template <Colour C>
 constexpr BB pawn_attack(BB bb) {
-    using enum Direction;
-    return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
+  using enum Direction;
+  return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
 }
 
 }  // namespace BBUtils

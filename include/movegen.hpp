@@ -14,249 +14,240 @@ enum MoveGenType { GenQuiet = 1, GenCap = 2, GenAll = GenQuiet | GenCap };
 
 template <Direction dir>
 constexpr Square shift(Square sq) {
-    return static_cast<Square>(sq + I8(dir));
+  return static_cast<Square>(sq + I8(dir));
 }
 
-template <Colour Us, MoveGenType Gt, bool IsCap, typename Handler>
+template <Colour Us, bool IsCap, typename Handler>
 constexpr void enum_promotions(Square src, Square dst, Handler&& handler) {
-    constexpr MoveFlag QueenFlag  = IsCap ? PromoCap_Q : Promo_Q;
-    constexpr MoveFlag RookFlag   = IsCap ? PromoCap_R : Promo_R;
-    constexpr MoveFlag BishopFlag = IsCap ? PromoCap_B : Promo_B;
-    constexpr MoveFlag KnightFlag = IsCap ? PromoCap_N : Promo_N;
+  constexpr MoveFlag QueenFlag  = IsCap ? PromoCap_Q : Promo_Q;
+  constexpr MoveFlag RookFlag   = IsCap ? PromoCap_R : Promo_R;
+  constexpr MoveFlag BishopFlag = IsCap ? PromoCap_B : Promo_B;
+  constexpr MoveFlag KnightFlag = IsCap ? PromoCap_N : Promo_N;
 
-    if constexpr (Gt & GenCap) handler(encode<QueenFlag>(src, dst));
-
-    if constexpr (Gt & GenQuiet) {
-        handler(encode<RookFlag>(src, dst));
-        handler(encode<BishopFlag>(src, dst));
-        handler(encode<KnightFlag>(src, dst));
-    }
+  handler(encode<QueenFlag>(src, dst));
+  handler(encode<RookFlag>(src, dst));
+  handler(encode<BishopFlag>(src, dst));
+  handler(encode<KnightFlag>(src, dst));
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_pawn(const Board& board, Handler&& handler) {
-    using enum Direction;
-    constexpr Colour    Them       = ~Us;
-    constexpr Piece     Pawn       = make_piece(Us, P);
-    constexpr BB        push_rank  = Us == White ? from(Rank2) : from(Rank7);
-    constexpr BB        promo_rank = Us == White ? from(Rank7) : from(Rank2);
-    constexpr Direction Up         = Us == White ? N : S;
-    constexpr Direction Down       = Us == White ? S : N;
-    constexpr Direction UpWest     = Us == White ? NW : SW;
-    constexpr Direction UpEast     = Us == White ? NE : SE;
-    constexpr Direction DownWest   = Us == White ? SW : NW;
-    constexpr Direction DownEast   = Us == White ? SE : NE;
+  using enum Direction;
+  constexpr Colour    Them       = ~Us;
+  constexpr Piece     Pawn       = make_piece(Us, P);
+  constexpr BB        push_rank  = Us == White ? from(Rank2) : from(Rank7);
+  constexpr BB        promo_rank = Us == White ? from(Rank7) : from(Rank2);
+  constexpr Direction Up         = Us == White ? N : S;
+  constexpr Direction Down       = Us == White ? S : N;
+  constexpr Direction UpWest     = Us == White ? NW : SW;
+  constexpr Direction UpEast     = Us == White ? NE : SE;
+  constexpr Direction DownWest   = Us == White ? SW : NW;
+  constexpr Direction DownEast   = Us == White ? SE : NE;
 
-    const BB     empty             = ~board.bb();
-    const BB     enemy             = board.bb(Them);
-    const BB     pawns             = board.bb(Pawn);
-    const BB     ep_pin            = board.state()->ep_pin;
-    const BB     diag_pin          = board.state()->diag_pin;
-    const BB     hv_pin            = board.state()->hv_pin;
-    const BB     check_mask        = board.state()->check_mask;
-    const Square ep                = board.state()->ep;
-    const BB     ep_target         = shift<Down>(from(ep));
+  const BB     empty             = ~board.bb();
+  const BB     enemy             = board.bb(Them);
+  const BB     pawns             = board.bb(Pawn);
+  const BB     ep_pin            = board.state()->ep_pin;
+  const BB     diag_pin          = board.state()->diag_pin;
+  const BB     hv_pin            = board.state()->hv_pin;
+  const BB     check_mask        = board.state()->check_mask;
+  const Square ep                = board.state()->ep;
+  const BB     ep_target         = shift<Down>(from(ep));
 
-    if constexpr (Gt & GenCap) {
-        BB can_cap      = pawns & ~hv_pin;
-        BB can_cap_west = can_cap & (~diag_pin | shift<DownWest>(diag_pin));
-        BB can_cap_east = can_cap & (~diag_pin | shift<DownEast>(diag_pin));
+  if constexpr (Gt & GenCap) {
+    BB can_cap      = pawns & ~hv_pin;
+    BB can_cap_west = can_cap & (~diag_pin | shift<DownWest>(diag_pin));
+    BB can_cap_east = can_cap & (~diag_pin | shift<DownEast>(diag_pin));
 
-        if (ep != NoSquare && !ep_pin) {
-            BB can_ep_west = can_cap_west & shift<W>(ep_target & check_mask);
-            if (can_ep_west) handler(encode<EP>(lsb(can_ep_west), ep));
+    if (ep != NoSquare && !ep_pin) {
+      BB can_ep_west = can_cap_west & shift<W>(ep_target & check_mask);
+      if (can_ep_west) handler(encode<EP>(lsb(can_ep_west), ep));
 
-            BB can_ep_east = can_cap_east & shift<E>(ep_target & check_mask);
-            if (can_ep_east) handler(encode<EP>(lsb(can_ep_east), ep));
-        }
-
-        can_cap_west &= shift<DownWest>(enemy & check_mask);
-        can_cap_east &= shift<DownEast>(enemy & check_mask);
-
-        if ((can_cap_west | can_cap_east) & promo_rank) {
-            loop(can_cap_west & promo_rank, [&](Square src) {
-                enum_promotions<Us, Gt, true>(src, shift<UpWest>(src), handler);
-            });
-            loop(can_cap_east & promo_rank, [&](Square src) {
-                enum_promotions<Us, Gt, true>(src, shift<UpEast>(src), handler);
-            });
-            loop(can_cap_west & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
-            loop(can_cap_east & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
-        } else {
-            loop(can_cap_west, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
-            loop(can_cap_east, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
-        }
+      BB can_ep_east = can_cap_east & shift<E>(ep_target & check_mask);
+      if (can_ep_east) handler(encode<EP>(lsb(can_ep_east), ep));
     }
 
-    if constexpr (Gt & GenQuiet) {
-        BB semi_pushable   = pawns & ~diag_pin & shift<Down>(empty) & (~hv_pin | shift<Down>(hv_pin));
-        BB can_double_push = semi_pushable & push_rank & shift<Down>(shift<Down>(empty & check_mask));
-        BB can_push        = semi_pushable & shift<Down>(check_mask);
+    can_cap_west &= shift<DownWest>(enemy & check_mask);
+    can_cap_east &= shift<DownEast>(enemy & check_mask);
 
-        if (can_push & promo_rank) {
-            loop(can_push & promo_rank, [&](Square src) {
-                enum_promotions<Us, Gt, false>(src, shift<Up>(src), handler);
-            });
-            loop(can_push & ~promo_rank, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
-        } else
-            loop(can_push, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
-
-        loop(can_double_push, [&](Square src) { handler(encode<DoublePush>(src, shift<Up>(shift<Up>(src)))); });
+    if ((can_cap_west | can_cap_east) & promo_rank) {
+      loop(can_cap_west & promo_rank, [&](Square src) { enum_promotions<Us, true>(src, shift<UpWest>(src), handler); });
+      loop(can_cap_east & promo_rank, [&](Square src) { enum_promotions<Us, true>(src, shift<UpEast>(src), handler); });
+      loop(can_cap_west & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
+      loop(can_cap_east & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
+    } else {
+      loop(can_cap_west, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
+      loop(can_cap_east, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
     }
+  }
+
+  if constexpr (Gt & GenQuiet) {
+    BB semi_pushable   = pawns & ~diag_pin & shift<Down>(empty) & (~hv_pin | shift<Down>(hv_pin));
+    BB can_double_push = semi_pushable & push_rank & shift<Down>(shift<Down>(empty & check_mask));
+    BB can_push        = semi_pushable & shift<Down>(check_mask);
+
+    if (can_push & promo_rank) {
+      loop(can_push & promo_rank, [&](Square src) { enum_promotions<Us, false>(src, shift<Up>(src), handler); });
+      loop(can_push & ~promo_rank, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
+    } else
+      loop(can_push, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
+
+    loop(can_double_push, [&](Square src) { handler(encode<DoublePush>(src, shift<Up>(shift<Up>(src)))); });
+  }
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_knights(const Board& board, Handler&& handler) {
-    constexpr Colour Them   = ~Us;
-    constexpr Piece  Knight = make_piece(Us, N);
+  constexpr Colour Them   = ~Us;
+  constexpr Piece  Knight = make_piece(Us, N);
 
-    const BB empty          = ~board.bb();
-    const BB enemy          = board.bb(Them);
-    const BB diag_pin       = board.state()->diag_pin;
-    const BB hv_pin         = board.state()->hv_pin;
-    const BB check_mask     = board.state()->check_mask;
+  const BB empty          = ~board.bb();
+  const BB enemy          = board.bb(Them);
+  const BB diag_pin       = board.state()->diag_pin;
+  const BB hv_pin         = board.state()->hv_pin;
+  const BB check_mask     = board.state()->check_mask;
 
-    BB attacks;
-    BB moveable = board.bb(Knight) & ~(diag_pin | hv_pin);
-    loop(moveable, [&](Square src) {
-        attacks = KNIGHT_ATK[src] & check_mask;
+  BB attacks;
+  BB moveable = board.bb(Knight) & ~(diag_pin | hv_pin);
+  loop(moveable, [&](Square src) {
+    attacks = KNIGHT_ATK[src] & check_mask;
 
-        if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-        if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
-    });
+    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+  });
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_diag_slider(const Board& board, Handler&& handler) {
-    constexpr Colour Them   = ~Us;
-    constexpr Piece  Bishop = make_piece(Us, B);
-    constexpr Piece  Queen  = make_piece(Us, Q);
+  constexpr Colour Them   = ~Us;
+  constexpr Piece  Bishop = make_piece(Us, B);
+  constexpr Piece  Queen  = make_piece(Us, Q);
 
-    const BB occ            = board.bb();
-    const BB empty          = ~occ;
-    const BB enemy          = board.bb(Them);
-    const BB diag_pin       = board.state()->diag_pin;
-    const BB hv_pin         = board.state()->hv_pin;
-    const BB check_mask     = board.state()->check_mask;
+  const BB occ            = board.bb();
+  const BB empty          = ~occ;
+  const BB enemy          = board.bb(Them);
+  const BB diag_pin       = board.state()->diag_pin;
+  const BB hv_pin         = board.state()->hv_pin;
+  const BB check_mask     = board.state()->check_mask;
 
-    BB attacks;
-    BB moveable = board.bb(Bishop, Queen) & ~hv_pin;
-    loop(moveable & diag_pin, [&](Square src) {
-        attacks = BISHOP_ATK[src][occ] & check_mask & diag_pin;
+  BB attacks;
+  BB moveable = board.bb(Bishop, Queen) & ~hv_pin;
+  loop(moveable & diag_pin, [&](Square src) {
+    attacks = BISHOP_ATK[src][occ] & check_mask & diag_pin;
 
-        if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-        if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
-    });
-    loop(moveable & ~diag_pin, [&](Square src) {
-        attacks = BISHOP_ATK[src][occ] & check_mask;
+    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+  });
+  loop(moveable & ~diag_pin, [&](Square src) {
+    attacks = BISHOP_ATK[src][occ] & check_mask;
 
-        if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-        if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
-    });
+    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+  });
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_hv_slider(const Board& board, Handler&& handler) {
-    constexpr Colour Them  = ~Us;
-    constexpr Piece  Rook  = make_piece(Us, R);
-    constexpr Piece  Queen = make_piece(Us, Q);
+  constexpr Colour Them  = ~Us;
+  constexpr Piece  Rook  = make_piece(Us, R);
+  constexpr Piece  Queen = make_piece(Us, Q);
 
-    const BB occ           = board.bb();
-    const BB empty         = ~occ;
-    const BB enemy         = board.bb(Them);
-    const BB diag_pin      = board.state()->diag_pin;
-    const BB hv_pin        = board.state()->hv_pin;
-    const BB check_mask    = board.state()->check_mask;
+  const BB occ           = board.bb();
+  const BB empty         = ~occ;
+  const BB enemy         = board.bb(Them);
+  const BB diag_pin      = board.state()->diag_pin;
+  const BB hv_pin        = board.state()->hv_pin;
+  const BB check_mask    = board.state()->check_mask;
 
-    BB attacks;
-    BB moveable = board.bb(Rook, Queen) & ~diag_pin;
-    loop(moveable & hv_pin, [&](Square src) {
-        attacks = ROOK_ATK[src][occ] & check_mask & hv_pin;
+  BB attacks;
+  BB moveable = board.bb(Rook, Queen) & ~diag_pin;
+  loop(moveable & hv_pin, [&](Square src) {
+    attacks = ROOK_ATK[src][occ] & check_mask & hv_pin;
 
-        if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-        if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
-    });
-    loop(moveable & ~hv_pin, [&](Square src) {
-        attacks = ROOK_ATK[src][occ] & check_mask;
+    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+  });
+  loop(moveable & ~hv_pin, [&](Square src) {
+    attacks = ROOK_ATK[src][occ] & check_mask;
 
-        if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-        if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
-    });
+    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+  });
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_king(const Board& board, Handler&& handler) {
-    constexpr Colour Them = ~Us;
+  constexpr Colour Them = ~Us;
 
-    const Square ksq      = board.ksq<Us>();
-    const BB     attacked = board.state()->attacked;
-    const BB     enemy    = board.bb(Them);
-    const BB     empty    = ~board.bb();
+  const Square ksq      = board.ksq<Us>();
+  const BB     attacked = board.state()->attacked;
+  const BB     enemy    = board.bb(Them);
+  const BB     empty    = ~board.bb();
 
-    BB attacks            = KING_ATK[ksq] & ~attacked;
+  BB attacks            = KING_ATK[ksq] & ~attacked;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(ksq, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(ksq, dst)); });
+  if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(ksq, dst)); });
+  if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(ksq, dst)); });
 }
 
 template <Colour Us, bool QueenSide>
 constexpr bool can_castle(const Board& board, Square rs) {
-    constexpr Square kd = CastleMask::king_dst<Us>(QueenSide);
-    constexpr Square rd = CastleMask::rook_dst<Us>(QueenSide);
-    const Square     ks = board.ksq<Us>();
+  constexpr Square kd = CastleMask::king_dst<Us>(QueenSide);
+  constexpr Square rd = CastleMask::rook_dst<Us>(QueenSide);
+  const Square     ks = board.ksq<Us>();
 
-    const BB occ        = board.bb();
-    const BB attacked   = board.state()->attacked;
-    const BB hv_pin     = board.state()->hv_pin;
+  const BB occ        = board.bb();
+  const BB attacked   = board.state()->attacked;
+  const BB hv_pin     = board.state()->hv_pin;
 
-    BB king_area        = BTWN_BB[ks][kd] | from(kd);
-    BB rook_area        = BTWN_BB[ks][rs] | from(rd);
+  BB king_area        = BTWN_BB[ks][kd] | from(kd);
+  BB rook_area        = BTWN_BB[ks][rs] | from(rd);
 
-    BB occ_mask         = (king_area | rook_area) & ~(from(ks) | from(rs));
+  BB occ_mask         = (king_area | rook_area) & ~(from(ks) | from(rs));
 
-    return !(king_area & attacked) && !(occ_mask & occ) && !(from(rs) & hv_pin);
+  return !(king_area & attacked) && !(occ_mask & occ) && !(from(rs) & hv_pin);
 }
 
 template <Colour Us, typename Handler>
 constexpr void enum_castle(const Board& board, Handler&& handler) {
-    constexpr Castle OO   = Us == White ? WhiteOO : BlackOO;
-    constexpr Castle OOO  = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Castle OO   = Us == White ? WhiteOO : BlackOO;
+  constexpr Castle OOO  = Us == White ? WhiteOOO : BlackOOO;
 
-    const Castle cr       = board.state()->castling;
-    const Square ksq      = board.ksq<Us>();
-    const Square queen_rs = board.castling_mask().rook_src<Us>(true);
-    const Square king_rs  = board.castling_mask().rook_src<Us>(false);
+  const Castle cr       = board.state()->castling;
+  const Square ksq      = board.ksq<Us>();
+  const Square queen_rs = board.castling_mask().rook_src<Us>(true);
+  const Square king_rs  = board.castling_mask().rook_src<Us>(false);
 
-    if ((cr & OO) && can_castle<Us, false>(board, king_rs)) handler(encode<KingCastle>(ksq, king_rs));
-    if ((cr & OOO) && can_castle<Us, true>(board, queen_rs)) handler(encode<QueenCastle>(ksq, queen_rs));
+  if ((cr & OO) && can_castle<Us, false>(board, king_rs)) handler(encode<KingCastle>(ksq, king_rs));
+  if ((cr & OOO) && can_castle<Us, true>(board, queen_rs)) handler(encode<QueenCastle>(ksq, queen_rs));
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_moves(const Board& board, Handler&& handler) {
-    const BB check_mask = board.state()->check_mask;
+  const BB check_mask = board.state()->check_mask;
 
-    if (!check_mask)
-        enum_king<Us, Gt>(board, handler);
-    else {
-        enum_pawn<Us, Gt>(board, handler);
-        enum_knights<Us, Gt>(board, handler);
-        enum_diag_slider<Us, Gt>(board, handler);
-        enum_hv_slider<Us, Gt>(board, handler);
-        enum_king<Us, Gt>(board, handler);
+  if (!check_mask)
+    enum_king<Us, Gt>(board, handler);
+  else {
+    enum_pawn<Us, Gt>(board, handler);
+    enum_knights<Us, Gt>(board, handler);
+    enum_diag_slider<Us, Gt>(board, handler);
+    enum_hv_slider<Us, Gt>(board, handler);
+    enum_king<Us, Gt>(board, handler);
 
-        if constexpr (Gt & GenQuiet)
-            if (check_mask == FullBB) enum_castle<Us>(board, handler);
-    }
+    if constexpr (Gt & GenQuiet)
+      if (check_mask == FullBB) enum_castle<Us>(board, handler);
+  }
 }
 
 constexpr std::vector<Move> list_moves(const Board& board) {
-    std::vector<Move> moves;
+  std::vector<Move> moves;
 
-    auto append = [&](Move move) { moves.push_back(move); };
+  auto append = [&](Move move) { moves.push_back(move); };
 
-    board.stm() == White ? enum_moves<White, GenAll>(board, append) : enum_moves<Black, GenAll>(board, append);
+  board.stm() == White ? enum_moves<White, GenAll>(board, append) : enum_moves<Black, GenAll>(board, append);
 
-    return moves;
+  return moves;
 }
 
 }  // namespace Lyra

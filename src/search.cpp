@@ -2,8 +2,8 @@
 
 #include <atomic>
 #include <cstdio>
-#include <sstream>
 
+#include "engine.hpp"
 #include "movepick.hpp"
 
 namespace Lyra {
@@ -20,13 +20,6 @@ void PVLine::update(const PVLine& other, Move best) {
   std::copy_n(other.moves, other.length, &moves[1]);
 }
 
-std::string PVLine::to_str() {
-  std::ostringstream os;
-  for (size_t i = 0; i < length; i++)
-    os << MoveUtils::to_str(moves[i]) << " ";
-  return os.str();
-}
-
 /******************************************\
 |==========================================|
 |              Search Helpers              |
@@ -36,6 +29,8 @@ std::string PVLine::to_str() {
 void Worker::reset(std::string fen) {
   board_.set(fen);
   pv_    = {};
+  nodes_ = 0;
+  depth_ = 1;
   nodes_ = 0;
 }
 
@@ -47,23 +42,21 @@ void Worker::report() {
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
-    pv_.to_str().c_str()
+    Engine::print_pv(pv_, board_.chess960).c_str()
   );
   fflush(stdout);
 }
 
 void Worker::start(const TimeControl& tc) {
   Colour stm   = board_.stm();
-  depth_       = 1;
-  nodes_       = 0;
 
   Move best_mv = NoMove;
 
   if (is_main()) clock_.set(stm, tc);
 
   while (depth_ < MAX_DEPTH && !clock_.stop_iter(depth_)) {
-    Eval alpha = -INF;
-    Eval beta  = INF;
+    Eval alpha = -EVAL_INF;
+    Eval beta  = EVAL_INF;
 
     eval_      = search(board_, pv_, alpha, beta, depth_);
 
@@ -75,7 +68,7 @@ void Worker::start(const TimeControl& tc) {
     depth_  += 1;
   }
 
-  printf("bestmove %s\n", MoveUtils::to_str(best_mv).c_str());
+  printf("bestmove %s\n", Engine::print_move(best_mv, board_.chess960).c_str());
   fflush(stdout);
 }
 
@@ -104,7 +97,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
   MovePickState  mps{board, NoMove, depth};
   MovePicker<Us> mp{false, mps};
 
-  Eval best = -INF;
+  Eval best = -EVAL_INF;
   Move mv   = NoMove;
 
   while ((mv = mp.next())) {

@@ -22,6 +22,7 @@ class UCI {
   void parse_go(std::istringstream& is);
   void parse_pos(std::istringstream& is);
   void parse_perft(std::istringstream& is);
+  void parse_opt(std::istringstream& is);
 };
 
 }  // namespace Lyra

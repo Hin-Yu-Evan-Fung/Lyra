@@ -1,6 +1,7 @@
 #include "perft.hpp"
 
 #include "defs.hpp"
+#include "engine.hpp"
 #include "movegen.hpp"
 #include "movepick.hpp"
 
@@ -28,7 +29,7 @@ U64 perft(Board& board, Depth depth) {
 
     total += n;
 
-    if (Div && n > 0) printf("       %s: %lu\n", to_str(move).data(), n);
+    if (Div && n > 0) printf("       %s: %lu\n", Engine::print_move(move, board.chess960).c_str(), n);
   });
 
   return total;
@@ -62,7 +63,7 @@ U64 perftmp(Board& board, Depth depth) {
 
     total += n;
 
-    if (Div && n > 0) printf("       %s: %lu\n", to_str(move).data(), n);
+    if (Div && n > 0) printf("       %s: %lu\n", Engine::print_move(move, board.chess960).c_str(), n);
   }
 
   return total;

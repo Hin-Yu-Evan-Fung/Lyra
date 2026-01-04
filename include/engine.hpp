@@ -43,6 +43,10 @@ class Engine {
   void stop() { pool_.stop(); }
 
   void set_threads(size_t num);
+  void set_chess960(bool chess960);
+
+  static std::string print_pv(const PVLine& pv, bool chess960);
+  static std::string print_move(Move move, bool chess960);
 
  private:
   Board      board_;

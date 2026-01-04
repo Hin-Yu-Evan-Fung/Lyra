@@ -2,7 +2,6 @@
 #include <string>
 
 #include "defs.hpp"
-#include "utils.hpp"
 
 namespace Lyra {
 
@@ -14,6 +13,8 @@ namespace Lyra {
 | Bits (12-15): flags                      |
 |==========================================|
 \******************************************/
+
+class Board;
 
 using Move = U16;
 
@@ -69,12 +70,7 @@ constexpr bool is_castle(Move move) { return (flag(move) & CastleMask) == Castle
 
 constexpr PieceType promoted_pt(Move move) { return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N); }
 
-constexpr std::string to_str(Move move) {
-  if (!move) return "none";
-  std::string move_str = Lyra::to_str(src(move)) + Lyra::to_str(dst(move));
-  if (is_promo(move)) return move_str + Lyra::to_char(make_piece(Colour::Black, promoted_pt(move)));
-  return move_str;
-}
+constexpr std::string to_str(Move move, const Board& board);
 
 }  // namespace MoveUtils
 

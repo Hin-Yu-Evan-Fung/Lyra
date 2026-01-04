@@ -66,9 +66,9 @@ constexpr char        to_char(Rank r) { return static_cast<char>(r + '1'); }
 constexpr std::string to_str(Square sq) { return {to_char(file_of(sq)), to_char(rank_of(sq))}; }
 constexpr char        to_char(Piece pc) { return PIECE_STR.at(pc); }
 
-constexpr File   char2file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
-constexpr Rank   char2rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
-constexpr Square str2sq(const std::string& str) { return make_square(char2file(str[0]), char2rank(str[1])); }
-constexpr Piece  char2piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
+constexpr File   to_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
+constexpr Rank   to_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
+constexpr Square to_sq(const std::string& str) { return make_square(to_file(str[0]), to_rank(str[1])); }
+constexpr Piece  to_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
 
 }  // namespace Lyra

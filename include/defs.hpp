@@ -29,7 +29,7 @@ using Eval  = I32;
 
 constexpr Depth       MAX_DEPTH = 256;
 constexpr std::size_t MAX_MOVES = 256;
-constexpr Eval        INF       = 30000;
+constexpr Eval        EVAL_INF  = 30000;
 constexpr Eval        DRAW      = 0;
 
 /******************************************\

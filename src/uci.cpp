@@ -22,9 +22,14 @@ void UCI::loop() {
     token.clear();
     is >> std::skipws >> token;
 
-    if (token == "uci")
-      printf("id name: %s\nid author %s\nversion: %s\nuciok\n", NAME.data(), AUTHOR.data(), VERSION.data());
-    else if (token == "isready")
+    if (token == "uci") {
+      printf("id name: %s\nid author %s\nversion: %s\n", NAME.data(), AUTHOR.data(), VERSION.data());
+      printf("option name UCI_Chess960 type check default false\n");
+      printf("option name ClearHash type button\n");
+      printf("option name Hash type spin default 32 min 1 max 128\n");
+      printf("option name Threads type spin default 1 min 1 max 12\n");
+      printf("uciok\n");
+    } else if (token == "isready")
       printf("readyok\n");
     else if (token == "stop" || token == "quit")
       engine_.stop();
@@ -37,7 +42,7 @@ void UCI::loop() {
     else if (token == "b")
       engine_.print_pos();
     else if (token == "setoption")
-      ;
+      parse_opt(is);
     else if (token == "perft")
       parse_perft(is);
 
@@ -124,6 +129,23 @@ void UCI::parse_pos(std::istringstream& is) {
   try {
     engine_.set_pos(fen, moves);
   } catch (const std::invalid_argument& e) { printf("Error: %s\n", e.what()); }
+}
+
+void UCI::parse_opt(std::istringstream& is) {
+  std::string token, name;
+  is >> token;
+
+  if (token != "name") return;
+  is >> name;
+
+  is >> token;
+  if (token != "value") return;
+
+  if (name == "UCI_Chess960") {
+    bool chess960;
+    is >> std::boolalpha >> chess960;
+    engine_.set_chess960(chess960);
+  }
 }
 
 }  // namespace Lyra

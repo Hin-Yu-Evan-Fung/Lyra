@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bitboard.hpp"
-#include "castling.hpp"
+#include "castle.hpp"
 #include "defs.hpp"
 #include "eval.hpp"
 #include "move.hpp"
@@ -81,6 +81,8 @@ class Board {
  public:
   Board();
   ~Board();
+
+  bool chess960;
 
   Board(const Board& board)      = delete;  // No Copying
   Board& operator=(const Board&) = delete;

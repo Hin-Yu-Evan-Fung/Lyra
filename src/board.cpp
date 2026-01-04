@@ -7,7 +7,7 @@
 #include <sstream>
 
 #include "bitboard.hpp"
-#include "castling.hpp"
+#include "castle.hpp"
 #include "defs.hpp"
 #include "eval.hpp"
 #include "mask.hpp"
@@ -61,7 +61,7 @@ void Board::set(const std::string& fen) {
     sq = make_square(File(file), Rank(rank));
 
     if (std::isalpha(c)) {
-      Piece pc = char2piece(c);
+      Piece pc = to_piece(c);
       colour_of(pc) == White ? set_piece<true, White>(pc, sq) : set_piece<true, Black>(pc, sq);
       file++;
     } else if (std::isdigit(c)) {
@@ -100,7 +100,7 @@ void Board::set(const std::string& fen) {
       castling = CastleMask::get_mask(s, true);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper >= 'A' && upper <= 'H') {
-      rsq      = relative(s, make_square(char2file(upper), Rank1));
+      rsq      = relative(s, make_square(to_file(upper), Rank1));
       castling = CastleMask::get_mask(s, ksq > rsq);
       castling_mask_.add_rights(ksq, rsq, castling);
     }
@@ -111,7 +111,7 @@ void Board::set(const std::string& fen) {
   // 4. Parse enpassant
   ss >> std::skipws >> part;
   state_->ep = NoSquare;
-  if (part.length() == 2) { state_->ep = str2sq(part); }
+  if (part.length() == 2) { state_->ep = to_sq(part); }
 
   int fifty_mv = 0, full_mv = 1;
   ss >> std::skipws >> fifty_mv;
@@ -147,6 +147,7 @@ void Board::print() const {
   printf("Hash Key: 0x%lx\n", state_->key);
   printf("Incremental PSQ: %d\n", eval_incr());
   printf("Real PSQ: %d\n", eval_raw());
+  printf("Chess960: %s\n", chess960 ? "true" : "false");
 }
 
 std::string Board::fen() const {

@@ -2,6 +2,7 @@
 #include <string>
 
 #include "defs.hpp"
+#include "utils.hpp"
 
 namespace Lyra {
 
@@ -70,7 +71,20 @@ constexpr bool is_castle(Move move) { return (flag(move) & CastleMask) == Castle
 
 constexpr PieceType promoted_pt(Move move) { return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N); }
 
-constexpr std::string to_str(Move move, const Board& board);
+constexpr std::string format(Move move, bool chess960) {
+  if (!move) return "none";
+
+  Square src_sq = src(move);
+  Square dst_sq = dst(move);
+
+  if (!chess960 && is_castle(move)) dst_sq = make_square(flag(move) == QueenCastle ? FileC : FileG, rank_of(src_sq));
+
+  std::string move_str = IOUtils::format_sq(src_sq) + IOUtils::format_sq(dst_sq);
+
+  if (is_promo(move)) move_str += " pnbrqk"[promoted_pt(move)];
+
+  return move_str;
+}
 
 }  // namespace MoveUtils
 

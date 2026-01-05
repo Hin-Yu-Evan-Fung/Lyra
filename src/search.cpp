@@ -2,8 +2,8 @@
 
 #include <atomic>
 #include <cstdio>
+#include <print>
 
-#include "engine.hpp"
 #include "movepick.hpp"
 
 namespace Lyra {
@@ -20,6 +20,13 @@ void PVLine::update(const PVLine& other, Move best) {
   std::copy_n(other.moves, other.length, &moves[1]);
 }
 
+std::string PVLine::format(bool chess960) {
+  std::ostringstream os;
+  for (size_t i = 0; i < length; i++)
+    os << MoveUtils::format(moves[i], chess960) << " ";
+  return os.str();
+}
+
 /******************************************\
 |==========================================|
 |              Search Helpers              |
@@ -34,17 +41,17 @@ void Worker::reset(std::string fen) {
   nodes_ = 0;
 }
 
-void Worker::report() {
-  printf(
-    "info depth %d seldepth 0 score cp %d time %lu nodes %lu nps %lu pv %s\n",
+void Worker::uci_report() {
+  std::println(
+    "info depth {} seldepth 0 score cp {} time {} nodes {} nps {} pv {}\n",
     depth_,
     eval_,
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
-    Engine::print_pv(pv_, board_.chess960).c_str()
+    pv_.format(board_.chess960)
   );
-  fflush(stdout);
+  std::fflush(stdout);
 }
 
 void Worker::start(const TimeControl& tc) {
@@ -62,19 +69,19 @@ void Worker::start(const TimeControl& tc) {
 
     if (stop_.load(std::memory_order::relaxed)) break;
 
-    report();
+    uci_report();
 
     best_mv  = pv_.moves[0];
     depth_  += 1;
   }
 
-  printf("bestmove %s\n", Engine::print_move(best_mv, board_.chess960).c_str());
-  fflush(stdout);
+  std::println("bestmove {}", MoveUtils::format(best_mv, board_.chess960));
+  std::fflush(stdout);
 }
 
 /******************************************\
 |==========================================|
-|              Main Search              |
+|               Main Search                |
 |==========================================|
 \******************************************/
 
@@ -85,7 +92,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth) {
-  if (clock_.stop(nodes_)) return DRAW;
+  if (clock_.stop(nodes_)) return EVAL_DRAW;
 
   nodes_ += 1;
   pv.clear();
@@ -105,7 +112,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
     Eval val = -search<~Us, PV>(board, child_pv, -beta, -alpha, depth - 1);
     board.undo_move<Us>();
 
-    if (stop_.load(std::memory_order::relaxed)) return DRAW;
+    if (stop_.load(std::memory_order::relaxed)) return EVAL_DRAW;
 
     if (val > best) {
       best = val;
@@ -124,7 +131,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
-  if (clock_.stop(nodes_)) return DRAW;
+  if (clock_.stop(nodes_)) return EVAL_DRAW;
 
   nodes_ += 1;
   pv.clear();
@@ -134,7 +141,7 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
   MovePickState  mps{board, NoMove, 0};
   MovePicker<Us> mp{true, mps};
 
-  Eval best = board.eval_incr();
+  Eval best = board.compute_incr_eval();
   if (best >= beta) return best;
   if (best > alpha) alpha = best;
 
@@ -145,7 +152,7 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
     Eval val = -qsearch<~Us, PV>(board, child_pv, -beta, -alpha);
     board.undo_move<Us>();
 
-    if (stop_.load(std::memory_order::relaxed)) return DRAW;
+    if (stop_.load(std::memory_order::relaxed)) return EVAL_DRAW;
 
     if (val > best) {
       best = val;

@@ -1,5 +1,7 @@
 #include "bitboard.hpp"
 
+#include <print>
+
 #include "utils.hpp"
 
 namespace Lyra::BBUtils {
@@ -13,18 +15,18 @@ using enum Direction;
 \******************************************/
 
 void print(BB bb) {
-  printf("\n     +---+---+---+---+---+---+---+---+\n");
+  std::println("\n     +---+---+---+---+---+---+---+---+");
 
   for (Rank r = Rank8; r >= Rank1; --r) {
-    printf(" %c   |", to_char(r));
+    std::print("{}   |", IOUtils::format_rank(r));
     for (File f = FileA; f <= FileH; ++f)
-      printf(" %c |", bb & from(make_square(f, r)) ? '1' : '.');
+      std::print(" {} |", bb & from(make_square(f, r)) ? '1' : '.');
 
-    printf("\n     +---+---+---+---+---+---+---+---+\n");
+    std::println("\n     +---+---+---+---+---+---+---+---+");
   }
 
-  printf("\n       A   B   C   D   E   F   G   H\n\n");
-  printf("Bitboard: 0x%lx\n", bb);
+  std::println("\n       A   B   C   D   E   F   G   H\n");
+  std::println("Bitboard: {:#X}", bb);
 }
 
 /******************************************\
@@ -156,7 +158,7 @@ void init_magics(Square sq, BB table[], Magic entries[]) {
 #endif
   // Offset the pointer to the table and save the attacks
   m.attacks  = &table[offset];
-  offset    += 1 << count(m.mask);
+  offset    += 1 << popcount(m.mask);
   // Calculate the attacks for each possible occupancy bitboard and store it at the index
   BB occ = EmptyBB;
   do {

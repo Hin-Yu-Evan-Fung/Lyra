@@ -17,7 +17,7 @@ struct PVLine {
 
   void        update(const PVLine& other, Move best);
   void        clear() { length = 0; }
-  std::string to_str();
+  std::string format(bool chess960);
 };
 
 struct StackEntry {
@@ -39,14 +39,14 @@ class Worker {
 
   void reset(std::string fen);
   void start(const TimeControl& tc);
-
-  void report();
+  void uci_report();
 
  private:
   void iter_deep();
   void asp_win();
-  template <Colour Us, NodeType NT>
   Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
+
+  template <Colour Us, NodeType NT>
   Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT>
   Eval qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta);

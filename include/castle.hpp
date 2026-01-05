@@ -80,10 +80,10 @@ inline std::string CastleMask::to_str(Castle cr, bool chess960) const {
   std::ostringstream out;
 
   if (!cr) out << "-";
-  if (cr & WhiteOO) out << (chess960 ? to_char(file_of(rook_sq[0])) : 'K');
-  if (cr & WhiteOOO) out << (chess960 ? to_char(file_of(rook_sq[1])) : 'Q');
-  if (cr & BlackOO) out << (chess960 ? to_char(file_of(rook_sq[2])) : 'k');
-  if (cr & BlackOOO) out << (chess960 ? to_char(file_of(rook_sq[3])) : 'q');
+  if (cr & WhiteOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[0])) : 'K');
+  if (cr & WhiteOOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[1])) : 'Q');
+  if (cr & BlackOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[2])) : 'k');
+  if (cr & BlackOOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[3])) : 'q');
   return out.str();
 }
 

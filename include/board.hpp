@@ -99,13 +99,6 @@ class Board {
   template <Colour Us>
   void undo_move();
 
-  Zobrist::Key          compute_key() const;
-  Zobrist::Key          compute_pawn_key() const;
-  std::pair<Score, int> compute_psq() const;
-
-  Eval eval_raw() const;
-  Eval eval_incr() const;
-
   constexpr BB bb() const;
   constexpr BB bb(Colour c) const;
   constexpr BB bb(PieceType pt) const;
@@ -115,12 +108,19 @@ class Board {
   constexpr Piece on(Square sq) const;
   template <Colour C>
   constexpr Square ksq() const;
+  constexpr Colour stm() const;
 
-  constexpr Colour     stm() const;
   constexpr CastleMask castling_mask() const;
 
   constexpr Undo* state();
   constexpr Undo* state() const;
+
+  Zobrist::Key          compute_key() const;
+  Zobrist::Key          compute_pawn_key() const;
+  std::pair<Score, int> compute_psq() const;
+
+  Eval compute_raw_eval() const;
+  Eval compute_incr_eval() const;
 };
 
 /******************************************\

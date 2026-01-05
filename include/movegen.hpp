@@ -71,13 +71,17 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
     can_cap_east &= shift<DownEast>(enemy & check_mask);
 
     if ((can_cap_west | can_cap_east) & promo_rank) {
-      loop(can_cap_west & promo_rank, [&](Square src) { enum_promotions<Us, true>(src, shift<UpWest>(src), handler); });
-      loop(can_cap_east & promo_rank, [&](Square src) { enum_promotions<Us, true>(src, shift<UpEast>(src), handler); });
-      loop(can_cap_west & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
-      loop(can_cap_east & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
+      bitloop(can_cap_west & promo_rank, [&](Square src) {
+        enum_promotions<Us, true>(src, shift<UpWest>(src), handler);
+      });
+      bitloop(can_cap_east & promo_rank, [&](Square src) {
+        enum_promotions<Us, true>(src, shift<UpEast>(src), handler);
+      });
+      bitloop(can_cap_west & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
+      bitloop(can_cap_east & ~promo_rank, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
     } else {
-      loop(can_cap_west, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
-      loop(can_cap_east, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
+      bitloop(can_cap_west, [&](Square src) { handler(encode<Cap>(src, shift<UpWest>(src))); });
+      bitloop(can_cap_east, [&](Square src) { handler(encode<Cap>(src, shift<UpEast>(src))); });
     }
   }
 
@@ -87,12 +91,12 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
     BB can_push        = semi_pushable & shift<Down>(check_mask);
 
     if (can_push & promo_rank) {
-      loop(can_push & promo_rank, [&](Square src) { enum_promotions<Us, false>(src, shift<Up>(src), handler); });
-      loop(can_push & ~promo_rank, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
+      bitloop(can_push & promo_rank, [&](Square src) { enum_promotions<Us, false>(src, shift<Up>(src), handler); });
+      bitloop(can_push & ~promo_rank, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
     } else
-      loop(can_push, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
+      bitloop(can_push, [&](Square src) { handler(encode<Quiet>(src, shift<Up>(src))); });
 
-    loop(can_double_push, [&](Square src) { handler(encode<DoublePush>(src, shift<Up>(shift<Up>(src)))); });
+    bitloop(can_double_push, [&](Square src) { handler(encode<DoublePush>(src, shift<Up>(shift<Up>(src)))); });
   }
 }
 
@@ -109,11 +113,11 @@ constexpr void enum_knights(const Board& board, Handler&& handler) {
 
   BB attacks;
   BB moveable = board.bb(Knight) & ~(diag_pin | hv_pin);
-  loop(moveable, [&](Square src) {
+  bitloop(moveable, [&](Square src) {
     attacks = KNIGHT_ATK[src] & check_mask;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+    if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
   });
 }
 
@@ -132,17 +136,17 @@ constexpr void enum_diag_slider(const Board& board, Handler&& handler) {
 
   BB attacks;
   BB moveable = board.bb(Bishop, Queen) & ~hv_pin;
-  loop(moveable & diag_pin, [&](Square src) {
+  bitloop(moveable & diag_pin, [&](Square src) {
     attacks = BISHOP_ATK[src][occ] & check_mask & diag_pin;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+    if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
   });
-  loop(moveable & ~diag_pin, [&](Square src) {
+  bitloop(moveable & ~diag_pin, [&](Square src) {
     attacks = BISHOP_ATK[src][occ] & check_mask;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+    if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
   });
 }
 
@@ -161,17 +165,17 @@ constexpr void enum_hv_slider(const Board& board, Handler&& handler) {
 
   BB attacks;
   BB moveable = board.bb(Rook, Queen) & ~diag_pin;
-  loop(moveable & hv_pin, [&](Square src) {
+  bitloop(moveable & hv_pin, [&](Square src) {
     attacks = ROOK_ATK[src][occ] & check_mask & hv_pin;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+    if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
   });
-  loop(moveable & ~hv_pin, [&](Square src) {
+  bitloop(moveable & ~hv_pin, [&](Square src) {
     attacks = ROOK_ATK[src][occ] & check_mask;
 
-    if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
-    if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
+    if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(src, dst)); });
+    if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(src, dst)); });
   });
 }
 
@@ -186,8 +190,8 @@ constexpr void enum_king(const Board& board, Handler&& handler) {
 
   BB attacks            = KING_ATK[ksq] & ~attacked;
 
-  if constexpr (Gt & GenCap) loop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(ksq, dst)); });
-  if constexpr (Gt & GenQuiet) loop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(ksq, dst)); });
+  if constexpr (Gt & GenCap) bitloop(attacks & enemy, [&](Square dst) { handler(encode<Cap>(ksq, dst)); });
+  if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(ksq, dst)); });
 }
 
 template <Colour Us, bool QueenSide>

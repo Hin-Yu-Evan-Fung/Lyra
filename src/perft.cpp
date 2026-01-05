@@ -1,7 +1,8 @@
 #include "perft.hpp"
 
+#include <print>
+
 #include "defs.hpp"
-#include "engine.hpp"
 #include "movegen.hpp"
 #include "movepick.hpp"
 
@@ -29,7 +30,7 @@ U64 perft(Board& board, Depth depth) {
 
     total += n;
 
-    if (Div && n > 0) printf("       %s: %lu\n", Engine::print_move(move, board.chess960).c_str(), n);
+    if (Div && n > 0) std::println("       {}: {}", MoveUtils::format(move, board.chess960), n);
   });
 
   return total;
@@ -63,7 +64,7 @@ U64 perftmp(Board& board, Depth depth) {
 
     total += n;
 
-    if (Div && n > 0) printf("       %s: %lu\n", Engine::print_move(move, board.chess960).c_str(), n);
+    if (Div && n > 0) std::println("       {}: {}", MoveUtils::format(move, board.chess960), n);
   }
 
   return total;
@@ -71,7 +72,7 @@ U64 perftmp(Board& board, Depth depth) {
 
 template <PerftMode PM>
 void perft(Board& board, Depth d) {
-  printf("========   PERFT   ========\n\n");
+  std::println("========   PERFT   ========\n");
 
   Time start = now();
   U64  nodes = 0;
@@ -86,12 +87,12 @@ void perft(Board& board, Depth d) {
   int nps      = 0;
   if (elapsed > 0) { nps = nodes * 1000 / elapsed; }
 
-  printf("\n========  RESULTS  ========\n");
-  printf("     use_mp: %s              \n", PM == Perft_MP ? "True" : "False");
-  printf("      nodes: %lu             \n", nodes);
-  printf("       time: %lu ms          \n", elapsed);
-  printf("        nps: %.1f Mnps       \n", (float)nps / 1e6);
-  printf("===========================  \n");
+  std::println("\n========  RESULTS  ========");
+  std::println("     use_mp: {}              ", PM == Perft_MP ? "True" : "False");
+  std::println("      nodes: {}             ", nodes);
+  std::println("       time: {} ms          ", elapsed);
+  std::println("        nps: {:.1f} Mnps       ", (float)nps / 1e6);
+  std::println("===========================  ");
 }
 
 template void perft<Perft>(Board& board, Depth d);
@@ -155,9 +156,9 @@ BenchTestCase tests[] = {
 void perft_bench() {
   Board board;
   U64   nodes;
-  printf(
+  std::println(
     "==================================================  START BENCH  "
-    "==================================================\n"
+    "=================================================="
   );
   for (auto& [fen, depth, validation] : tests) {
     board.set(fen);
@@ -171,19 +172,15 @@ void perft_bench() {
     int nps      = 0;
     if (elapsed > 0) { nps = nodes * 1000 / elapsed; }
 
-    printf(
-      "status: %s, time: %lu ms, nps: %d, fen: %s\n",
-      (nodes == validation ? "PASSED" : "FAILED"),
-      elapsed,
-      nps,
-      fen.c_str()
+    std::println(
+      "status: {}, time: {} ms, nps: {}, fen: {}\n", nodes == validation ? "PASSED" : "FAILED", elapsed, nps, fen
     );
 
     if (nodes != validation) return;
   }
-  printf(
+  std::println(
     "==================================================  ALL PASSED  "
-    "==================================================\n"
+    "=================================================="
   );
 }
 }  // namespace Lyra

@@ -59,16 +59,20 @@ inline Time now() {
 |==========================================|
 \******************************************/
 
+namespace IOUtils {
+
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
-constexpr char        to_char(File f) { return static_cast<char>(f + 'a'); }
-constexpr char        to_char(Rank r) { return static_cast<char>(r + '1'); }
-constexpr std::string to_str(Square sq) { return {to_char(file_of(sq)), to_char(rank_of(sq))}; }
-constexpr char        to_char(Piece pc) { return PIECE_STR.at(pc); }
+constexpr char        format_file(File f) { return static_cast<char>(f + 'a'); }
+constexpr char        format_rank(Rank r) { return static_cast<char>(r + '1'); }
+constexpr std::string format_sq(Square sq) { return {format_file(file_of(sq)), format_rank(rank_of(sq))}; }
+constexpr char        format_piece(Piece pc) { return PIECE_STR.at(pc); }
 
-constexpr File   to_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
-constexpr Rank   to_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
-constexpr Square to_sq(const std::string& str) { return make_square(to_file(str[0]), to_rank(str[1])); }
-constexpr Piece  to_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
+constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
+constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
+constexpr Square parse_sq(const std::string& str) { return make_square(parse_file(str[0]), parse_rank(str[1])); }
+constexpr Piece  parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
+
+}  // namespace IOUtils
 
 }  // namespace Lyra

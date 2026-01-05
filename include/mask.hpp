@@ -18,10 +18,10 @@ constexpr BB Board::threatened() {
 
   const BB occ            = bb() ^ bb(King);
 
-  BB threatened           = pawn_attack<Them>(bb(Pawn)) | KING_ATK[ksq<Them>()];
-  loop(bb(Knight), [&](Square src) { threatened |= KNIGHT_ATK[src]; });
-  loop(bb(Bishop, Queen), [&](Square src) { threatened |= BISHOP_ATK[src][occ]; });
-  loop(bb(Rook, Queen), [&](Square src) { threatened |= ROOK_ATK[src][occ]; });
+  BB threatened           = pawn_attack_bb<Them>(bb(Pawn)) | KING_ATK[ksq<Them>()];
+  bitloop(bb(Knight), [&](Square src) { threatened |= KNIGHT_ATK[src]; });
+  bitloop(bb(Bishop, Queen), [&](Square src) { threatened |= BISHOP_ATK[src][occ]; });
+  bitloop(bb(Rook, Queen), [&](Square src) { threatened |= ROOK_ATK[src][occ]; });
 
   return threatened;
 }
@@ -59,18 +59,18 @@ constexpr void Board::update_pin_and_check_masks() {
   // clang-format off
 
     BB pinners = BISHOP_ATK[ksq][their_occ] & bb(Bishop, Queen);
-    loop(pinners, [&](Square atk) {
+    bitloop(pinners, [&](Square atk) {
         pin_mask = BTWN_BB[ksq][atk] | from(atk);
-        switch (count(pin_mask & our_occ)) {
+        switch (popcount(pin_mask & our_occ)) {
         case 0: if constexpr (inCheck) check_mask |= pin_mask; break;
         case 1: diag_pin |= pin_mask;
         }
     });
 
     pinners = ROOK_ATK[ksq][their_occ] & bb(Rook, Queen);
-    loop(pinners, [&](Square atk) {
+    bitloop(pinners, [&](Square atk) {
         pin_mask = BTWN_BB[ksq][atk] | from(atk);
-        switch (count(pin_mask & our_occ)) {
+        switch (popcount(pin_mask & our_occ)) {
         case 0: if constexpr (inCheck) check_mask |= pin_mask; break;
         case 1: hv_pin |= pin_mask;
         }

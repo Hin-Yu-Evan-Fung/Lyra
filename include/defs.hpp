@@ -30,7 +30,7 @@ using Eval  = I32;
 constexpr Depth       MAX_DEPTH = 256;
 constexpr std::size_t MAX_MOVES = 256;
 constexpr Eval        EVAL_INF  = 30000;
-constexpr Eval        DRAW      = 0;
+constexpr Eval        EVAL_DRAW = 0;
 
 /******************************************\
 |==========================================|
@@ -161,8 +161,8 @@ constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
 \******************************************/
 
 constexpr Square flip_rank(Square sq) noexcept { return static_cast<Square>(sq ^ A8); }
-constexpr Square relative(Colour c, Square sq) noexcept { return c == White ? sq : flip_rank(sq); }
-constexpr Castle relative(Colour c, Castle cr) noexcept { return c == White ? cr : Castle(cr << 2); }
+constexpr Square relative_sq(Colour c, Square sq) noexcept { return c == White ? sq : flip_rank(sq); }
+constexpr Castle relative_castle(Colour c, Castle cr) noexcept { return c == White ? cr : Castle(cr << 2); }
 
 template <Colour C>
 constexpr Square forward(Square sq) noexcept {

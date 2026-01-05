@@ -4,6 +4,7 @@
 #include <cstring>
 #include <ios>
 #include <iostream>
+#include <print>
 #include <sstream>
 
 #include "bitboard.hpp"
@@ -61,7 +62,7 @@ void Board::set(const std::string& fen) {
     sq = make_square(File(file), Rank(rank));
 
     if (std::isalpha(c)) {
-      Piece pc = to_piece(c);
+      Piece pc = IOUtils::parse_piece(c);
       colour_of(pc) == White ? set_piece<true, White>(pc, sq) : set_piece<true, Black>(pc, sq);
       file++;
     } else if (std::isdigit(c)) {
@@ -88,19 +89,19 @@ void Board::set(const std::string& fen) {
     Square rsq;
 
     if (upper == 'K') {
-      rsq = relative(s, H1);
+      rsq = relative_sq(s, H1);
       while (on(rsq) != rook)
         --rsq;
       castling = CastleMask::get_mask(s, false);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper == 'Q') {
-      rsq = relative(s, A1);
+      rsq = relative_sq(s, A1);
       while (on(rsq) != rook)
         ++rsq;
       castling = CastleMask::get_mask(s, true);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper >= 'A' && upper <= 'H') {
-      rsq      = relative(s, make_square(to_file(upper), Rank1));
+      rsq      = relative_sq(s, make_square(IOUtils::parse_file(upper), Rank1));
       castling = CastleMask::get_mask(s, ksq > rsq);
       castling_mask_.add_rights(ksq, rsq, castling);
     }
@@ -111,7 +112,7 @@ void Board::set(const std::string& fen) {
   // 4. Parse enpassant
   ss >> std::skipws >> part;
   state_->ep = NoSquare;
-  if (part.length() == 2) { state_->ep = to_sq(part); }
+  if (part.length() == 2) { state_->ep = IOUtils::parse_sq(part); }
 
   int fifty_mv = 0, full_mv = 1;
   ss >> std::skipws >> fifty_mv;
@@ -130,24 +131,24 @@ void Board::set(const std::string& fen) {
 }
 
 void Board::print() const {
-  printf("\n     +---+---+---+---+---+---+---+---+\n");
+  std::println("\n     +---+---+---+---+---+---+---+---+");
 
   for (Rank r = Rank8; r >= Rank1; --r) {
-    printf(" %c   |", to_char(r));
+    std::print(" {}   |", IOUtils::format_rank(r));
     for (File f = FileA; f <= FileH; ++f)
-      printf(" %c |", to_char(on(make_square(f, r))));
+      std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
 
-    printf("\n     +---+---+---+---+---+---+---+---+\n");
+    std::println("\n     +---+---+---+---+---+---+---+---+");
   }
-  printf("\n       A   B   C   D   E   F   G   H\n\n");
-  printf("Fen: %s\n", fen().c_str());
-  printf("Side to move: %s\n", stm_ == White ? "White" : "Black");
-  printf("Castling Rights: %s\n", castling_mask_.to_str(state_->castling).c_str());
-  printf("Enpassant Square: %s\n", to_str(state_->ep).c_str());
-  printf("Hash Key: 0x%lx\n", state_->key);
-  printf("Incremental PSQ: %d\n", eval_incr());
-  printf("Real PSQ: %d\n", eval_raw());
-  printf("Chess960: %s\n", chess960 ? "true" : "false");
+  std::println("\n       A   B   C   D   E   F   G   H\n");
+  std::println("Fen: {}", fen());
+  std::println("Side to move: {}", stm_ == White ? "White" : "Black");
+  std::println("Castling Rights: {}", castling_mask_.to_str(state_->castling).c_str());
+  std::println("Enpassant Square: {}", IOUtils::format_sq(state_->ep).c_str());
+  std::println("Hash Key: {:#X}", state_->key);
+  std::println("Incremental PSQ: {}", compute_incr_eval());
+  std::println("Real PSQ: {}", compute_raw_eval());
+  std::println("Chess960: {}", chess960 ? "true" : "false");
 }
 
 std::string Board::fen() const {
@@ -162,7 +163,7 @@ std::string Board::fen() const {
       pc = on(sq);
       if (pc != NoPiece) {
         if (empty_count != 0) out << empty_count;
-        out << to_char(pc);
+        out << IOUtils::format_piece(pc);
         empty_count = 0;
       } else {
         empty_count += 1;
@@ -176,7 +177,7 @@ std::string Board::fen() const {
 
   out << " " << (stm_ == Colour::White ? "w" : "b");
   out << " " << castling_mask_.to_str(state_->castling);
-  out << " " << (state_->ep != NoSquare ? to_str(state_->ep) : "-");
+  out << " " << (state_->ep != NoSquare ? IOUtils::format_sq(state_->ep) : "-");
   out << " " << int(state_->fifty_mv);
   out << " " << half_mv_ / 2 + 1;
 
@@ -222,7 +223,7 @@ Zobrist::Key Board::compute_pawn_key() const {
 |==========================================|
 \******************************************/
 
-Eval Board::eval_raw() const {
+Eval Board::compute_raw_eval() const {
   Score score{};
   int   game_phase = 0;
 
@@ -238,7 +239,7 @@ Eval Board::eval_raw() const {
   return stm_ == White ? raw : -raw;
 }
 
-Eval Board::eval_incr() const {
+Eval Board::compute_incr_eval() const {
   Eval raw = state_->psq.to_eval(state_->game_phase);
   return stm_ == White ? raw : -raw;
 }

@@ -1,7 +1,6 @@
 #include "engine.hpp"
 
 #include <atomic>
-#include <sstream>
 
 #include "defs.hpp"
 #include "movegen.hpp"
@@ -54,7 +53,7 @@ void Engine::set_pos(const std::string fen, const std::vector<std::string>& move
     Move parsed = NoMove;
 
     for (Move move : list_moves(board_)) {
-      std::string move_repr = print_move(move, board_.chess960);
+      std::string move_repr = MoveUtils::format(move, board_.chess960);
       MoveFlag    flag      = MoveUtils::flag(move);
 
       // clang-format off
@@ -80,34 +79,6 @@ void Engine::set_threads(size_t num) {
 }
 
 void Engine::set_chess960(bool chess960) { board_.chess960 = chess960; }
-
-/******************************************\
-|==========================================|
-|                 Printing                 |
-|==========================================|
-\******************************************/
-
-std::string Engine::print_move(Move move, bool chess960) {
-  if (!move) return "none";
-
-  Square src_sq = src(move);
-  Square dst_sq = dst(move);
-
-  if (!chess960 && is_castle(move)) dst_sq = make_square(flag(move) == QueenCastle ? FileC : FileG, rank_of(src_sq));
-
-  std::string move_str = Lyra::to_str(src_sq) + Lyra::to_str(dst_sq);
-
-  if (is_promo(move)) move_str += " pnbrqk"[promoted_pt(move)];
-
-  return move_str;
-}
-
-std::string Engine::print_pv(const PVLine& pv, bool chess960) {
-  std::ostringstream os;
-  for (size_t i = 0; i < pv.length; i++)
-    os << print_move(pv.moves[i], chess960) << " ";
-  return os.str();
-}
 
 template void Engine::perft<Perft>(Depth d);
 template void Engine::perft<Perft_MP>(Depth d);

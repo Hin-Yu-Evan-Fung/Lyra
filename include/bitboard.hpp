@@ -45,11 +45,11 @@ constexpr BB from(File f) { return FileABB << f; }
 inline U64 pext(BB bb, BB mask) { return _pext_u64(bb, mask); }
 #endif
 inline Square lsb(BB bb) { return static_cast<Square>(_tzcnt_u64(bb)); }
-inline int    count(BB bb) { return _mm_popcnt_u64(bb); }
+inline int    popcount(BB bb) { return _mm_popcnt_u64(bb); }
 constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>
-constexpr void loop(BB bb, Func&& func) {
+constexpr void bitloop(BB bb, Func&& func) {
   for (; bb; bb &= bb - 1)
     func(lsb(bb));
 }
@@ -108,7 +108,7 @@ extern BB    BTWN_BB[NSquare][NSquare];
 extern BB    CHECK_BB[NSquare][NSquare];
 
 template <Colour C>
-constexpr BB pawn_attack(BB bb) {
+constexpr BB pawn_attack_bb(BB bb) {
   using enum Direction;
   return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
 }

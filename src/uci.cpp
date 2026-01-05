@@ -2,6 +2,7 @@
 
 #include <ios>
 #include <iostream>
+#include <print>
 #include <sstream>
 #include <string>
 
@@ -23,14 +24,15 @@ void UCI::loop() {
     is >> std::skipws >> token;
 
     if (token == "uci") {
-      printf("id name: %s\nid author %s\nversion: %s\n", NAME.data(), AUTHOR.data(), VERSION.data());
-      printf("option name UCI_Chess960 type check default false\n");
-      printf("option name ClearHash type button\n");
-      printf("option name Hash type spin default 32 min 1 max 128\n");
-      printf("option name Threads type spin default 1 min 1 max 12\n");
-      printf("uciok\n");
+      std::println("id name {} {}", NAME, AUTHOR);
+      std::println("id author {}", AUTHOR);
+      std::println("option name UCI_Chess960 type check default false");
+      std::println("option name ClearHash type button");
+      std::println("option name Hash type spin default 32 min 1 max 128");
+      std::println("option name Threads type spin default 1 min 1 max 12");
+      std::println("uciok");
     } else if (token == "isready")
-      printf("readyok\n");
+      std::println("readyok");
     else if (token == "stop" || token == "quit")
       engine_.stop();
     else if (token == "ucinewgame")
@@ -42,7 +44,7 @@ void UCI::loop() {
     else if (token == "b")
       engine_.print_pos();
     else if (token == "setoption")
-      parse_opt(is);
+      parse_option(is);
     else if (token == "perft")
       parse_perft(is);
 
@@ -69,7 +71,7 @@ void UCI::parse_perft(std::istringstream& is) {
   } else if (token == "bench")
     engine_.perft_bench();
   else
-    printf("Wrong command format! Must be perft [depth], perft mp [depth] or perft bench!\n");
+    std::println("Wrong command format! Must be perft [depth], perft mp [depth] or perft bench!");
 }
 
 void UCI::parse_go(std::istringstream& is) {
@@ -95,7 +97,7 @@ void UCI::parse_go(std::istringstream& is) {
     else if (token == "infinite")
       tc.is_infinite = true;
     else {
-      printf("Wrong command format!\n");
+      std::println("Wrong command format!");
       return;
     }
   }
@@ -114,9 +116,9 @@ void UCI::parse_pos(std::istringstream& is) {
     while (is >> token && token != "moves")
       fen += token + " ";
   } else {
-    printf(
+    std::println(
       "Wrong command format! Must be 'position startpos [moves] <move-1> <move-2> ...' or 'position fen <fen> "
-      "[moves] <move-1> <move-2>'\n"
+      "[moves] <move-1> <move-2>'"
     );
     return;
   }
@@ -128,10 +130,10 @@ void UCI::parse_pos(std::istringstream& is) {
 
   try {
     engine_.set_pos(fen, moves);
-  } catch (const std::invalid_argument& e) { printf("Error: %s\n", e.what()); }
+  } catch (const std::invalid_argument& e) { std::println("Error: {}", e.what()); }
 }
 
-void UCI::parse_opt(std::istringstream& is) {
+void UCI::parse_option(std::istringstream& is) {
   std::string token, name;
   is >> token;
 

@@ -72,7 +72,7 @@ U64 perftmp(Board& board, Depth depth) {
 
 template <PerftMode PM>
 void perft(Board& board, Depth d) {
-  std::println("========   PERFT   ========\n");
+  std::println("========   PERFT   ========");
 
   Time start = now();
   U64  nodes = 0;
@@ -173,7 +173,7 @@ void perft_bench() {
     if (elapsed > 0) { nps = nodes * 1000 / elapsed; }
 
     std::println(
-      "status: {}, time: {} ms, nps: {}, fen: {}\n", nodes == validation ? "PASSED" : "FAILED", elapsed, nps, fen
+      "status: {}, time: {} ms, nps: {}, fen: {}", nodes == validation ? "PASSED" : "FAILED", elapsed, nps, fen
     );
 
     if (nodes != validation) return;

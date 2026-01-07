@@ -1,5 +1,6 @@
 #include "board.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <ios>
@@ -12,6 +13,7 @@
 #include "defs.hpp"
 #include "eval.hpp"
 #include "mask.hpp"
+#include "movegen.hpp"
 #include "utils.hpp"
 #include "zobrist.hpp"
 
@@ -24,21 +26,22 @@ namespace Lyra {
 \******************************************/
 
 Board::Board() {
-  history_ = new Undo[MAX_DEPTH];
+  history_ = new Undo[MaxPly];
   reset();
 }
 
 Board::~Board() { delete[] history_; }
 
 void Board::reset() {
-  chess960           = false;
-  half_mv_           = 0;
-  state_             = history_;
-  state_->castling   = NoCastle;
-  state_->ep         = NoSquare;
-  state_->fifty_mv   = 0;
-  state_->psq        = {};
-  state_->game_phase = 0;
+  chess960              = false;
+  ply_                  = 0;
+  undo_                 = history_;
+  undo_->ply_from_null_ = 0;
+  undo_->castling       = NoCastle;
+  undo_->ep             = NoSquare;
+  undo_->rule50         = 0;
+  undo_->psq            = {};
+  undo_->game_phase     = 0;
 
   memset(pieceBB_, BBUtils::EmptyBB, sizeof(pieceBB_));
   memset(colourBB_, BBUtils::EmptyBB, sizeof(colourBB_));
@@ -107,28 +110,39 @@ void Board::set(const std::string& fen) {
       castling_mask_.add_rights(ksq, rsq, castling);
     }
 
-    state_->castling |= castling;
+    undo_->castling |= castling;
   }
 
   // 4. Parse enpassant
   ss >> std::skipws >> part;
-  state_->ep = NoSquare;
-  if (part.length() == 2) { state_->ep = IOUtils::parse_sq(part); }
+  undo_->ep = NoSquare;
+  if (part.length() == 2) { undo_->ep = IOUtils::parse_sq(part); }
 
   int fifty_mv = 0, full_mv = 1;
   ss >> std::skipws >> fifty_mv;
   ss >> std::skipws >> full_mv;
 
-  state_->fifty_mv = I8(fifty_mv);
-  half_mv_         = I8(full_mv - 1) * 2 + I8(stm_);
-
-  state_->key      = compute_key();
+  undo_->rule50 = I8(fifty_mv);
+  ply_          = I8(full_mv - 1) * 2 + I8(stm_);
+  undo_->key    = compute_key();
 
   // Basic board legality checks
   if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
   if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
 
   stm_ == White ? update_masks<White>() : update_masks<Black>();
+}
+
+void Board::set(const Board& board) {
+  chess960       = board.chess960;
+  ply_           = board.ply_;
+  castling_mask_ = board.castling_mask_;
+  stm_           = board.stm_;
+  std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
+  std::copy_n(board.colourBB_, NColour, colourBB_);
+  std::copy_n(board.board_, NSquare, board_);
+  std::copy_n(board.history_, board.undo_->ply_from_null_ + 1, history_);
+  undo_ = history_ + board.undo_->ply_from_null_;
 }
 
 void Board::print() const {
@@ -144,12 +158,13 @@ void Board::print() const {
   std::println("\n       A   B   C   D   E   F   G   H\n");
   std::println("Fen: {}", fen());
   std::println("Side to move: {}", stm_ == White ? "White" : "Black");
-  std::println("Castling Rights: {}", castling_mask_.to_str(state_->castling).c_str());
-  std::println("Enpassant Square: {}", IOUtils::format_sq(state_->ep).c_str());
-  std::println("Hash Key: {:#X}", state_->key);
+  std::println("Castling Rights: {}", castling_mask_.to_str(undo_->castling).c_str());
+  std::println("Enpassant Square: {}", IOUtils::format_sq(undo_->ep).c_str());
+  std::println("Hash Key: {:#X}", undo_->key);
   std::println("Incremental PSQ: {}", compute_incr_eval());
   std::println("Real PSQ: {}", compute_raw_eval());
   std::println("Chess960: {}", chess960 ? "true" : "false");
+  std::println("Ply from null: {}", undo_->ply_from_null_);
 }
 
 std::string Board::fen() const {
@@ -177,10 +192,10 @@ std::string Board::fen() const {
   }
 
   out << " " << (stm_ == Colour::White ? "w" : "b");
-  out << " " << castling_mask_.to_str(state_->castling);
-  out << " " << (state_->ep != NoSquare ? IOUtils::format_sq(state_->ep) : "-");
-  out << " " << int(state_->fifty_mv);
-  out << " " << half_mv_ / 2 + 1;
+  out << " " << castling_mask_.to_str(undo_->castling);
+  out << " " << (undo_->ep != NoSquare ? IOUtils::format_sq(undo_->ep) : "-");
+  out << " " << int(undo_->rule50);
+  out << " " << ply_ / 2 + 1;
 
   return out.str();
 }
@@ -200,9 +215,9 @@ Zobrist::Key Board::compute_key() const {
   }
 
   if (stm_ == Black) key ^= Zobrist::SIDE_KEY;
-  if (state_->ep != NoSquare) key ^= Zobrist::EP_KEYS[file_of(state_->ep)];
+  if (undo_->ep != NoSquare) key ^= Zobrist::EP_KEYS[file_of(undo_->ep)];
 
-  key ^= Zobrist::CASTLE_KEYS[state_->castling];
+  key ^= Zobrist::CASTLE_KEYS[undo_->castling];
 
   return key;
 }
@@ -241,8 +256,30 @@ Eval Board::compute_raw_eval() const {
 }
 
 Eval Board::compute_incr_eval() const {
-  Eval raw = state_->psq.to_eval(state_->game_phase);
+  Eval raw = undo_->psq.to_eval(undo_->game_phase);
   return stm_ == White ? raw : -raw;
 }
+
+/******************************************\
+|==========================================|
+|                  Score                   |
+|==========================================|
+\******************************************/
+
+bool Board::is_draw() const {
+  bool not_checkmate = (undo_->check_mask == FullBB || list_moves(*this).size());
+  if (undo_->rule50 >= Rule50Ply && not_checkmate) return true;
+  return is_reps();
+}
+
+bool Board::is_reps() const {
+  int end = std::min((U16)undo_->rule50, undo_->ply_from_null_);
+  if (end >= 4)
+    for (int i = 2, reps = 0; i <= end; i += 2)
+      if (undo_->key == (undo_ - i)->key && ++reps >= 2) return true;
+  return false;
+}
+
+bool Board::in_check() const { return undo_->check_mask != FullBB; }
 
 }  // namespace Lyra

@@ -29,13 +29,15 @@ struct Undo {
   Castle castling;
   Square ep;
 
-  U8           fifty_mv;
+  U8           rule50;
+  U16          ply_from_null_;
   Move         mv;
   Zobrist::Key key;
   Zobrist::Key pawn_key;
 
-  BB   check_mask, diag_pin, hv_pin, attacked;
-  bool ep_pin;
+  // Check mask: FullBB = No checks, EmptyBB = Double check, otherwise = Checkers
+  // Attacked: EmptyBB = King cannot move, otherwise = squares attacked by enemy
+  BB check_mask, diag_pin, hv_pin, attacked;
 
   Score psq;
   int   game_phase;
@@ -54,10 +56,10 @@ class Board {
   Piece board_[NSquare];
 
   Colour     stm_;
-  Ply        half_mv_;
+  U16        ply_;
   CastleMask castling_mask_;
 
-  Undo* state_;
+  Undo* undo_;
   Undo* history_;
 
   template <bool DoMove, Colour C>
@@ -72,7 +74,7 @@ class Board {
   template <Colour Us, bool inCheck>
   constexpr void update_pin_and_check_masks();
   template <Colour Us>
-  constexpr void update_ep_pin();
+  constexpr bool can_ep(Square ep);
   template <Colour Us>
   constexpr BB checkers();
   template <Colour Us>
@@ -88,6 +90,7 @@ class Board {
   Board& operator=(const Board&) = delete;
 
   void set(const std::string& fen);
+  void set(const Board& board);
   void reset();
 
   void        print() const;
@@ -112,8 +115,9 @@ class Board {
 
   constexpr CastleMask castling_mask() const;
 
-  constexpr Undo* state();
-  constexpr Undo* state() const;
+  constexpr Undo*         state();
+  constexpr Undo*         state() const;
+  constexpr Zobrist::Key* rep_table();
 
   Zobrist::Key          compute_key() const;
   Zobrist::Key          compute_pawn_key() const;
@@ -121,6 +125,10 @@ class Board {
 
   Eval compute_raw_eval() const;
   Eval compute_incr_eval() const;
+
+  bool is_draw() const;
+  bool is_reps() const;
+  bool in_check() const;
 };
 
 /******************************************\
@@ -129,8 +137,8 @@ class Board {
 |==========================================|
 \******************************************/
 
-constexpr Undo*      Board::state() { return state_; }
-constexpr Undo*      Board::state() const { return state_; }
+constexpr Undo*      Board::state() { return undo_; }
+constexpr Undo*      Board::state() const { return undo_; }
 constexpr Colour     Board::stm() const { return stm_; }
 constexpr CastleMask Board::castling_mask() const { return castling_mask_; }
 
@@ -172,9 +180,9 @@ constexpr void Board::set_piece(Piece pc, Square sq) {
 
   if constexpr (!DoMove) return;
 
-  state_->key        ^= Zobrist::PIECE_KEYS[pc][sq];
-  state_->psq        += EvalUtils::PSQT[pc][sq];
-  state_->game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
+  undo_->key        ^= Zobrist::PIECE_KEYS[pc][sq];
+  undo_->psq        += EvalUtils::PSQT[pc][sq];
+  undo_->game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
 }
 
 template <bool DoMove, Colour C>
@@ -186,9 +194,9 @@ constexpr void Board::pop_piece(Square sq) {
 
   if constexpr (!DoMove) return;
 
-  state_->key        ^= Zobrist::PIECE_KEYS[pc][sq];
-  state_->psq        -= EvalUtils::PSQT[pc][sq];
-  state_->game_phase -= EvalUtils::GamePhaseInc[pt_of(pc)];
+  undo_->key        ^= Zobrist::PIECE_KEYS[pc][sq];
+  undo_->psq        -= EvalUtils::PSQT[pc][sq];
+  undo_->game_phase -= EvalUtils::GamePhaseInc[pt_of(pc)];
 }
 
 template <bool DoMove, Colour C>
@@ -201,8 +209,30 @@ constexpr void Board::move_piece(Square src, Square dst) {
 
   if constexpr (!DoMove) return;
 
-  state_->key ^= Zobrist::PIECE_KEYS[pc][src] ^ Zobrist::PIECE_KEYS[pc][dst];
-  state_->psq += EvalUtils::PSQT[pc][dst] - EvalUtils::PSQT[pc][src];
+  undo_->key ^= Zobrist::PIECE_KEYS[pc][src] ^ Zobrist::PIECE_KEYS[pc][dst];
+  undo_->psq += EvalUtils::PSQT[pc][dst] - EvalUtils::PSQT[pc][src];
 }
+
+/******************************************\
+|==========================================|
+|             Repetitions/Draw             |
+|==========================================|
+\******************************************/
+
+// constexpr void Board::update_reps() {
+//   Reps& r = rep_table_[undo_->rule50];
+//   r.key   = undo_->key;
+//   r.reps  = 0;
+//
+//   int end = std::min((U16)undo_->rule50, undo_->ply_from_null_);
+//   if (end >= 4) {
+//     for (int i = 2; i <= end; i += 2) {
+//       Reps& prev = rep_table_[undo_->rule50 - i];
+//       if (prev.key != r.key) continue;
+//       r.reps = prev.reps ? -i : i;
+//       break;
+//     }
+//   }
+// }
 
 }  // namespace Lyra

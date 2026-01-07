@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
+#include <string>
 
 namespace Lyra {
 
@@ -18,7 +20,6 @@ using U16   = uint16_t;
 using U64   = uint64_t;
 
 using Depth = I16;
-using Ply   = U16;
 using Eval  = I32;
 
 /******************************************\
@@ -27,10 +28,17 @@ using Eval  = I32;
 |==========================================|
 \******************************************/
 
-constexpr Depth       MAX_DEPTH = 256;
-constexpr std::size_t MAX_MOVES = 256;
-constexpr Eval        EVAL_INF  = 30000;
-constexpr Eval        EVAL_DRAW = 0;
+enum {
+  MaxDepth      = 256,
+  MaxPly        = 2048,
+  MaxMoves      = 256,
+  Rule50Ply     = 100,
+  EvalInf       = 30000,
+  EvalMate      = 29000,
+  EvalMateBound = EvalMate - MaxDepth,
+  EvalDraw      = 0,
+  EvalStop      = 0,
+};
 
 /******************************************\
 |==========================================|
@@ -133,7 +141,7 @@ constexpr Piece     make_piece(Colour c, PieceType pt) noexcept { return static_
 
 /******************************************\
 |==========================================|
-|                  Score                   |
+|               Eval/Score                 |
 |==========================================|
 \******************************************/
 
@@ -153,6 +161,22 @@ constexpr Score  operator+(Score s1, Score s2) { return {s1.mg + s2.mg, s1.eg + 
 constexpr Score  operator-(Score s1, Score s2) { return {s1.mg - s2.mg, s1.eg - s2.eg}; }
 constexpr Score& operator+=(Score& s1, Score s2) { return s1 = s1 + s2; }
 constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
+
+namespace EvalUtils {
+
+constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
+constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
+
+inline std::string format(Eval v) {
+  if (v >= EvalMateBound)
+    return std::format("mate {}", (EvalMate - v + 1) / 2);
+  else if (v <= EvalMateBound)
+    return std::format("mate {}", (-EvalMate - v - 1) / 2);
+  else
+    return std::format("cp {}", v);
+}
+
+}  // namespace EvalUtils
 
 /******************************************\
 |==========================================|

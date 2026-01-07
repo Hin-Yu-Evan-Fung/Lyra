@@ -37,7 +37,7 @@ Eval MovePicker<Us>::score_quiet(Move move) {
 template <Colour Us>
 void MovePicker<Us>::gen_score_cap() {
   start_ptr = 0;
-  end_ptr   = MAX_MOVES - 1;
+  end_ptr   = MaxMoves - 1;
   enum_moves<Us, GenCap>(state_.board, [&](Move move) {
     if (move == state_.tt_move) return;
 
@@ -83,7 +83,7 @@ Move MovePicker<Us>::pop_front() {
 template <Colour Us>
 Move MovePicker<Us>::pop_back() {
   end_ptr++;
-  swap(best_idx(end_ptr, MAX_MOVES), end_ptr);
+  swap(best_idx(end_ptr, MaxMoves), end_ptr);
   return moves_[end_ptr];
 }
 

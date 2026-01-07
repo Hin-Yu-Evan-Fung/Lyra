@@ -47,7 +47,6 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
   const BB     empty             = ~board.bb();
   const BB     enemy             = board.bb(Them);
   const BB     pawns             = board.bb(Pawn);
-  const BB     ep_pin            = board.state()->ep_pin;
   const BB     diag_pin          = board.state()->diag_pin;
   const BB     hv_pin            = board.state()->hv_pin;
   const BB     check_mask        = board.state()->check_mask;
@@ -59,7 +58,7 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
     BB can_cap_west = can_cap & (~diag_pin | shift<DownWest>(diag_pin));
     BB can_cap_east = can_cap & (~diag_pin | shift<DownEast>(diag_pin));
 
-    if (ep != NoSquare && !ep_pin) {
+    if (ep != NoSquare) {
       BB can_ep_west = can_cap_west & shift<W>(ep_target & check_mask);
       if (can_ep_west) handler(encode<EP>(lsb(can_ep_west), ep));
 

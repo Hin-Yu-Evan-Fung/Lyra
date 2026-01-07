@@ -1,5 +1,8 @@
 #include "move.hpp"
 
+#include <print>
+
+#include "bitboard.hpp"
 #include "board.hpp"
 #include "defs.hpp"
 #include "mask.hpp"
@@ -25,41 +28,44 @@ void Board::do_move(Move move) {
   const Piece      pc   = on(src);
   const MoveFlag   flag = MoveUtils::flag(move);
   Piece            promo;
-  Square           rook_dst, king_dst, ep_sq;
+  Square           rook_dst, king_dst, ep;
   bool             queen_side;
 
-  half_mv_++;
+  ply_++;
 
   // Initialise new state
-  Undo* prev         = state_++;
-  state_->mv         = move;
-  state_->castling   = prev->castling;
-  state_->fifty_mv   = prev->fifty_mv + 1;
-  state_->game_phase = prev->game_phase;
-  state_->psq        = prev->psq;
+  Undo* prev            = undo_++;
+  undo_->mv             = move;
+  undo_->castling       = prev->castling;
+  undo_->rule50         = prev->rule50 + 1;
+  undo_->game_phase     = prev->game_phase;
+  undo_->psq            = prev->psq;
+  undo_->ply_from_null_ = prev->ply_from_null_ + 1;
 
-  Piece cap          = on(dst);
-  state_->cap        = cap;
-  state_->key        = prev->key;
+  Piece cap             = on(dst);
+  undo_->cap            = cap;
+  undo_->key            = prev->key;
   // Update key if enpassant is reset
-  state_->key ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
-  state_->ep   = NoSquare;
+  undo_->key ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
+  undo_->ep   = NoSquare;
 
   switch (flag) {
   case Quiet:
     move_piece<true, Us>(src, dst);
-    if (pc == Pawn) state_->fifty_mv = 0;
+    if (pc == Pawn) undo_->rule50 = 0;
     break;
   case Cap:
     pop_piece<true, Them>(dst);
     move_piece<true, Us>(src, dst);
-    state_->fifty_mv = 0;
+    undo_->rule50 = 0;
     break;
   case DoublePush:
     move_piece<true, Us>(src, dst);
-    state_->ep        = forward<Us>(src);
-    state_->key      ^= Zobrist::EP_KEYS[file_of(src)];
-    state_->fifty_mv  = 0;
+    ep            = forward<Us>(src);
+    undo_->rule50 = 0;
+    if (!can_ep<Them>(ep)) break;
+    undo_->ep   = ep;
+    undo_->key ^= Zobrist::EP_KEYS[file_of(ep)];
     break;
   case KingCastle:
   case QueenCastle:
@@ -83,26 +89,26 @@ void Board::do_move(Move move) {
     promo = make_piece(Us, MoveUtils::promoted_pt(move));
     pop_piece<true, Us>(src);
     set_piece<true, Us>(promo, dst);
-    state_->fifty_mv = 0;
+    undo_->rule50 = 0;
     break;
   case EP:
-    ep_sq = forward<Them>(dst);
-    cap   = make_piece(Them, P);
+    ep  = forward<Them>(dst);
+    cap = make_piece(Them, P);
     move_piece<true, Us>(src, dst);
-    pop_piece<true, Them>(ep_sq);
-    state_->cap      = cap;
-    state_->fifty_mv = 0;
+    pop_piece<true, Them>(ep);
+    undo_->cap    = cap;
+    undo_->rule50 = 0;
     break;
   }
 
   // Update castling rights and keys
-  state_->key      ^= Zobrist::CASTLE_KEYS[state_->castling];
-  state_->castling &= castling_mask_.rights[src] & castling_mask_.rights[dst];
-  state_->key      ^= Zobrist::CASTLE_KEYS[state_->castling];
+  undo_->key      ^= Zobrist::CASTLE_KEYS[undo_->castling];
+  undo_->castling &= castling_mask_.rights[src] & castling_mask_.rights[dst];
+  undo_->key      ^= Zobrist::CASTLE_KEYS[undo_->castling];
 
   // Update board state
-  state_->key ^= Zobrist::SIDE_KEY;
-  stm_         = ~stm_;
+  undo_->key ^= Zobrist::SIDE_KEY;
+  stm_        = ~stm_;
 
   update_masks<Them>();
 }
@@ -112,8 +118,8 @@ void Board::undo_move() {
   constexpr Colour Them = ~Us;
   constexpr Piece  King = make_piece(Us, K);
   constexpr Piece  Pawn = make_piece(Us, P);
-  const Move       move = state_->mv;
-  const Piece      cap  = state_->cap;
+  const Move       move = undo_->mv;
+  const Piece      cap  = undo_->cap;
   const Square     src  = MoveUtils::src(move);
   const Square     dst  = MoveUtils::dst(move);
   const MoveFlag   flag = MoveUtils::flag(move);
@@ -160,9 +166,9 @@ void Board::undo_move() {
     break;
   }
 
-  state_--;
+  undo_--;
   stm_ = ~stm_;
-  half_mv_--;
+  ply_--;
 }
 
 template void Board::do_move<White>(Move move);

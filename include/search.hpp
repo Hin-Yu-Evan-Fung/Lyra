@@ -12,7 +12,7 @@ class ThreadPool;
 class Thread;
 
 struct PVLine {
-  Move   moves[MAX_DEPTH];
+  Move   moves[MaxDepth];
   size_t length;
 
   void        update(const PVLine& other, Move best);
@@ -27,24 +27,11 @@ struct StackEntry {
   Piece moved;
   Eval  eval;
   bool  in_check;
-  Ply   ply_since_null;
+  U16   ply_since_null;
 };
 
 class Worker {
   enum NodeType { Root, PV, NonPV };
-
- public:
-  Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}
-  bool is_main() { return id_ == 0; }
-
-  void reset(std::string fen);
-  void start(const TimeControl& tc);
-  void uci_report();
-
- private:
-  void iter_deep();
-  void asp_win();
-  Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
 
   template <Colour Us, NodeType NT>
   Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
@@ -60,8 +47,17 @@ class Worker {
   PVLine pv_;
   size_t nodes_;
   Depth  depth_;
-  Ply    ply_;
+  Depth  seldepth_;
+  U16    ply_;
   Eval   eval_;
+
+ public:
+  Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}
+  bool is_main() { return id_ == 0; }
+
+  void reset(const Board& board);
+  void start(const TimeControl& tc);
+  void uci_report();
 };
 
 }  // namespace Lyra

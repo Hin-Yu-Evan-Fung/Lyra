@@ -42,15 +42,15 @@ class MovePicker {
   void   swap(size_t idx1, size_t idx2);
 
   bool peek_front() { return start_ptr != 0; }
-  bool peek_back() { return end_ptr != MAX_MOVES - 1; }
+  bool peek_back() { return end_ptr != MaxMoves - 1; }
   Move pop_front();
   Move pop_back();
 
-  Move moves_[MAX_MOVES];
-  Eval scores_[MAX_MOVES];
+  Move moves_[MaxMoves];
+  Eval scores_[MaxMoves];
 
   size_t start_ptr = 0;
-  size_t end_ptr   = MAX_MOVES - 1;
+  size_t end_ptr   = MaxMoves - 1;
 
   const MovePickState& state_;
   MovePickStage        stage_ = TT;

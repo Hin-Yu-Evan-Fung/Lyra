@@ -1,7 +1,6 @@
 #include "engine.hpp"
 
 #include <atomic>
-#include <iostream>
 
 #include "defs.hpp"
 #include "movegen.hpp"
@@ -26,7 +25,7 @@ void Engine::go(const TimeControl& tc) {
 
   pool_.stop_.store(false, std::memory_order::relaxed);
   pool_.exec([&](Thread& th) {
-    th.worker_.reset(board_.fen());
+    th.worker_.reset(board_);
     th.worker_.start(tc);
   });
 }

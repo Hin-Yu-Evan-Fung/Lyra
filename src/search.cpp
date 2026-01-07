@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <print>
 
+#include "defs.hpp"
 #include "movepick.hpp"
 
 namespace Lyra {
@@ -33,19 +34,28 @@ std::string PVLine::format(bool chess960) {
 |==========================================|
 \******************************************/
 
-void Worker::reset(std::string fen) {
-  board_.set(fen);
+void Worker::reset(const Board& board) {
+  board_.set(board);
   pv_    = {};
   nodes_ = 0;
   depth_ = 1;
-  nodes_ = 0;
+  ply_   = 0;
 }
 
 void Worker::uci_report() {
+  std::string eval_str;
+
+  if (std::abs(eval_) >= EvalMateBound) {
+    int moves_to_mate = (EvalMate - std::abs(eval_) + 1) / 2;
+    eval_str          = std::format("mate {}", eval_ > 0 ? moves_to_mate : -moves_to_mate);
+  } else {
+    eval_str = std::format("cp {}", eval_);
+  }
+
   std::println(
-    "info depth {} seldepth 0 score cp {} time {} nodes {} nps {} pv {}\n",
+    "info depth {} seldepth 0 score {} time {} nodes {} nps {} pv {}",
     depth_,
-    eval_,
+    eval_str,
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
@@ -55,17 +65,19 @@ void Worker::uci_report() {
 }
 
 void Worker::start(const TimeControl& tc) {
-  Colour stm   = board_.stm();
-
-  Move best_mv = NoMove;
+  Colour stm     = board_.stm();
+  Move   best_mv = NoMove;
 
   if (is_main()) clock_.set(stm, tc);
 
-  while (depth_ < MAX_DEPTH && !clock_.stop_iter(depth_)) {
-    Eval alpha = -EVAL_INF;
-    Eval beta  = EVAL_INF;
+  board_.print();
 
-    eval_      = search(board_, pv_, alpha, beta, depth_);
+  while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
+    Eval alpha = -EvalInf;
+    Eval beta  = EvalInf;
+
+    eval_      = board_.stm() == White ? search<White, Root>(board_, pv_, alpha, beta, depth_)
+                                       : search<Black, Root>(board_, pv_, alpha, beta, depth_);
 
     if (stop_.load(std::memory_order::relaxed)) break;
 
@@ -85,84 +97,134 @@ void Worker::start(const TimeControl& tc) {
 |==========================================|
 \******************************************/
 
-Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth) {
-  return board.stm() == White ? search<White, Root>(board_, pv_, alpha, beta, depth_)
-                              : search<Black, Root>(board_, pv_, alpha, beta, depth_);
-}
-
+// ** Search **
+// Alpha is our guaranteed score
+// Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth) {
-  if (clock_.stop(nodes_)) return EVAL_DRAW;
-
   nodes_ += 1;
   pv.clear();
 
   if (depth == 0) return qsearch<Us, PV>(board, pv, alpha, beta);
 
-  PVLine child_pv{};
+  if (NT != Root) {
+    if (clock_.stop(nodes_)) return EvalStop;
+    if (board.is_draw()) return EvalDraw;
+    if (ply_ >= MaxDepth) return board.in_check() ? EvalDraw : board.compute_incr_eval();
 
+    // Our guaranteed score will not be worse than mated in ply.
+    alpha = std::max(alpha, mated_in(ply_));
+    // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
+    beta = std::min(beta, mate_in(ply_ + 1));
+    // if our guaranteed score is better than the opponent's best score, no need to continue to search this.
+    if (alpha >= beta) return alpha;
+  }
+
+  // ** Main Search Loop ** //
+
+  PVLine         child_pv{};
   MovePickState  mps{board, NoMove, depth};
   MovePicker<Us> mp{false, mps};
 
-  Eval best = -EVAL_INF;
-  Move mv   = NoMove;
+  Eval best       = -EvalInf;
+  int  move_count = 0;
+  Move mv         = NoMove;
 
   while ((mv = mp.next())) {
+    move_count++;
+
+    // ** Recursive Search **
     board.do_move<Us>(mv);
+    ply_++;
+
     Eval val = -search<~Us, PV>(board, child_pv, -beta, -alpha, depth - 1);
+
+    ply_--;
     board.undo_move<Us>();
 
-    if (stop_.load(std::memory_order::relaxed)) return EVAL_DRAW;
+    // If we are stopping, return a placeholder score.
+    if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
+    // This move has a better score than the current best
+    // this is now the best move down this line.
     if (val > best) {
       best = val;
 
+      // This move has a better score than our guaranteed score - alpha,
+      // this is now the best move at this depth.
       if (val > alpha) {
         pv.update(child_pv, mv);
         alpha = val;
       }
     }
 
+    // This move has a better score than our opponent's guaranteed score - beta,
+    // so the opponent won't play this.
     if (val >= beta) return best;
   }
+
+  if (move_count == 0) return board_.in_check() ? mated_in(ply_) : EvalDraw;
 
   return best;
 }
 
+// ** Quiescence Search **
+// Alpha is our guaranteed score
+// Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
-  if (clock_.stop(nodes_)) return EVAL_DRAW;
+  // ** Check Draw ** //
+
+  if (clock_.stop(nodes_)) return EvalStop;
 
   nodes_ += 1;
   pv.clear();
 
-  PVLine child_pv{};
-
+  PVLine         child_pv{};
   MovePickState  mps{board, NoMove, 0};
   MovePicker<Us> mp{true, mps};
+
+  // ** Stand Pat ** //
+  // The current eval is the lower bound because we can just not capture anything (assume its not a zugzwang)
+  // If lower bound >= beta, then we fail high (opponent has better options)
+  // If lower bound > alpha, then we update alpha (the best we can do)
 
   Eval best = board.compute_incr_eval();
   if (best >= beta) return best;
   if (best > alpha) alpha = best;
 
+  // ** Main QSearch Loop ** //
+
   Move mv = NoMove;
 
   while ((mv = mp.next())) {
+    // ** Recursive Search **
     board.do_move<Us>(mv);
+    ply_++;
+
     Eval val = -qsearch<~Us, PV>(board, child_pv, -beta, -alpha);
+
+    ply_--;
     board.undo_move<Us>();
 
-    if (stop_.load(std::memory_order::relaxed)) return EVAL_DRAW;
+    // If we are stopping, return a placeholder score
+    if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
+    // This move has a better score than the current best
+    // this is now the best move down this line
     if (val > best) {
       best = val;
 
+      // This move has a better score than our guaranteed score - alpha,
+      // this is now the best move at this depth
       if (val > alpha) {
         pv.update(child_pv, mv);
         alpha = val;
       }
     }
 
+    // This move has a better score than our opponent's guaranteed score - beta,
+    // so the opponent won't play this.
     if (val >= beta) return best;
   }
 

@@ -78,37 +78,37 @@ constexpr void Board::update_pin_and_check_masks() {
 
   // clang-format on
 
-  state_->diag_pin = diag_pin;
-  state_->hv_pin   = hv_pin;
-  if constexpr (inCheck) state_->check_mask |= check_mask;
+  undo_->diag_pin = diag_pin;
+  undo_->hv_pin   = hv_pin;
+  if constexpr (inCheck) undo_->check_mask |= check_mask;
 }
 
 template <Colour Us>
-constexpr void Board::update_ep_pin() {
+constexpr bool Board::can_ep(Square ep) {
   using enum Direction;
   constexpr Colour    Them   = ~Us;
   constexpr Direction Up     = Us == White ? N : S;
   constexpr Piece     ERook  = make_piece(Them, R);
   constexpr Piece     EQueen = make_piece(Them, Q);
 
-  const BB ep_rank           = Us == White ? from(Rank5) : from(Rank4);
-  const BB king              = bb(make_piece(Us, K));
-  const BB pawns             = bb(make_piece(Us, P));
-  const BB enemy_rq          = bb(ERook, EQueen);
-  const BB occ               = bb();
-
-  const Square ep            = state_->ep;
+  const BB     ep_rank       = Us == White ? from(Rank5) : from(Rank4);
+  const BB     king          = bb(make_piece(Us, K));
+  const BB     pawns         = bb(make_piece(Us, P));
+  const BB     enemy_rq      = bb(ERook, EQueen);
+  const BB     occ           = bb();
   const BB     ep_target     = shift<~Up>(from(ep));
   const Square ksq           = Board::ksq<Us>();
 
-  if (!(ep_rank & king) || !(ep_rank & pawns) || !(ep_rank & enemy_rq)) return;
-
-  BB ep_w = pawns & shift<E>(ep_target);
-  BB ep_e = pawns & shift<W>(ep_target);
+  BB ep_w                    = pawns & shift<E>(ep_target);
+  BB ep_e                    = pawns & shift<W>(ep_target);
 
   // If the enemy rook/queen sees the king after simulating the enpassant, register the enpassant pin
-  if (ep_w) state_->ep_pin |= bool(ROOK_ATK[ksq][occ & ~(ep_target | ep_w)] & enemy_rq);
-  if (ep_e) state_->ep_pin |= bool(ROOK_ATK[ksq][occ & ~(ep_target | ep_e)] & enemy_rq);
+  bool has_attacker = PAWN_ATK[Them][ep] & pawns;
+  bool no_hv_pin    = !(ep_rank & king) || !(ep_rank & pawns) || !(ep_rank & enemy_rq);
+  bool ep_w_pin     = ep_w && ROOK_ATK[ksq][occ & ~(ep_target | ep_w)] & enemy_rq;
+  bool ep_e_pin     = ep_e && ROOK_ATK[ksq][occ & ~(ep_target | ep_e)] & enemy_rq;
+
+  return has_attacker && (no_hv_pin || !(ep_w_pin || ep_e_pin));
 }
 
 template <Colour Us>
@@ -116,22 +116,18 @@ void Board::update_masks() {
   constexpr Piece Rook           = make_piece(Us, R);
   const Square    ksq            = Board::ksq<Us>();
   const BB        enemy_or_empty = ~bb(Us) | bb(Rook);
-  const Square    ep             = state_->ep;
   BB              b              = checkers<Us>();
 
-  state_->ep_pin                 = false;
-
   if (!b) {
-    state_->check_mask = FullBB;
+    undo_->check_mask = FullBB;
     update_pin_and_check_masks<Us, false>();
-    if (ep != NoSquare) update_ep_pin<Us>();
   } else if (!more_than_one(b)) {
-    state_->check_mask = b;
+    undo_->check_mask = b;
     update_pin_and_check_masks<Us, true>();
   } else
-    state_->check_mask = EmptyBB;
+    undo_->check_mask = EmptyBB;
 
-  if (KING_ATK[ksq] & enemy_or_empty) state_->attacked = threatened<Us>();
+  if (KING_ATK[ksq] & enemy_or_empty) undo_->attacked = threatened<Us>();
 }
 
 }  // namespace Lyra

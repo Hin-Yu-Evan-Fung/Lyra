@@ -33,15 +33,15 @@ Board::Board() {
 Board::~Board() { delete[] history_; }
 
 void Board::reset() {
-  chess960              = false;
-  ply_                  = 0;
-  undo_                 = history_;
-  undo_->ply_from_null_ = 0;
-  undo_->castling       = NoCastle;
-  undo_->ep             = NoSquare;
-  undo_->rule50         = 0;
-  undo_->psq            = {};
-  undo_->game_phase     = 0;
+  chess960          = false;
+  gameply_          = 0;
+  undo_             = history_;
+  undo_->ply        = 0;
+  undo_->c_rights   = NoCastle;
+  undo_->ep         = NoSquare;
+  undo_->rule50     = 0;
+  undo_->psq        = {};
+  undo_->game_phase = 0;
 
   memset(pieceBB_, BBUtils::EmptyBB, sizeof(pieceBB_));
   memset(colourBB_, BBUtils::EmptyBB, sizeof(colourBB_));
@@ -110,7 +110,7 @@ void Board::set(const std::string& fen) {
       castling_mask_.add_rights(ksq, rsq, castling);
     }
 
-    undo_->castling |= castling;
+    undo_->c_rights |= castling;
   }
 
   // 4. Parse enpassant
@@ -123,7 +123,7 @@ void Board::set(const std::string& fen) {
   ss >> std::skipws >> full_mv;
 
   undo_->rule50 = I8(fifty_mv);
-  ply_          = I8(full_mv - 1) * 2 + I8(stm_);
+  gameply_      = I8(full_mv - 1) * 2 + I8(stm_);
   undo_->key    = compute_key();
 
   // Basic board legality checks
@@ -133,16 +133,16 @@ void Board::set(const std::string& fen) {
   stm_ == White ? update_masks<White>() : update_masks<Black>();
 }
 
-void Board::set(const Board& board) {
+void Board::copy(const Board& board) {
   chess960       = board.chess960;
-  ply_           = board.ply_;
+  gameply_       = board.gameply_;
   castling_mask_ = board.castling_mask_;
   stm_           = board.stm_;
   std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
   std::copy_n(board.colourBB_, NColour, colourBB_);
   std::copy_n(board.board_, NSquare, board_);
-  std::copy_n(board.history_, board.undo_->ply_from_null_ + 1, history_);
-  undo_ = history_ + board.undo_->ply_from_null_;
+  std::copy_n(board.history_, board.undo_->ply + 1, history_);
+  undo_ = history_ + board.undo_->ply;
 }
 
 void Board::print() const {
@@ -158,13 +158,10 @@ void Board::print() const {
   std::println("\n       A   B   C   D   E   F   G   H\n");
   std::println("Fen: {}", fen());
   std::println("Side to move: {}", stm_ == White ? "White" : "Black");
-  std::println("Castling Rights: {}", castling_mask_.to_str(undo_->castling).c_str());
-  std::println("Enpassant Square: {}", IOUtils::format_sq(undo_->ep).c_str());
+  std::println("Castling Rights: {}", castling_mask_.to_str(undo_->c_rights));
+  std::println("Enpassant Square: {}", IOUtils::format_sq(undo_->ep));
   std::println("Hash Key: {:#X}", undo_->key);
-  std::println("Incremental PSQ: {}", compute_incr_eval());
-  std::println("Real PSQ: {}", compute_raw_eval());
   std::println("Chess960: {}", chess960 ? "true" : "false");
-  std::println("Ply from null: {}", undo_->ply_from_null_);
 }
 
 std::string Board::fen() const {
@@ -192,10 +189,10 @@ std::string Board::fen() const {
   }
 
   out << " " << (stm_ == Colour::White ? "w" : "b");
-  out << " " << castling_mask_.to_str(undo_->castling);
+  out << " " << castling_mask_.to_str(undo_->c_rights);
   out << " " << (undo_->ep != NoSquare ? IOUtils::format_sq(undo_->ep) : "-");
   out << " " << int(undo_->rule50);
-  out << " " << ply_ / 2 + 1;
+  out << " " << gameply_ / 2 + 1;
 
   return out.str();
 }
@@ -217,7 +214,7 @@ Zobrist::Key Board::compute_key() const {
   if (stm_ == Black) key ^= Zobrist::SIDE_KEY;
   if (undo_->ep != NoSquare) key ^= Zobrist::EP_KEYS[file_of(undo_->ep)];
 
-  key ^= Zobrist::CASTLE_KEYS[undo_->castling];
+  key ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
 
   return key;
 }
@@ -255,7 +252,7 @@ Eval Board::compute_raw_eval() const {
   return stm_ == White ? raw : -raw;
 }
 
-Eval Board::compute_incr_eval() const {
+Eval Board::eval() const {
   Eval raw = undo_->psq.to_eval(undo_->game_phase);
   return stm_ == White ? raw : -raw;
 }
@@ -273,7 +270,7 @@ bool Board::is_draw() const {
 }
 
 bool Board::is_reps() const {
-  int end = std::min((U16)undo_->rule50, undo_->ply_from_null_);
+  int end = std::min((U16)undo_->rule50, undo_->ply);
   if (end >= 4)
     for (int i = 2, reps = 0; i <= end; i += 2)
       if (undo_->key == (undo_ - i)->key && ++reps >= 2) return true;

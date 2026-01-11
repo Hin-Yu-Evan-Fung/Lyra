@@ -35,7 +35,7 @@ std::string PVLine::format(bool chess960) {
 \******************************************/
 
 void Worker::reset(const Board& board) {
-  board_.set(board);
+  board_.copy(board);
   pv_    = {};
   nodes_ = 0;
   depth_ = 1;
@@ -43,19 +43,10 @@ void Worker::reset(const Board& board) {
 }
 
 void Worker::uci_report() {
-  std::string eval_str;
-
-  if (std::abs(eval_) >= EvalMateBound) {
-    int moves_to_mate = (EvalMate - std::abs(eval_) + 1) / 2;
-    eval_str          = std::format("mate {}", eval_ > 0 ? moves_to_mate : -moves_to_mate);
-  } else {
-    eval_str = std::format("cp {}", eval_);
-  }
-
   std::println(
     "info depth {} seldepth 0 score {} time {} nodes {} nps {} pv {}",
     depth_,
-    eval_str,
+    EvalUtils::format(eval_),
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
@@ -110,13 +101,13 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
   if (NT != Root) {
     if (clock_.stop(nodes_)) return EvalStop;
     if (board.is_draw()) return EvalDraw;
-    if (ply_ >= MaxDepth) return board.in_check() ? EvalDraw : board.compute_incr_eval();
+    if (ply_ >= MaxDepth) return board.in_check() ? EvalDraw : board.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
-    alpha = std::max(alpha, mated_in(ply_));
+    alpha = std::max(alpha, EvalUtils::mated_in(ply_));
     // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
-    beta = std::min(beta, mate_in(ply_ + 1));
-    // if our guaranteed score is better than the opponent's best score, no need to continue to search this.
+    beta = std::min(beta, EvalUtils::mate_in(ply_ + 1));
+    // if our guaranteed score is better than the opponent's guaranteed score, no need to continue to search this.
     if (alpha >= beta) return alpha;
   }
 
@@ -128,13 +119,13 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 
   Eval best       = -EvalInf;
   int  move_count = 0;
-  Move mv         = NoMove;
+  Move move       = NoMove;
 
-  while ((mv = mp.next())) {
+  while ((move = mp.next())) {
     move_count++;
 
     // ** Recursive Search **
-    board.do_move<Us>(mv);
+    board.do_move<Us>(move);
     ply_++;
 
     Eval val = -search<~Us, PV>(board, child_pv, -beta, -alpha, depth - 1);
@@ -144,26 +135,19 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
+    // If val >= beta (fail high), stop searching this branch,
+    // as we won't go down this path and we have a lower bound for the eval
+    if (val >= beta) return val;
 
-    // This move has a better score than the current best
-    // this is now the best move down this line.
-    if (val > best) {
-      best = val;
-
-      // This move has a better score than our guaranteed score - alpha,
-      // this is now the best move at this depth.
-      if (val > alpha) {
-        pv.update(child_pv, mv);
-        alpha = val;
-      }
+    best = std::max(best, val);
+    // If val > alpha (our global best score), update pv and alpha.
+    if (val > alpha) {
+      pv.update(child_pv, move);
+      alpha = val;
     }
-
-    // This move has a better score than our opponent's guaranteed score - beta,
-    // so the opponent won't play this.
-    if (val >= beta) return best;
   }
 
-  if (move_count == 0) return board_.in_check() ? mated_in(ply_) : EvalDraw;
+  if (move_count == 0) return board_.in_check() ? EvalUtils::mated_in(ply_) : EvalDraw;
 
   return best;
 }
@@ -188,18 +172,17 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
   // The current eval is the lower bound because we can just not capture anything (assume its not a zugzwang)
   // If lower bound >= beta, then we fail high (opponent has better options)
   // If lower bound > alpha, then we update alpha (the best we can do)
-
-  Eval best = board.compute_incr_eval();
+  Eval best = board.eval();
   if (best >= beta) return best;
-  if (best > alpha) alpha = best;
+  alpha = std::max(alpha, best);
 
   // ** Main QSearch Loop ** //
 
-  Move mv = NoMove;
+  Move move = NoMove;
 
-  while ((mv = mp.next())) {
+  while ((move = mp.next())) {
     // ** Recursive Search **
-    board.do_move<Us>(mv);
+    board.do_move<Us>(move);
     ply_++;
 
     Eval val = -qsearch<~Us, PV>(board, child_pv, -beta, -alpha);
@@ -209,18 +192,15 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
 
     // If we are stopping, return a placeholder score
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
+    // If val >= beta (their guaranteed score), stop searching this branch,
+    // as we won't go down this path and we have a lower bound for the eval
+    if (val >= beta) return val;
 
-    // This move has a better score than the current best
-    // this is now the best move down this line
-    if (val > best) {
-      best = val;
-
-      // This move has a better score than our guaranteed score - alpha,
-      // this is now the best move at this depth
-      if (val > alpha) {
-        pv.update(child_pv, mv);
-        alpha = val;
-      }
+    best = std::max(best, val);
+    // If val > alpha (our guaranteed score), update pv and alpha.
+    if (val > alpha) {
+      pv.update(child_pv, move);
+      alpha = val;
     }
 
     // This move has a better score than our opponent's guaranteed score - beta,

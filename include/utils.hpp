@@ -55,6 +55,28 @@ inline Time now() {
 
 /******************************************\
 |==========================================|
+|               Eval Helpers               |
+|==========================================|
+\******************************************/
+
+namespace EvalUtils {
+
+constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
+constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
+
+inline std::string format(Eval v) {
+  if (v >= EvalMateBound)
+    return std::format("mate {}", (EvalMate - v + 1) / 2);
+  else if (v <= -EvalMateBound)
+    return std::format("mate {}", (-EvalMate - v - 1) / 2);
+  else
+    return std::format("cp {}", v);
+}
+
+}  // namespace EvalUtils
+
+/******************************************\
+|==========================================|
 |                 IO helpers               |
 |==========================================|
 \******************************************/
@@ -65,8 +87,10 @@ constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
 constexpr char        format_file(File f) { return static_cast<char>(f + 'a'); }
 constexpr char        format_rank(Rank r) { return static_cast<char>(r + '1'); }
-constexpr std::string format_sq(Square sq) { return {format_file(file_of(sq)), format_rank(rank_of(sq))}; }
 constexpr char        format_piece(Piece pc) { return PIECE_STR.at(pc); }
+constexpr std::string format_sq(Square sq) {
+  return sq == NoSquare ? "none" : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
+}
 
 constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
 constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }

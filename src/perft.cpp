@@ -173,7 +173,11 @@ void perft_bench() {
     if (elapsed > 0) { nps = nodes * 1000 / elapsed; }
 
     std::println(
-      "status: {}, time: {} ms, nps: {}, fen: {}", nodes == validation ? "PASSED" : "FAILED", elapsed, nps, fen
+      "status: {}, time: {} ms, nps: {}, fen: {}",
+      nodes == validation ? "PASSED" : std::format("FAILED ({} != {})", nodes, validation),
+      elapsed,
+      nps,
+      fen
     );
 
     if (nodes != validation) return;

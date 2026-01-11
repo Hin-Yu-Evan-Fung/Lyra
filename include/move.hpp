@@ -67,7 +67,7 @@ constexpr MoveFlag flag(Move move) { return static_cast<MoveFlag>(move & FlagMas
 
 constexpr bool is_capture(Move move) { return flag(move) & CapMask; }
 constexpr bool is_promo(Move move) { return flag(move) & PromoMask; }
-constexpr bool is_castle(Move move) { return (flag(move) & CastleMask) == CastleMask; }
+constexpr bool is_castle(Move move) { return flag(move) == KingCastle || flag(move) == QueenCastle; }
 
 constexpr PieceType promoted_pt(Move move) { return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N); }
 

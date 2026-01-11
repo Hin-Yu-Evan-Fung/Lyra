@@ -23,24 +23,29 @@ constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK
 |==========================================|
 \******************************************/
 
-// Undo state, used for do_move and undo_move
+// Undo state, used for do_move and undo_move,
+// stores variables that cannot be inferred when undoing a move
 struct Undo {
-  Piece  cap;
-  Castle castling;
-  Square ep;
+  // Board variables
+  U16    ply;     // Half move counter from Board::set position
+  U8     rule50;  // Fifty move counter
+  Castle c_rights;
+  Move   move;
 
-  U8           rule50;
-  U16          ply_from_null_;
-  Move         mv;
+  // Hash keys
   Zobrist::Key key;
   Zobrist::Key pawn_key;
 
-  // Check mask: FullBB = No checks, EmptyBB = Double check, otherwise = Checkers
-  // Attacked: EmptyBB = King cannot move, otherwise = squares attacked by enemy
-  BB check_mask, diag_pin, hv_pin, attacked;
-
+  // Piece square table scores
   Score psq;
   int   game_phase;
+
+  // Board variables that are not copied
+  Square ep;
+  Piece  cap;
+
+  // Move generation masks
+  BB check_mask, diag_pin, hv_pin, attacked;
 };
 
 /******************************************\
@@ -50,18 +55,19 @@ struct Undo {
 \******************************************/
 
 class Board {
- private:
   BB    pieceBB_[NPieceType];
   BB    colourBB_[NColour];
   Piece board_[NSquare];
 
-  Colour     stm_;
-  U16        ply_;
+  Colour stm_;
+  // Ply from the start of the game, which includes the half move clock in fen.
+  U16        gameply_;
   CastleMask castling_mask_;
 
   Undo* undo_;
   Undo* history_;
 
+  // Move and Undo Move helper functions
   template <bool DoMove, Colour C>
   constexpr void set_piece(Piece pc, Square sq);
   template <bool DoMove, Colour C>
@@ -69,16 +75,23 @@ class Board {
   template <bool DoMove, Colour C>
   constexpr void move_piece(Square src, Square dst);
 
+  // Board masks update functions
   template <Colour Us>
   void update_masks();
   template <Colour Us, bool inCheck>
   constexpr void update_pin_and_check_masks();
   template <Colour Us>
-  constexpr bool can_ep(Square ep);
-  template <Colour Us>
   constexpr BB checkers();
   template <Colour Us>
   constexpr BB threatened();
+  template <Colour Us>
+  constexpr bool can_ep(Square ep);
+
+  // Functions that compute from scratch
+  Eval                  compute_raw_eval() const;
+  Zobrist::Key          compute_key() const;
+  Zobrist::Key          compute_pawn_key() const;
+  std::pair<Score, int> compute_psq() const;  // (PSQT score, Game Phase)
 
  public:
   Board();
@@ -86,46 +99,49 @@ class Board {
 
   bool chess960;
 
-  Board(const Board& board)      = delete;  // No Copying
+  // No implicit copying
+  Board(const Board& board)      = delete;
   Board& operator=(const Board&) = delete;
 
+  // Setters
   void set(const std::string& fen);
-  void set(const Board& board);
+  void copy(const Board& board);
   void reset();
 
+  // IO functions
   void        print() const;
   std::string fen() const;
 
+  // Move and Undo Move
   void do_move(Move move);
   template <Colour Us>
   void do_move(Move move);
   template <Colour Us>
   void undo_move();
 
+  // Bitboard getters
   constexpr BB bb() const;
   constexpr BB bb(Colour c) const;
   constexpr BB bb(PieceType pt) const;
   constexpr BB bb(Piece pc) const;
   constexpr BB bb(Piece pc1, Piece pc2) const;
 
-  constexpr Piece on(Square sq) const;
+  // Getters
   template <Colour C>
-  constexpr Square ksq() const;
-  constexpr Colour stm() const;
+  constexpr Square      ksq() const;
+  constexpr Piece       on(Square sq) const;
+  constexpr Colour      stm() const;
+  constexpr Undo* const state() const;
+  Eval                  eval() const;
+  constexpr CastleMask  castle_mask() const;
 
-  constexpr CastleMask castling_mask() const;
+  // Movegen Helpers
+  template <Colour Us, bool QueenSide>
+  constexpr bool can_castle() const;
+  template <Colour Us>
+  bool is_legal(Move move) const;
 
-  constexpr Undo*         state();
-  constexpr Undo*         state() const;
-  constexpr Zobrist::Key* rep_table();
-
-  Zobrist::Key          compute_key() const;
-  Zobrist::Key          compute_pawn_key() const;
-  std::pair<Score, int> compute_psq() const;
-
-  Eval compute_raw_eval() const;
-  Eval compute_incr_eval() const;
-
+  // Game State functions
   bool is_draw() const;
   bool is_reps() const;
   bool in_check() const;
@@ -137,10 +153,9 @@ class Board {
 |==========================================|
 \******************************************/
 
-constexpr Undo*      Board::state() { return undo_; }
-constexpr Undo*      Board::state() const { return undo_; }
-constexpr Colour     Board::stm() const { return stm_; }
-constexpr CastleMask Board::castling_mask() const { return castling_mask_; }
+constexpr Undo* const Board::state() const { return undo_; }
+constexpr Colour      Board::stm() const { return stm_; }
+constexpr CastleMask  Board::castle_mask() const { return castling_mask_; }
 
 /******************************************\
 |==========================================|
@@ -215,24 +230,53 @@ constexpr void Board::move_piece(Square src, Square dst) {
 
 /******************************************\
 |==========================================|
-|             Repetitions/Draw             |
+|             Castle/Ep Helpers            |
 |==========================================|
 \******************************************/
 
-// constexpr void Board::update_reps() {
-//   Reps& r = rep_table_[undo_->rule50];
-//   r.key   = undo_->key;
-//   r.reps  = 0;
-//
-//   int end = std::min((U16)undo_->rule50, undo_->ply_from_null_);
-//   if (end >= 4) {
-//     for (int i = 2; i <= end; i += 2) {
-//       Reps& prev = rep_table_[undo_->rule50 - i];
-//       if (prev.key != r.key) continue;
-//       r.reps = prev.reps ? -i : i;
-//       break;
-//     }
-//   }
-// }
+template <Colour Us, bool QueenSide>
+constexpr bool Board::can_castle() const {
+  constexpr Square kd = CastleMask::king_dst<Us>(QueenSide);
+  constexpr Square rd = CastleMask::rook_dst<Us>(QueenSide);
+  const Square     ks = ksq<Us>();
+  const Square     rs = castling_mask_.rook_src<Us>(QueenSide);
+
+  const BB occ        = bb();
+  const BB attacked   = undo_->attacked;
+  const BB hv_pin     = undo_->hv_pin;
+
+  const BB king_area  = BTWN_BB[ks][kd] | from(kd);
+  const BB rook_area  = BTWN_BB[rs][rd] | from(rd);
+  const BB occ_mask   = (king_area | rook_area) & ~(from(ks) | from(rs));
+
+  return !(king_area & attacked) && !(occ_mask & occ) && !(from(rs) & hv_pin);
+}
+
+template <Colour Us>
+constexpr bool Board::can_ep(Square ep) {
+  using enum Direction;
+  constexpr Colour    Them   = ~Us;
+  constexpr Direction Up     = Us == White ? N : S;
+  constexpr Piece     ERook  = make_piece(Them, R);
+  constexpr Piece     EQueen = make_piece(Them, Q);
+
+  const BB     ep_rank       = Us == White ? from(Rank5) : from(Rank4);
+  const BB     king          = bb(make_piece(Us, K));
+  const BB     pawns         = bb(make_piece(Us, P));
+  const BB     enemy_rq      = bb(ERook, EQueen);
+  const BB     occ           = bb();
+  const BB     ep_target     = shift<~Up>(from(ep));
+  const Square ksq           = Board::ksq<Us>();
+  const BB     ep_w          = pawns & shift<E>(ep_target);
+  const BB     ep_e          = pawns & shift<W>(ep_target);
+
+  // If the enemy rook/queen sees the king after simulating the enpassant, register the enpassant pin
+  const bool has_attacker = PAWN_ATK[Them][ep] & pawns;
+  const bool no_hv_pin    = !(ep_rank & king) || !(ep_rank & pawns) || !(ep_rank & enemy_rq);
+  const bool ep_w_pin     = ep_w && ROOK_ATK[ksq][occ & ~(ep_target | ep_w)] & enemy_rq;
+  const bool ep_e_pin     = ep_e && ROOK_ATK[ksq][occ & ~(ep_target | ep_e)] & enemy_rq;
+
+  return has_attacker && (no_hv_pin || !(ep_w_pin || ep_e_pin));
+}
 
 }  // namespace Lyra

@@ -81,8 +81,8 @@ BB    KNIGHT_ATK[NSquare];
 BB    KING_ATK[NSquare];
 Magic BISHOP_ATK[NSquare];
 Magic ROOK_ATK[NSquare];
+BB    LINE_BB[NSquare][NSquare];
 BB    BTWN_BB[NSquare][NSquare];
-BB    CHECK_BB[NSquare][NSquare];
 
 static BB BISHOP_TBL[0x1480];
 static BB ROOK_TBL[0x19000];
@@ -177,10 +177,14 @@ void init_magics(Square sq, BB table[], Magic entries[]) {
 void init() {
   for (Square src = A1; src <= H8; ++src) {
     for (Square dst = A1; dst <= H8; ++dst) {
-      if (naive_slider_attacks<B>(src, EmptyBB) & from(dst))
+      if (naive_slider_attacks<B>(src, EmptyBB) & from(dst)) {
+        LINE_BB[src][dst] = naive_slider_attacks<B>(src, EmptyBB) & naive_slider_attacks<B>(src, EmptyBB);
         BTWN_BB[src][dst] = naive_slider_attacks<B>(src, from(dst)) & naive_slider_attacks<B>(dst, from(src));
-      if (naive_slider_attacks<R>(src, EmptyBB) & from(dst))
+      }
+      if (naive_slider_attacks<R>(src, EmptyBB) & from(dst)) {
+        LINE_BB[src][dst] = naive_slider_attacks<R>(src, EmptyBB) & naive_slider_attacks<R>(src, EmptyBB);
         BTWN_BB[src][dst] = naive_slider_attacks<R>(src, from(dst)) & naive_slider_attacks<R>(dst, from(src));
+      }
     }
   }
 

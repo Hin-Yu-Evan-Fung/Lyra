@@ -193,36 +193,18 @@ constexpr void enum_king(const Board& board, Handler&& handler) {
   if constexpr (Gt & GenQuiet) bitloop(attacks & empty, [&](Square dst) { handler(encode<Quiet>(ksq, dst)); });
 }
 
-template <Colour Us, bool QueenSide>
-constexpr bool can_castle(const Board& board, Square rs) {
-  constexpr Square kd = CastleMask::king_dst<Us>(QueenSide);
-  constexpr Square rd = CastleMask::rook_dst<Us>(QueenSide);
-  const Square     ks = board.ksq<Us>();
-
-  const BB occ        = board.bb();
-  const BB attacked   = board.state()->attacked;
-  const BB hv_pin     = board.state()->hv_pin;
-
-  BB king_area        = BTWN_BB[ks][kd] | from(kd);
-  BB rook_area        = BTWN_BB[ks][rs] | from(rd);
-
-  BB occ_mask         = (king_area | rook_area) & ~(from(ks) | from(rs));
-
-  return !(king_area & attacked) && !(occ_mask & occ) && !(from(rs) & hv_pin);
-}
-
 template <Colour Us, typename Handler>
 constexpr void enum_castle(const Board& board, Handler&& handler) {
   constexpr Castle OO   = Us == White ? WhiteOO : BlackOO;
   constexpr Castle OOO  = Us == White ? WhiteOOO : BlackOOO;
 
-  const Castle cr       = board.state()->castling;
+  const Castle cr       = board.state()->c_rights;
   const Square ksq      = board.ksq<Us>();
-  const Square queen_rs = board.castling_mask().rook_src<Us>(true);
-  const Square king_rs  = board.castling_mask().rook_src<Us>(false);
+  const Square queen_rs = board.castle_mask().rook_src<Us>(true);
+  const Square king_rs  = board.castle_mask().rook_src<Us>(false);
 
-  if ((cr & OO) && can_castle<Us, false>(board, king_rs)) handler(encode<KingCastle>(ksq, king_rs));
-  if ((cr & OOO) && can_castle<Us, true>(board, queen_rs)) handler(encode<QueenCastle>(ksq, queen_rs));
+  if (cr & OO && board.can_castle<Us, false>()) handler(encode<KingCastle>(ksq, king_rs));
+  if (cr & OOO && board.can_castle<Us, true>()) handler(encode<QueenCastle>(ksq, queen_rs));
 }
 
 template <Colour Us, MoveGenType Gt, typename Handler>

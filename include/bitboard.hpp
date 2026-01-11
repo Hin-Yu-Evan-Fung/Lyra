@@ -104,14 +104,22 @@ extern BB    KNIGHT_ATK[NSquare];
 extern BB    KING_ATK[NSquare];
 extern Magic BISHOP_ATK[NSquare];
 extern Magic ROOK_ATK[NSquare];
+extern BB    LINE_BB[NSquare][NSquare];
 extern BB    BTWN_BB[NSquare][NSquare];
-extern BB    CHECK_BB[NSquare][NSquare];
+
+/******************************************\
+|==========================================|
+|               Misc Helpers               |
+|==========================================|
+\******************************************/
 
 template <Colour C>
 constexpr BB pawn_attack_bb(BB bb) {
   using enum Direction;
   return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
 }
+
+constexpr bool is_aligned(Square sq1, Square sq2, Square sq3) { return LINE_BB[sq1][sq2] & from(sq3); }
 
 }  // namespace BBUtils
 

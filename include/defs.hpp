@@ -162,22 +162,6 @@ constexpr Score  operator-(Score s1, Score s2) { return {s1.mg - s2.mg, s1.eg - 
 constexpr Score& operator+=(Score& s1, Score s2) { return s1 = s1 + s2; }
 constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
 
-namespace EvalUtils {
-
-constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
-constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
-
-inline std::string format(Eval v) {
-  if (v >= EvalMateBound)
-    return std::format("mate {}", (EvalMate - v + 1) / 2);
-  else if (v <= EvalMateBound)
-    return std::format("mate {}", (-EvalMate - v - 1) / 2);
-  else
-    return std::format("cp {}", v);
-}
-
-}  // namespace EvalUtils
-
 /******************************************\
 |==========================================|
 |              Misc Functions              |

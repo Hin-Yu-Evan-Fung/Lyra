@@ -39,7 +39,7 @@ U64 perft(Board& board, Depth depth) {
 template <bool Div, Colour Us>
 U64 perftmp(Board& board, Depth depth) {
   MovePickState  mps{board, NoMove, 0};
-  MovePicker<Us> mp(false, mps);
+  MovePicker<Us> mp(mps);
 
   if (!Div && depth <= 1) {
     U64 n = 0;

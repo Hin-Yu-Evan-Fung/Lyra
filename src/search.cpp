@@ -6,6 +6,7 @@
 
 #include "defs.hpp"
 #include "movepick.hpp"
+#include "utils.hpp"
 
 namespace Lyra {
 
@@ -35,40 +36,36 @@ std::string PVLine::format(bool chess960) {
 \******************************************/
 
 void Worker::reset(const Board& board) {
-  board_.copy(board);
-  pv_    = {};
-  nodes_ = 0;
-  depth_ = 1;
-  ply_   = 0;
+  root_board_.copy(board);
+  pv_       = {};
+  nodes_    = 0;
+  depth_    = 0;
+  seldepth_ = 0;
+  ply_      = 0;
 }
 
 void Worker::uci_report() {
   std::println(
-    "info depth {} seldepth 0 score {} time {} nodes {} nps {} pv {}",
-    depth_,
+    "info depth {} seldepth {} score {} time {} nodes {} nps {} pv {}",
+    depth_ + 1,
+    seldepth_ + 1,
     EvalUtils::format(eval_),
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
-    pv_.format(board_.chess960)
+    pv_.format(root_board_.chess960)
   );
   std::fflush(stdout);
 }
 
 void Worker::start(const TimeControl& tc) {
-  Colour stm     = board_.stm();
+  Colour stm     = root_board_.stm();
   Move   best_mv = NoMove;
 
   if (is_main()) clock_.set(stm, tc);
 
-  board_.print();
-
   while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
-    Eval alpha = -EvalInf;
-    Eval beta  = EvalInf;
-
-    eval_      = board_.stm() == White ? search<White, Root>(board_, pv_, alpha, beta, depth_)
-                                       : search<Black, Root>(board_, pv_, alpha, beta, depth_);
+    (stm == White) ? aspwin<White>() : aspwin<Black>();
 
     if (stop_.load(std::memory_order::relaxed)) break;
 
@@ -78,8 +75,16 @@ void Worker::start(const TimeControl& tc) {
     depth_  += 1;
   }
 
-  std::println("bestmove {}", MoveUtils::format(best_mv, board_.chess960));
+  std::println("bestmove {}", MoveUtils::format(best_mv, root_board_.chess960));
   std::fflush(stdout);
+}
+
+// TODO: Aspiration windows
+template <Colour Us>
+void Worker::aspwin() {
+  Eval alpha = -EvalInf;
+  Eval beta  = EvalInf;
+  eval_      = search<Us>(root_board_, pv_, alpha, beta, depth_ + 1);
 }
 
 /******************************************\
@@ -93,10 +98,10 @@ void Worker::start(const TimeControl& tc) {
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth) {
-  nodes_ += 1;
-  pv.clear();
-
   if (depth == 0) return qsearch<Us, PV>(board, pv, alpha, beta);
+
+  pv.clear();
+  seldepth_ = std::max(seldepth_, (Depth)ply_);
 
   if (NT != Root) {
     if (clock_.stop(nodes_)) return EvalStop;
@@ -115,7 +120,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 
   PVLine         child_pv{};
   MovePickState  mps{board, NoMove, depth};
-  MovePicker<Us> mp{false, mps};
+  MovePicker<Us> mp{mps};
 
   Eval best       = -EvalInf;
   int  move_count = 0;
@@ -124,21 +129,21 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
   while ((move = mp.next())) {
     move_count++;
 
-    // ** Recursive Search **
-    board.do_move<Us>(move);
+    nodes_++;
+    // ** Recursive Search ** //
     ply_++;
-
+    board.do_move<Us>(move);
     Eval val = -search<~Us, PV>(board, child_pv, -beta, -alpha, depth - 1);
-
-    ply_--;
     board.undo_move<Us>();
+    ply_--;
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
+
     // If val >= beta (fail high), stop searching this branch,
     // as we won't go down this path and we have a lower bound for the eval
     if (val >= beta) return val;
-
+    // Update best score
     best = std::max(best, val);
     // If val > alpha (our global best score), update pv and alpha.
     if (val > alpha) {
@@ -147,7 +152,7 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
     }
   }
 
-  if (move_count == 0) return board_.in_check() ? EvalUtils::mated_in(ply_) : EvalDraw;
+  if (move_count == 0) return board.in_check() ? EvalUtils::mated_in(ply_) : EvalDraw;
 
   return best;
 }
@@ -157,16 +162,14 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
-  // ** Check Draw ** //
-
   if (clock_.stop(nodes_)) return EvalStop;
 
-  nodes_ += 1;
   pv.clear();
+  seldepth_ = std::max(seldepth_, (Depth)ply_);
 
   PVLine         child_pv{};
-  MovePickState  mps{board, NoMove, 0};
-  MovePicker<Us> mp{true, mps};
+  MovePickState  mps{board, NoMove, DepthQS};
+  MovePicker<Us> mp{mps};
 
   // ** Stand Pat ** //
   // The current eval is the lower bound because we can just not capture anything (assume its not a zugzwang)
@@ -177,36 +180,36 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
   alpha = std::max(alpha, best);
 
   // ** Main QSearch Loop ** //
-
-  Move move = NoMove;
+  Move move       = NoMove;
+  int  move_count = 0;
 
   while ((move = mp.next())) {
-    // ** Recursive Search **
-    board.do_move<Us>(move);
+    move_count++;
+
+    nodes_++;
+    // ** Recursive Search ** //
     ply_++;
-
+    board.do_move<Us>(move);
     Eval val = -qsearch<~Us, PV>(board, child_pv, -beta, -alpha);
-
-    ply_--;
     board.undo_move<Us>();
+    ply_--;
 
     // If we are stopping, return a placeholder score
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
+
     // If val >= beta (their guaranteed score), stop searching this branch,
     // as we won't go down this path and we have a lower bound for the eval
     if (val >= beta) return val;
-
+    // Update best score
     best = std::max(best, val);
     // If val > alpha (our guaranteed score), update pv and alpha.
     if (val > alpha) {
       pv.update(child_pv, move);
       alpha = val;
     }
-
-    // This move has a better score than our opponent's guaranteed score - beta,
-    // so the opponent won't play this.
-    if (val >= beta) return best;
   }
+
+  if (move_count == 0 && board.in_check()) return EvalUtils::mated_in(ply_);
 
   return best;
 }

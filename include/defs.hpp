@@ -38,6 +38,8 @@ enum {
   EvalMateBound = EvalMate - MaxDepth,
   EvalDraw      = 0,
   EvalStop      = 0,
+
+  DepthQS       = 0,
 };
 
 /******************************************\

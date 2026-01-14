@@ -33,15 +33,17 @@ struct StackEntry {
 class Worker {
   enum NodeType { Root, PV, NonPV };
 
-  template <Colour Us, NodeType NT>
+  template <Colour Us>
+  void aspwin();
+  template <Colour Us, NodeType NT = Root>
   Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
-  template <Colour Us, NodeType NT>
+  template <Colour Us, NodeType NT = Root>
   Eval qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta);
 
   Clock             clock_;
   std::atomic_bool& stop_;
 
-  Board  board_;
+  Board  root_board_;
   size_t id_;
 
   PVLine pv_;

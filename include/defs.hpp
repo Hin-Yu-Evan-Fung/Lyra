@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <format>
-#include <string>
 
 namespace Lyra {
 
@@ -40,6 +38,7 @@ enum {
   EvalStop      = 0,
 
   DepthQS       = 0,
+  StackOffset   = 2,
 };
 
 /******************************************\

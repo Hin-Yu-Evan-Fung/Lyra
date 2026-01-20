@@ -22,7 +22,7 @@ void PVLine::update(const PVLine& other, Move best) {
   std::copy_n(other.moves, other.length, &moves[1]);
 }
 
-std::string PVLine::format(bool chess960) {
+std::string PVLine::format(bool chess960) const {
   std::ostringstream os;
   for (size_t i = 0; i < length; i++)
     os << MoveUtils::format(moves[i], chess960) << " ";
@@ -36,15 +36,14 @@ std::string PVLine::format(bool chess960) {
 \******************************************/
 
 void Worker::reset(const Board& board) {
-  root_board_.copy(board);
-  pv_       = {};
-  nodes_    = 0;
-  depth_    = 0;
-  seldepth_ = 0;
-  ply_      = 0;
+  root_.copy(board);
+  best_move_ = NoMove;
+  nodes_     = 0;
+  depth_     = 0;
+  seldepth_  = 0;
 }
 
-void Worker::uci_report() {
+void Worker::uci_report(const PVLine& pv) {
   std::println(
     "info depth {} seldepth {} score {} time {} nodes {} nps {} pv {}",
     depth_ + 1,
@@ -53,29 +52,28 @@ void Worker::uci_report() {
     clock_.elapsed(),
     nodes_,
     nodes_ * 1000 / std::max(clock_.elapsed(), 1UL),
-    pv_.format(root_board_.chess960)
+    pv.format(root_.chess960)
   );
   std::fflush(stdout);
 }
 
 void Worker::start(const TimeControl& tc) {
-  Colour stm     = root_board_.stm();
-  Move   best_mv = NoMove;
+  Colour stm = root_.stm();
 
   if (is_main()) clock_.set(stm, tc);
 
   while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
-    (stm == White) ? aspwin<White>() : aspwin<Black>();
+    if (stm == White)
+      aspwin<White>();
+    else
+      aspwin<Black>();
 
     if (stop_.load(std::memory_order::relaxed)) break;
 
-    uci_report();
-
-    best_mv  = pv_.moves[0];
-    depth_  += 1;
+    depth_ += 1;
   }
 
-  std::println("bestmove {}", MoveUtils::format(best_mv, root_board_.chess960));
+  std::println("bestmove {}", MoveUtils::format(best_move_, root_.chess960));
   std::fflush(stdout);
 }
 
@@ -84,7 +82,19 @@ template <Colour Us>
 void Worker::aspwin() {
   Eval alpha = -EvalInf;
   Eval beta  = EvalInf;
-  eval_      = search<Us>(root_board_, pv_, alpha, beta, depth_ + 1);
+
+  StackEntry  stack[MaxDepth + StackOffset]{};
+  StackEntry* ss = stack;
+
+  for (int i = 0; i <= MaxDepth + StackOffset; i++)
+    (ss + i)->ply = i;
+
+  eval_ = search<Us>(root_, ss, alpha, beta, depth_ + 1);
+
+  if (stop_.load(std::memory_order::relaxed)) return;
+
+  uci_report(ss->pv);
+  best_move_ = ss->pv.moves[0];
 }
 
 /******************************************\
@@ -97,62 +107,74 @@ void Worker::aspwin() {
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth) {
-  if (depth == 0) return qsearch<Us, PV>(board, pv, alpha, beta);
+Eval Worker::search(Board& board, StackEntry* ss, Eval alpha, Eval beta, Depth depth) {
+  if (depth == 0) return qsearch<Us, PV>(board, ss, alpha, beta);
 
-  pv.clear();
-  seldepth_ = std::max(seldepth_, (Depth)ply_);
+  ss->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(ss->ply + 1));
 
   if (NT != Root) {
     if (clock_.stop(nodes_)) return EvalStop;
     if (board.is_draw()) return EvalDraw;
-    if (ply_ >= MaxDepth) return board.in_check() ? EvalDraw : board.eval();
+    if (ss->ply >= MaxDepth) return board.in_check() ? EvalDraw : board.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
-    alpha = std::max(alpha, EvalUtils::mated_in(ply_));
+    alpha = std::max(alpha, EvalUtils::mated_in(ss->ply));
     // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
-    beta = std::min(beta, EvalUtils::mate_in(ply_ + 1));
+    beta = std::min(beta, EvalUtils::mate_in(ss->ply + 1));
     // if our guaranteed score is better than the opponent's guaranteed score, no need to continue to search this.
     if (alpha >= beta) return alpha;
   }
 
   // ** Main Search Loop ** //
 
-  PVLine         child_pv{};
-  MovePickState  mps{board, NoMove, depth};
-  MovePicker<Us> mp{mps};
+  // Clear killer moves
+  (ss + 1)->killers[0] = NoMove;
+  (ss + 1)->killers[1] = NoMove;
+
+  MovePicker<Us> mp{board, ss->killers, NoMove, depth};
 
   Eval best       = -EvalInf;
   int  move_count = 0;
   Move move       = NoMove;
+  Move best_move  = NoMove;
 
   while ((move = mp.next())) {
     move_count++;
 
     nodes_++;
     // ** Recursive Search ** //
-    ply_++;
     board.do_move<Us>(move);
-    Eval val = -search<~Us, PV>(board, child_pv, -beta, -alpha, depth - 1);
+    Eval val = -search<~Us, PV>(board, ss + 1, -beta, -alpha, depth - 1);
     board.undo_move<Us>();
-    ply_--;
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
-    // If val >= beta (fail high), stop searching this branch,
-    // as we won't go down this path and we have a lower bound for the eval
-    if (val >= beta) return val;
     // Update best score
-    best = std::max(best, val);
-    // If val > alpha (our global best score), update pv and alpha.
-    if (val > alpha) {
-      pv.update(child_pv, move);
-      alpha = val;
+    if (val > best) {
+      best      = val;
+      best_move = move;
+      // If val > alpha (our global best score), update pv and alpha.
+      if (val > alpha) {
+        // If val >= beta (fail high), stop searching this branch,
+        // as we won't go down this path and we have a lower bound for the eval
+        if (val >= beta) break;
+
+        ss->pv.update((ss + 1)->pv, move);
+        alpha = val;
+      }
     }
   }
 
-  if (move_count == 0) return board.in_check() ? EvalUtils::mated_in(ply_) : EvalDraw;
+  if (best_move && !MoveUtils::is_capture(best_move)) {
+    if (best_move != ss->killers[0]) {
+      ss->killers[1] = ss->killers[0];
+      ss->killers[0] = best_move;
+    }
+  }
+
+  if (move_count == 0) return board.in_check() ? EvalUtils::mated_in(ss->ply) : EvalDraw;
 
   return best;
 }
@@ -161,15 +183,13 @@ Eval Worker::search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
+Eval Worker::qsearch(Board& board, StackEntry* ss, Eval alpha, Eval beta) {
   if (clock_.stop(nodes_)) return EvalStop;
 
-  pv.clear();
-  seldepth_ = std::max(seldepth_, (Depth)ply_);
+  ss->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(ss->ply + 1));
 
-  PVLine         child_pv{};
-  MovePickState  mps{board, NoMove, DepthQS};
-  MovePicker<Us> mp{mps};
+  MovePicker<Us> mp{board, {}, NoMove, DepthQS};
 
   // ** Stand Pat ** //
   // The current eval is the lower bound because we can just not capture anything (assume its not a zugzwang)
@@ -188,28 +208,29 @@ Eval Worker::qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta) {
 
     nodes_++;
     // ** Recursive Search ** //
-    ply_++;
     board.do_move<Us>(move);
-    Eval val = -qsearch<~Us, PV>(board, child_pv, -beta, -alpha);
+    Eval val = -qsearch<~Us, PV>(board, ss + 1, -beta, -alpha);
     board.undo_move<Us>();
-    ply_--;
 
     // If we are stopping, return a placeholder score
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
-    // If val >= beta (their guaranteed score), stop searching this branch,
-    // as we won't go down this path and we have a lower bound for the eval
-    if (val >= beta) return val;
     // Update best score
-    best = std::max(best, val);
-    // If val > alpha (our guaranteed score), update pv and alpha.
-    if (val > alpha) {
-      pv.update(child_pv, move);
-      alpha = val;
+    if (val > best) {
+      best = val;
+      // If val > alpha (our global best score), update pv and alpha.
+      if (val > alpha) {
+        // If val >= beta (fail high), stop searching this branch,
+        // as we won't go down this path and we have a lower bound for the eval
+        if (val >= beta) break;
+
+        ss->pv.update((ss + 1)->pv, move);
+        alpha = val;
+      }
     }
   }
 
-  if (move_count == 0 && board.in_check()) return EvalUtils::mated_in(ply_);
+  if (move_count == 0 && board.in_check()) return EvalUtils::mated_in(ss->ply);
 
   return best;
 }

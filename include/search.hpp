@@ -17,17 +17,13 @@ struct PVLine {
 
   void        update(const PVLine& other, Move best);
   void        clear() { length = 0; }
-  std::string format(bool chess960);
+  std::string format(bool chess960) const;
 };
 
 struct StackEntry {
-  Move  killers[2];
-  Move  curr_move;
-  Move  excl_move;
-  Piece moved;
-  Eval  eval;
-  bool  in_check;
-  U16   ply_since_null;
+  std::array<Move, 2> killers;
+  PVLine              pv;
+  U16                 ply;
 };
 
 class Worker {
@@ -36,22 +32,21 @@ class Worker {
   template <Colour Us>
   void aspwin();
   template <Colour Us, NodeType NT = Root>
-  Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
+  Eval search(Board& board, StackEntry* ss, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT = Root>
-  Eval qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta);
+  Eval qsearch(Board& board, StackEntry* ss, Eval alpha, Eval beta);
 
   Clock             clock_;
   std::atomic_bool& stop_;
 
-  Board  root_board_;
+  Board  root_;
   size_t id_;
 
-  PVLine pv_;
   size_t nodes_;
   Depth  depth_;
   Depth  seldepth_;
-  U16    ply_;
   Eval   eval_;
+  Move   best_move_;
 
  public:
   Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}
@@ -59,7 +54,7 @@ class Worker {
 
   void reset(const Board& board);
   void start(const TimeControl& tc);
-  void uci_report();
+  void uci_report(const PVLine& pv);
 };
 
 }  // namespace Lyra

@@ -12,15 +12,14 @@ namespace Lyra {
 static constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const MovePickState& state) : state_(state) {
-  if (state_.board.in_check())
+MovePicker<Us>::MovePicker(const Board& board, const std::array<Move, 2>& killers, Move tt_move, Depth depth)
+  : board_(board), killers_(killers), tt_move_(tt_move), depth_(depth) {
+  if (board_.in_check())
     stage_ = EVASION_TT;
-  else if (state_.depth == DepthQS)
+  else if (depth == DepthQS)
     stage_ = QSEARCH_TT;
   else
     stage_ = TT;
-
-  stage_ += !(state_.tt_move && state_.board.is_legal<Us>(state_.tt_move));
 }
 
 /******************************************\
@@ -63,8 +62,8 @@ Move MovePicker<Us>::pop_back() {
 template <Colour Us>
 Eval MovePicker<Us>::score_cap(Move move) {
   // MVV LVA
-  PieceType attacker = pt_of(state_.board.on(MoveUtils::src(move)));
-  PieceType victim   = pt_of(state_.board.on(MoveUtils::dst(move)));
+  PieceType attacker = pt_of(board_.on(MoveUtils::src(move)));
+  PieceType victim   = pt_of(board_.on(MoveUtils::dst(move)));
 
   Eval mvv_lva       = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
   return mvv_lva;
@@ -85,8 +84,8 @@ template <Colour Us>
 void MovePicker<Us>::gen_score_cap() {
   start_ptr_ = 0;
   end_ptr_   = MaxMoves - 1;
-  enum_moves<Us, GenCap>(state_.board, [&](Move move) {
-    if (move == state_.tt_move) return;
+  enum_moves<Us, GenCap>(board_, [&](Move move) {
+    if (move == tt_move_) return;
 
     if (true) {
       moves_[start_ptr_]    = move;
@@ -101,8 +100,8 @@ void MovePicker<Us>::gen_score_cap() {
 template <Colour Us>
 void MovePicker<Us>::gen_score_quiet() {
   start_ptr_ = 0;
-  enum_moves<Us, GenQuiet>(state_.board, [&](Move move) {
-    if (move == state_.tt_move) return;
+  enum_moves<Us, GenQuiet>(board_, [&](Move move) {
+    if (move == tt_move_ || move == killers_[0] || move == killers_[1]) return;
 
     moves_[start_ptr_]    = move;
     scores_[start_ptr_++] = score_quiet(move);
@@ -112,8 +111,8 @@ void MovePicker<Us>::gen_score_quiet() {
 template <Colour Us>
 void MovePicker<Us>::gen_score_evasion() {
   start_ptr_ = 0;
-  enum_moves<Us, GenAll>(state_.board, [&](Move move) {
-    if (move == state_.tt_move) return;
+  enum_moves<Us, GenAll>(board_, [&](Move move) {
+    if (move == tt_move_) return;
 
     moves_[start_ptr_] = move;
 
@@ -135,7 +134,10 @@ Move MovePicker<Us>::next() {
   switch (stage_) {
   case TT:
   case QSEARCH_TT:
-  case EVASION_TT: ++stage_; return state_.tt_move;
+  case EVASION_TT:
+    ++stage_;
+    if (board_.is_legal<Us>(tt_move_)) return tt_move_;
+    [[fallthrough]];
   case INIT_CAP:
   case QSEARCH_INIT:
     gen_score_cap();
@@ -144,6 +146,14 @@ Move MovePicker<Us>::next() {
   case GOOD_CAP:
     if (peek_front()) return pop_front();
     ++stage_;
+    [[fallthrough]];
+  case KILLER_1:
+    ++stage_;
+    if (killers_[0] != tt_move_ && board_.is_legal<Us>(killers_[0])) return killers_[0];
+    [[fallthrough]];
+  case KILLER_2:
+    ++stage_;
+    if (killers_[1] != tt_move_ && board_.is_legal<Us>(killers_[1])) return killers_[1];
     [[fallthrough]];
   case INIT_QUIET:
     gen_score_quiet();

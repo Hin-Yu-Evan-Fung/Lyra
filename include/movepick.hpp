@@ -9,6 +9,8 @@ enum MovePickStage {
   TT,
   INIT_CAP,
   GOOD_CAP,
+  KILLER_1,
+  KILLER_2,
   INIT_QUIET,
   QUIET,
   BAD_CAP,
@@ -22,19 +24,17 @@ enum MovePickStage {
   QSEARCH,
 };
 
-// Contains all info required for MovePicker
-struct MovePickState {
-  const Board& board;
-  Move         tt_move;
-  Depth        depth;
-};
-
 template <Colour Us>
 class MovePicker {
  public:
-  MovePicker(const MovePickState& state);
+  MovePicker(const Board& board, const std::array<Move, 2>& killers, Move tt_move, Depth depth);
 
   Move next();
+
+  const Board&               board_;
+  const std::array<Move, 2>& killers_;
+  Move                       tt_move_;
+  Depth                      depth_;
 
  private:
   void gen_score_cap();
@@ -57,8 +57,6 @@ class MovePicker {
   size_t start_ptr_ = 0;
   size_t end_ptr_   = MaxMoves - 1;
   int    stage_     = TT;
-
-  const MovePickState& state_;
 };
 
 }  // namespace Lyra

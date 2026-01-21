@@ -5,8 +5,14 @@
 #include "defs.hpp"
 #include "movegen.hpp"
 #include "movepick.hpp"
+#include "search.hpp"
 
 namespace Lyra {
+
+namespace {
+MainHistory history;
+Killer      killer;
+}  // namespace
 
 template <bool Div, Colour Us>
 U64 perft(Board& board, Depth depth) {
@@ -38,7 +44,7 @@ U64 perft(Board& board, Depth depth) {
 
 template <bool Div, Colour Us>
 U64 perftmp(Board& board, Depth depth) {
-  MovePicker<Us> mp(board, {}, NoMove, DepthQS);
+  MovePicker<Us> mp(board, &killer, &history, NoMove, 0);
 
   if (!Div && depth <= 1) {
     U64 n = 0;

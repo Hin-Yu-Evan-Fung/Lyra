@@ -37,8 +37,9 @@ enum {
   EvalDraw      = 0,
   EvalStop      = 0,
 
-  DepthQS       = 0,
   StackOffset   = 2,
+
+  HistoryMax    = 16384,
 };
 
 /******************************************\

@@ -37,7 +37,7 @@ bool Clock::stop_iter(Depth depth) {
   if (stop_.load(std::memory_order::relaxed)) return true;
   if (max_ == 0 && max_depth_ == 0) return false;
 
-  bool stop = (opt_ > 0 && elapsed() >= opt_) || (max_depth_ > 0 && depth > max_depth_);
+  bool stop = (opt_ > 0 && elapsed() >= opt_) || (max_depth_ > 0 && depth >= max_depth_);
   if (stop) stop_.store(true, std::memory_order::relaxed);
   return stop;
 }

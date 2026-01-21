@@ -2,6 +2,7 @@
 
 #include "board.hpp"
 #include "defs.hpp"
+#include "search.hpp"
 
 namespace Lyra {
 
@@ -27,14 +28,16 @@ enum MovePickStage {
 template <Colour Us>
 class MovePicker {
  public:
-  MovePicker(const Board& board, const std::array<Move, 2>& killers, Move tt_move, Depth depth);
+  MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move, Depth depth);
+  MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move);
 
   Move next();
 
-  const Board&               board_;
-  const std::array<Move, 2>& killers_;
-  Move                       tt_move_;
-  Depth                      depth_;
+  const Board& board_;
+  Killer*      killer_;
+  MainHistory* history_;
+  Move         tt_move_;
+  Depth        depth_;
 
  private:
   void gen_score_cap();

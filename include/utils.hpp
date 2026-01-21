@@ -5,6 +5,17 @@
 #include "defs.hpp"
 
 namespace Lyra {
+/******************************************\
+|==========================================|
+|                 ND Array                 |
+|==========================================|
+\******************************************/
+
+template <typename T, size_t A, size_t... B>
+struct NDArray : public std::array<NDArray<T, B...>, A> {};
+
+template <typename T, size_t A>
+struct NDArray<T, A> : public std::array<T, A> {};
 
 /******************************************\
 |==========================================|

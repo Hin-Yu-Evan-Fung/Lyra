@@ -41,6 +41,8 @@ void Worker::reset(const Board& board) {
   nodes_     = 0;
   depth_     = 0;
   seldepth_  = 0;
+
+  history_.clear();
 }
 
 void Worker::uci_report(const PVLine& pv) {
@@ -129,10 +131,9 @@ Eval Worker::search(Board& board, StackEntry* ss, Eval alpha, Eval beta, Depth d
   // ** Main Search Loop ** //
 
   // Clear killer moves
-  (ss + 1)->killers[0] = NoMove;
-  (ss + 1)->killers[1] = NoMove;
+  (ss + 1)->killer.clear();
 
-  MovePicker<Us> mp{board, ss->killers, NoMove, depth};
+  MovePicker<Us> mp{board, &ss->killer, &history_, NoMove, depth};
 
   Eval best       = -EvalInf;
   int  move_count = 0;
@@ -168,10 +169,8 @@ Eval Worker::search(Board& board, StackEntry* ss, Eval alpha, Eval beta, Depth d
   }
 
   if (best_move && !MoveUtils::is_capture(best_move)) {
-    if (best_move != ss->killers[0]) {
-      ss->killers[1] = ss->killers[0];
-      ss->killers[0] = best_move;
-    }
+    ss->killer.update(best_move);
+    history_.get(board, best_move).update(300 * depth - 250);
   }
 
   if (move_count == 0) return board.in_check() ? EvalUtils::mated_in(ss->ply) : EvalDraw;
@@ -189,8 +188,6 @@ Eval Worker::qsearch(Board& board, StackEntry* ss, Eval alpha, Eval beta) {
   ss->pv.clear();
   seldepth_ = std::max(seldepth_, Depth(ss->ply + 1));
 
-  MovePicker<Us> mp{board, {}, NoMove, DepthQS};
-
   // ** Stand Pat ** //
   // The current eval is the lower bound because we can just not capture anything (assume its not a zugzwang)
   // If lower bound >= beta, then we fail high (opponent has better options)
@@ -202,6 +199,11 @@ Eval Worker::qsearch(Board& board, StackEntry* ss, Eval alpha, Eval beta) {
   // ** Main QSearch Loop ** //
   Move move       = NoMove;
   int  move_count = 0;
+
+  // Clear killer moves
+  (ss + 1)->killer.clear();
+
+  MovePicker<Us> mp{board, &ss->killer, &history_, NoMove};
 
   while ((move = mp.next())) {
     move_count++;

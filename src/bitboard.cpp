@@ -178,11 +178,11 @@ void init() {
   for (Square src = A1; src <= H8; ++src) {
     for (Square dst = A1; dst <= H8; ++dst) {
       if (naive_slider_attacks<B>(src, EmptyBB) & from(dst)) {
-        LINE_BB[src][dst] = naive_slider_attacks<B>(src, EmptyBB) & naive_slider_attacks<B>(src, EmptyBB);
+        LINE_BB[src][dst] = naive_slider_attacks<B>(src, EmptyBB) & naive_slider_attacks<B>(dst, EmptyBB);
         BTWN_BB[src][dst] = naive_slider_attacks<B>(src, from(dst)) & naive_slider_attacks<B>(dst, from(src));
       }
       if (naive_slider_attacks<R>(src, EmptyBB) & from(dst)) {
-        LINE_BB[src][dst] = naive_slider_attacks<R>(src, EmptyBB) & naive_slider_attacks<R>(src, EmptyBB);
+        LINE_BB[src][dst] = naive_slider_attacks<R>(src, EmptyBB) & naive_slider_attacks<R>(dst, EmptyBB);
         BTWN_BB[src][dst] = naive_slider_attacks<R>(src, from(dst)) & naive_slider_attacks<R>(dst, from(src));
       }
     }

@@ -5,6 +5,7 @@
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
+#include "history.hpp"
 
 namespace Lyra {
 
@@ -21,9 +22,9 @@ struct PVLine {
 };
 
 struct StackEntry {
-  std::array<Move, 2> killers;
-  PVLine              pv;
-  U16                 ply;
+  Killer killer;
+  PVLine pv;
+  U16    ply;
 };
 
 class Worker {
@@ -47,6 +48,8 @@ class Worker {
   Depth  seldepth_;
   Eval   eval_;
   Move   best_move_;
+
+  MainHistory history_;
 
  public:
   Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}

@@ -68,10 +68,8 @@ void UCI::parse_perft(std::istringstream& is) {
   if (token == "mp") {
     is >> depth;
     engine_.perft<Perft_MP>(depth);
-  } else if (token == "bench")
-    engine_.perft_bench();
-  else
-    std::println("Wrong command format! Must be perft [depth], perft mp [depth] or perft bench!");
+  } else
+    std::println("Wrong command format! Must be perft [depth], perft mp [depth]!");
 }
 
 void UCI::parse_go(std::istringstream& is) {

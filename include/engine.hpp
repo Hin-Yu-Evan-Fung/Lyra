@@ -37,7 +37,6 @@ class Engine {
 
   template <PerftMode PM>
   void perft(Depth d);
-  void perft_bench();
   void go(const TimeControl& tc);
   void newgame();
   void stop() { pool_.stop(); }

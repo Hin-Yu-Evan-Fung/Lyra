@@ -35,10 +35,6 @@ void Engine::perft(Depth d) {
   if (!is_busy()) Lyra::perft<PM>(board_, d);
 }
 
-void Engine::perft_bench() {
-  if (!is_busy()) Lyra::perft_bench();
-}
-
 /******************************************\
 |==========================================|
 |                 Setters                  |

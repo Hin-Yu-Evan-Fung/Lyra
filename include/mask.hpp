@@ -1,3 +1,5 @@
+#include <print>
+
 #include "bitboard.hpp"
 #include "board.hpp"
 #include "defs.hpp"

@@ -34,12 +34,14 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG        v1.15.2
 )
+FetchContent_MakeAvailable(googletest) # This line is mandatory to actually load GTest
+
 
 enable_testing()
 
 file(GLOB GTEST_SRC "tests/*.cpp")
 add_executable(LyraTests ${GTEST_SRC})
-target_link_libraries(LyraTests PRIVATE LyraLib gtest_main)
+target_link_libraries(LyraTests PRIVATE LyraLib GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(LyraTests)

@@ -56,7 +56,7 @@ class Worker {
   bool is_main() { return id_ == 0; }
 
   void reset(const Board& board);
-  void start(const TimeControl& tc);
+  void start(TimeControl tc);
   void uci_report(const PVLine& pv);
 };
 

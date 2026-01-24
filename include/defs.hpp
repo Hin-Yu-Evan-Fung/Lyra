@@ -179,4 +179,9 @@ constexpr Square forward(Square sq) noexcept {
   return static_cast<Square>(C == White ? sq + I8(Direction::N) : sq + I8(Direction::S));
 }
 
+template <Direction dir>
+constexpr Square shift(Square sq) {
+  return static_cast<Square>(sq + I8(dir));
+}
+
 }  // namespace Lyra

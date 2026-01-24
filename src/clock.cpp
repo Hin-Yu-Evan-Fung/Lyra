@@ -1,6 +1,7 @@
 #include "clock.hpp"
 
 #include <atomic>
+#include <print>
 
 #include "defs.hpp"
 #include "engine.hpp"
@@ -53,6 +54,7 @@ bool Clock::stop(U64 nodes) {
   if (max_ == 0) return false;
 
   bool stop = searched >= CLOCK_FREQ && elapsed() >= max_;
+  if (stop) std::println("Stopping!");
   if (stop) stop_.store(true, std::memory_order::relaxed);
   return stop;
 }

@@ -24,7 +24,7 @@ void Engine::go(const TimeControl& tc) {
   if (is_busy()) return;
 
   pool_.stop_.store(false, std::memory_order::relaxed);
-  pool_.exec([&](Thread& th) {
+  pool_.exec([tc, this](Thread& th) {
     th.worker_.reset(board_);
     th.worker_.start(tc);
   });

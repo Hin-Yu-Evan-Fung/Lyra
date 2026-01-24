@@ -81,7 +81,7 @@ constexpr std::string format(Move move, bool chess960) {
 
   std::string move_str = IOUtils::format_sq(src_sq) + IOUtils::format_sq(dst_sq);
 
-  if (is_promo(move)) move_str += " pnbrqk"[promoted_pt(move)];
+  if (is_promo(move)) move_str += "pnbrqk "[promoted_pt(move)];
 
   return move_str;
 }

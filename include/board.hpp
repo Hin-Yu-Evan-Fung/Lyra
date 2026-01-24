@@ -123,8 +123,9 @@ class Board {
   constexpr BB bb() const;
   constexpr BB bb(Colour c) const;
   constexpr BB bb(PieceType pt) const;
-  constexpr BB bb(Piece pc) const;
-  constexpr BB bb(Piece pc1, Piece pc2) const;
+  constexpr BB bb(PieceType pt1, PieceType pt2) const;
+  constexpr BB bb(Colour c, PieceType pt) const;
+  constexpr BB bb(Colour c, PieceType pt1, PieceType pt2) const;
 
   // Getters
   template <Colour C>
@@ -138,8 +139,12 @@ class Board {
   // Movegen Helpers
   template <Colour Us, bool QueenSide>
   constexpr bool can_castle() const;
+
+  // Movepick Helpers
+  BB attackers_to(Square to, BB occ) const;
   template <Colour Us>
   bool is_legal(Move move) const;
+  bool see(Move move, Eval threshold) const;
 
   // Game State functions
   bool is_draw() const;
@@ -166,8 +171,9 @@ constexpr CastleMask  Board::castle_mask() const { return castling_mask_; }
 constexpr BB Board::bb() const { return colourBB_[White] | colourBB_[Black]; }
 constexpr BB Board::bb(Colour c) const { return colourBB_[c]; }
 constexpr BB Board::bb(PieceType pt) const { return pieceBB_[pt]; }
-constexpr BB Board::bb(Piece pc) const { return bb(colour_of(pc)) & bb(pt_of(pc)); }
-constexpr BB Board::bb(Piece pc1, Piece pc2) const { return bb(pc1) | bb(pc2); }
+constexpr BB Board::bb(PieceType pt1, PieceType pt2) const { return bb(pt1) | bb(pt2); }
+constexpr BB Board::bb(Colour c, PieceType pt) const { return bb(c) & bb(pt); }
+constexpr BB Board::bb(Colour c, PieceType pt1, PieceType pt2) const { return bb(c) & bb(pt1, pt2); }
 
 /******************************************\
 |==========================================|
@@ -178,7 +184,7 @@ constexpr BB Board::bb(Piece pc1, Piece pc2) const { return bb(pc1) | bb(pc2); }
 constexpr Piece Board::on(Square sq) const { return board_[sq]; }
 template <Colour C>
 constexpr Square Board::ksq() const {
-  return BBUtils::lsb(bb(make_piece(C, K)));
+  return BBUtils::lsb(bb(C, K));
 }
 
 /******************************************\
@@ -255,20 +261,18 @@ constexpr bool Board::can_castle() const {
 template <Colour Us>
 constexpr bool Board::can_ep(Square ep) {
   using enum Direction;
-  constexpr Colour    Them   = ~Us;
-  constexpr Direction Up     = Us == White ? N : S;
-  constexpr Piece     ERook  = make_piece(Them, R);
-  constexpr Piece     EQueen = make_piece(Them, Q);
+  constexpr Colour    Them = ~Us;
+  constexpr Direction Up   = Us == White ? N : S;
 
-  const BB     ep_rank       = Us == White ? from(Rank5) : from(Rank4);
-  const BB     king          = bb(make_piece(Us, K));
-  const BB     pawns         = bb(make_piece(Us, P));
-  const BB     enemy_rq      = bb(ERook, EQueen);
-  const BB     occ           = bb();
-  const BB     ep_target     = shift<~Up>(from(ep));
-  const Square ksq           = Board::ksq<Us>();
-  const BB     ep_w          = pawns & shift<E>(ep_target);
-  const BB     ep_e          = pawns & shift<W>(ep_target);
+  const BB     ep_rank     = Us == White ? from(Rank5) : from(Rank4);
+  const BB     king        = bb(Us, K);
+  const BB     pawns       = bb(Us, P);
+  const BB     enemy_rq    = bb(Them, R, Q);
+  const BB     occ         = bb();
+  const BB     ep_target   = shift<~Up>(from(ep));
+  const Square ksq         = Board::ksq<Us>();
+  const BB     ep_w        = pawns & shift<E>(ep_target);
+  const BB     ep_e        = pawns & shift<W>(ep_target);
 
   // If the enemy rook/queen sees the king after simulating the enpassant, register the enpassant pin
   const bool has_attacker = PAWN_ATK[Them][ep] & pawns;

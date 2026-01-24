@@ -59,7 +59,7 @@ void Worker::uci_report(const PVLine& pv) {
   std::fflush(stdout);
 }
 
-void Worker::start(const TimeControl& tc) {
+void Worker::start(TimeControl tc) {
   Colour stm = root_.stm();
 
   if (is_main()) clock_.set(stm, tc);

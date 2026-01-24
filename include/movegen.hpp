@@ -12,11 +12,6 @@ using namespace MoveUtils;
 
 enum MoveGenType { GenQuiet = 1, GenCap = 2, GenAll = GenQuiet | GenCap };
 
-template <Direction dir>
-constexpr Square shift(Square sq) {
-  return static_cast<Square>(sq + I8(dir));
-}
-
 template <Colour Us, bool IsCap, typename Handler>
 constexpr void enum_promotions(Square src, Square dst, Handler&& handler) {
   constexpr MoveFlag QueenFlag  = IsCap ? PromoCap_Q : Promo_Q;
@@ -34,7 +29,6 @@ template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_pawn(const Board& board, Handler&& handler) {
   using enum Direction;
   constexpr Colour    Them       = ~Us;
-  constexpr Piece     Pawn       = make_piece(Us, P);
   constexpr BB        push_rank  = Us == White ? from(Rank2) : from(Rank7);
   constexpr BB        promo_rank = Us == White ? from(Rank7) : from(Rank2);
   constexpr Direction Up         = Us == White ? N : S;
@@ -46,7 +40,7 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
 
   const BB     empty             = ~board.bb();
   const BB     enemy             = board.bb(Them);
-  const BB     pawns             = board.bb(Pawn);
+  const BB     pawns             = board.bb(Us, P);
   const BB     diag_pin          = board.state()->diag_pin;
   const BB     hv_pin            = board.state()->hv_pin;
   const BB     check_mask        = board.state()->check_mask;
@@ -101,17 +95,16 @@ constexpr void enum_pawn(const Board& board, Handler&& handler) {
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_knights(const Board& board, Handler&& handler) {
-  constexpr Colour Them   = ~Us;
-  constexpr Piece  Knight = make_piece(Us, N);
+  constexpr Colour Them = ~Us;
 
-  const BB empty          = ~board.bb();
-  const BB enemy          = board.bb(Them);
-  const BB diag_pin       = board.state()->diag_pin;
-  const BB hv_pin         = board.state()->hv_pin;
-  const BB check_mask     = board.state()->check_mask;
+  const BB empty        = ~board.bb();
+  const BB enemy        = board.bb(Them);
+  const BB diag_pin     = board.state()->diag_pin;
+  const BB hv_pin       = board.state()->hv_pin;
+  const BB check_mask   = board.state()->check_mask;
 
   BB attacks;
-  BB moveable = board.bb(Knight) & ~(diag_pin | hv_pin);
+  BB moveable = board.bb(Us, N) & ~(diag_pin | hv_pin);
   bitloop(moveable, [&](Square src) {
     attacks = KNIGHT_ATK[src] & check_mask;
 
@@ -122,19 +115,17 @@ constexpr void enum_knights(const Board& board, Handler&& handler) {
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_diag_slider(const Board& board, Handler&& handler) {
-  constexpr Colour Them   = ~Us;
-  constexpr Piece  Bishop = make_piece(Us, B);
-  constexpr Piece  Queen  = make_piece(Us, Q);
+  constexpr Colour Them = ~Us;
 
-  const BB occ            = board.bb();
-  const BB empty          = ~occ;
-  const BB enemy          = board.bb(Them);
-  const BB diag_pin       = board.state()->diag_pin;
-  const BB hv_pin         = board.state()->hv_pin;
-  const BB check_mask     = board.state()->check_mask;
+  const BB occ          = board.bb();
+  const BB empty        = ~occ;
+  const BB enemy        = board.bb(Them);
+  const BB diag_pin     = board.state()->diag_pin;
+  const BB hv_pin       = board.state()->hv_pin;
+  const BB check_mask   = board.state()->check_mask;
 
   BB attacks;
-  BB moveable = board.bb(Bishop, Queen) & ~hv_pin;
+  BB moveable = board.bb(Us, B, Q) & ~hv_pin;
   bitloop(moveable & diag_pin, [&](Square src) {
     attacks = BISHOP_ATK[src][occ] & check_mask & diag_pin;
 
@@ -151,19 +142,17 @@ constexpr void enum_diag_slider(const Board& board, Handler&& handler) {
 
 template <Colour Us, MoveGenType Gt, typename Handler>
 constexpr void enum_hv_slider(const Board& board, Handler&& handler) {
-  constexpr Colour Them  = ~Us;
-  constexpr Piece  Rook  = make_piece(Us, R);
-  constexpr Piece  Queen = make_piece(Us, Q);
+  constexpr Colour Them = ~Us;
 
-  const BB occ           = board.bb();
-  const BB empty         = ~occ;
-  const BB enemy         = board.bb(Them);
-  const BB diag_pin      = board.state()->diag_pin;
-  const BB hv_pin        = board.state()->hv_pin;
-  const BB check_mask    = board.state()->check_mask;
+  const BB occ          = board.bb();
+  const BB empty        = ~occ;
+  const BB enemy        = board.bb(Them);
+  const BB diag_pin     = board.state()->diag_pin;
+  const BB hv_pin       = board.state()->hv_pin;
+  const BB check_mask   = board.state()->check_mask;
 
   BB attacks;
-  BB moveable = board.bb(Rook, Queen) & ~diag_pin;
+  BB moveable = board.bb(Us, R, Q) & ~diag_pin;
   bitloop(moveable & hv_pin, [&](Square src) {
     attacks = ROOK_ATK[src][occ] & check_mask & hv_pin;
 

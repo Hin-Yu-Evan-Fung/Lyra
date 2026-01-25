@@ -6,6 +6,7 @@
 #include "clock.hpp"
 #include "defs.hpp"
 #include "history.hpp"
+#include "tt.hpp"
 
 namespace Lyra {
 
@@ -13,51 +14,53 @@ class ThreadPool;
 class Thread;
 
 struct PVLine {
-  Move   moves[MaxDepth];
+  Move moves[MaxDepth];
   size_t length;
 
-  void        update(const PVLine& other, Move best);
-  void        clear() { length = 0; }
+  void update(const PVLine &other, Move best);
+  void clear() { length = 0; }
   std::string format(bool chess960) const;
 };
 
 struct StackEntry {
   Killer killer;
   PVLine pv;
-  U16    ply;
+  U16 ply;
 };
 
 class Worker {
   enum NodeType { Root, PV, NonPV };
 
-  template <Colour Us>
-  void aspwin();
+  template <Colour Us> void aspwin();
   template <Colour Us, NodeType NT = Root>
-  Eval search(Board& board, StackEntry* ss, Eval alpha, Eval beta, Depth depth);
+  Eval search(Board &board, StackEntry *ss, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT = Root>
-  Eval qsearch(Board& board, StackEntry* ss, Eval alpha, Eval beta);
+  Eval qsearch(Board &board, StackEntry *ss, Eval alpha, Eval beta);
 
-  Clock             clock_;
-  std::atomic_bool& stop_;
+  Clock clock_;
+  std::atomic_bool &stop_;
 
-  Board  root_;
+  Board root_;
   size_t id_;
 
   size_t nodes_;
-  Depth  depth_;
-  Depth  seldepth_;
-  Eval   eval_;
-  Move   best_move_;
+  Depth depth_;
+  Depth seldepth_;
+  Eval eval_;
+  Move best_move_;
 
   MainHistory history_;
 
- public:
-  Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}
+  TT &tt_;
+
+public:
+  Worker(std::atomic_bool &stop, size_t id, TT &tt)
+      : clock_(stop), stop_(stop), id_(id), tt_(tt) {}
   bool is_main() { return id_ == 0; }
 
-  void reset(const Board& board);
+  void reset(const Board &board);
   void start(TimeControl tc);
-  void uci_report(const PVLine& pv);
+  void uci_report(const PVLine &pv);
 };
 
-}  // namespace Lyra
+} // namespace Lyra

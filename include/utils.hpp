@@ -24,7 +24,7 @@ struct NDArray<T, A> : public std::array<T, A> {};
 \******************************************/
 
 struct PRNG {
- public:
+public:
   PRNG() : PRNG(0x6B51FF299F6A3AEE) {}
   PRNG(U64 seed) {
     s0 = seed;
@@ -34,18 +34,18 @@ struct PRNG {
   }
 
   U64 random() {
-    U64 tmp  = s1 << 17;
-    s2      ^= s0;
-    s3      ^= s1;
-    s1      ^= s2;
-    s0      ^= s3;
-    s2      ^= tmp;
-    s3       = std::rotl(s3, 45);
+    U64 tmp = s1 << 17;
+    s2 ^= s0;
+    s3 ^= s1;
+    s1 ^= s2;
+    s0 ^= s3;
+    s2 ^= tmp;
+    s3 = std::rotl(s3, 45);
 
     return s0;
   }
 
- private:
+private:
   U64 s0, s1, s2, s3;
 };
 
@@ -59,9 +59,8 @@ using Time = uint64_t;
 
 inline Time now() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::high_resolution_clock::now().time_since_epoch()
-  )
-    .count();
+             std::chrono::high_resolution_clock::now().time_since_epoch())
+      .count();
 }
 
 /******************************************\
@@ -75,6 +74,17 @@ namespace EvalUtils {
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
 
+// Remove the mate score's dependency on ply from root, as the same position can
+// be reached in different lines
+constexpr Eval to_TT(Eval v, U16 ply) {
+  return v >= EvalMateBound ? v + ply : v <= -EvalMateBound ? v - ply : v;
+}
+// Restore the mate score's dependency on ply from root, as the same position
+// can be reached in different lines
+constexpr Eval from_TT(Eval v, U16 ply) {
+  return v >= EvalMateBound ? v - ply : v <= -EvalMateBound ? v + ply : v;
+}
+
 inline std::string format(Eval v) {
   if (v >= EvalMateBound)
     return std::format("mate {}", (EvalMate - v + 1) / 2);
@@ -84,7 +94,7 @@ inline std::string format(Eval v) {
     return std::format("cp {}", v);
 }
 
-}  // namespace EvalUtils
+} // namespace EvalUtils
 
 /******************************************\
 |==========================================|
@@ -96,18 +106,28 @@ namespace IOUtils {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
-constexpr char        format_file(File f) { return static_cast<char>(f + 'a'); }
-constexpr char        format_rank(Rank r) { return static_cast<char>(r + '1'); }
-constexpr char        format_piece(Piece pc) { return PIECE_STR.at(pc); }
+constexpr char format_file(File f) { return static_cast<char>(f + 'a'); }
+constexpr char format_rank(Rank r) { return static_cast<char>(r + '1'); }
+constexpr char format_piece(Piece pc) { return PIECE_STR.at(pc); }
 constexpr std::string format_sq(Square sq) {
-  return sq == NoSquare ? "none" : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
+  return sq == NoSquare
+             ? "none"
+             : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
 }
 
-constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
-constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
-constexpr Square parse_sq(const std::string& str) { return make_square(parse_file(str[0]), parse_rank(str[1])); }
-constexpr Piece  parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
+constexpr File parse_file(const char c) {
+  return static_cast<File>(std::tolower(c) - 'a');
+}
+constexpr Rank parse_rank(const char c) {
+  return static_cast<Rank>(std::tolower(c) - '1');
+}
+constexpr Square parse_sq(const std::string &str) {
+  return make_square(parse_file(str[0]), parse_rank(str[1]));
+}
+constexpr Piece parse_piece(const char c) {
+  return static_cast<Piece>(PIECE_STR.find(c));
+}
 
-}  // namespace IOUtils
+} // namespace IOUtils
 
-}  // namespace Lyra
+} // namespace Lyra

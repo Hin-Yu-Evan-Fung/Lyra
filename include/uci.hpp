@@ -13,16 +13,16 @@ namespace Lyra {
 \******************************************/
 
 class UCI {
- public:
+public:
   void loop();
 
- private:
+private:
   Engine engine_;
 
-  void parse_go(std::istringstream& is);
-  void parse_pos(std::istringstream& is);
-  void parse_perft(std::istringstream& is);
-  void parse_option(std::istringstream& is);
+  void parse_go(std::istringstream &is);
+  void parse_pos(std::istringstream &is);
+  void parse_perft(std::istringstream &is);
+  void parse_option(std::istringstream &is);
 };
 
-}  // namespace Lyra
+} // namespace Lyra

@@ -16,7 +16,7 @@ static constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 template <Colour Us>
 MovePicker<Us>::MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move, Depth depth)
   : board_(board), killer_(killer), history_(history), tt_move_(tt_move), depth_(depth) {
-  stage_ = TT;
+  stage_ = MAIN_TT;
 }
 
 template <Colour Us>
@@ -141,7 +141,7 @@ Move MovePicker<Us>::next() {
   Move killer;
 
   switch (stage_) {
-  case TT:
+  case MAIN_TT:
   case QSEARCH_TT:
   case EVASION_TT:
     ++stage_;
@@ -205,30 +205,29 @@ template <Colour Us>
 bool Board::is_legal(Move move) const {
   using namespace MoveUtils;
   using namespace BBUtils;
+  using enum Direction;
 
-  constexpr Colour Them = ~Us;
-  constexpr Castle OO   = Us == White ? WhiteOO : BlackOO;
-  constexpr Castle OOO  = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Direction Up  = Us == White ? N : S;
+  constexpr Castle    OO  = Us == White ? WhiteOO : BlackOO;
+  constexpr Castle    OOO = Us == White ? WhiteOOO : BlackOOO;
 
   if (!move) return false;
 
   // Move params
-  const Square    src_       = src(move);
-  const Square    dst_       = dst(move);
-  const Piece     pc         = on(src_);
-  const PieceType pt         = pt_of(pc);
-  const Piece     cap        = on(dst_);
-  const MoveFlag  flag_      = flag(move);
-  const bool      is_castle_ = is_castle(move);
-  const bool      is_cap_    = is_capture(move);
-  const bool      is_ep_     = flag_ == EP;
-  const bool      is_dp_     = flag_ == DoublePush;
-  const bool      is_quiet_  = flag_ == Quiet;
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
+  const Piece     pc        = on(src);
+  const PieceType pt        = pt_of(pc);
+  const Piece     cap       = on(dst);
+  const bool      is_castle = MoveUtils::is_castle(move);
+  const bool      is_cap    = MoveUtils::is_capture(move);
+  const bool      is_ep     = flag == EP;
+  const bool      is_dp     = flag == DoublePush;
+  const bool      is_quiet  = flag == Quiet;
 
   // Board info
   const Square ksq_       = ksq<Us>();
-  const Square ep_        = undo_->ep;
-  const Square ep_target_ = forward<Them>(ep_);
   const BB     occ        = bb();
   const BB     hv_pin     = undo_->hv_pin;
   const BB     diag_pin   = undo_->diag_pin;
@@ -238,44 +237,39 @@ bool Board::is_legal(Move move) const {
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
   // Check if the captured piece is theirs or not (Except for castling where we can capture our own rook)
-  const bool invalid_cap = !is_castle_ && cap != NoPiece && colour_of(cap) == Us;
+  const bool invalid_cap = !is_castle && cap != NoPiece && colour_of(cap) == Us;
   // Check if the squares makes sense (Chess960 allows for src == dst for castling)
-  const bool invalid_sq = !is_castle_ && src_ == dst_;
+  const bool invalid_sq = !is_castle && src == dst;
   // Check if the capture flag is consistent with a piece being captured
-  const bool invalid_cap_flag = !is_castle_ && !is_ep_ && is_cap_ == (cap == NoPiece);
+  const bool invalid_cap_flag = !is_castle && !is_ep && is_cap == (cap == NoPiece);
 
   if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag) return false;
 
-  if (is_castle_) {
-    if (flag_ == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
-    if (flag_ == QueenCastle && undo_->c_rights & OOO) return !in_check() && can_castle<Us, true>();
+  if (is_castle) {
+    if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
+    if (flag == QueenCastle && undo_->c_rights & OOO) return !in_check() && can_castle<Us, true>();
     return false;
   }
 
+  if (pt == K) return KING_ATK[src] & from(dst) && !(attacked & from(dst));
+
   // Check if there is a pin and if so check if the movement is aligned to the king
-  const bool valid_pin = !(diag_pin & from(src_) || hv_pin & from(src_)) || is_aligned(src_, dst_, ksq_);
+  const bool valid_pin = !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
 
-  if (is_ep_) return undo_->ep == dst_ && valid_pin && PAWN_ATK[Us][src_] & from(dst_) && from(ep_target_) & check_mask;
-
-  switch (pt) {
-  case P:
-    // Capture is illegal if its the wrong attack pattern
-    if (is_cap_ && !(PAWN_ATK[Us][src_] & from(dst_))) return false;
+  if (pt == P) {
+    // Enpassant is illegal if the destination is incorrect, the attack pattern is wrong, or the move results in check.
+    if (is_ep) return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
+    // Capture is illegal if the move does not correspond to the attack pattern
+    if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
     // Double Push is illegal if there are pieces in the way
-    if (is_dp_ && (BTWN_BB[src_][dst_] | from(dst_)) & occ) return false;
+    if (is_dp && (BTWN_BB[src][dst] | from(dst)) & occ) return false;
     // Single Push is illegal if its the wrong pattern and there are pieces in the way
-    if (is_quiet_ && (dst_ != forward<Us>(src_) || from(dst_) & occ)) return false;
-    // Check for pins and checks
-    return valid_pin && from(dst_) & check_mask;
-  case N: return valid_pin && from(dst_) & check_mask & KNIGHT_ATK[src_];
-  case B: return valid_pin && from(dst_) & check_mask & BISHOP_ATK[src_][occ];
-  case R: return valid_pin && from(dst_) & check_mask & ROOK_ATK[src_][occ];
-  case Q: return valid_pin && from(dst_) & check_mask & (BISHOP_ATK[src_][occ] | ROOK_ATK[src_][occ]);
-  case K: return KING_ATK[src_] & from(dst_) && !(attacked & from(dst_));
-  case NoPieceType: return false;
+    if (is_quiet && (dst != forward<Us>(src) || from(dst) & occ)) return false;
+
+    return valid_pin && from(dst) & check_mask;
   }
 
-  return true;
+  return valid_pin && from(dst) & check_mask & attack_bb<Us>(pt, src, occ);
 }
 
 template bool Board::is_legal<White>(Move move) const;

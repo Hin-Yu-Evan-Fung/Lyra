@@ -51,10 +51,10 @@ void UCI::loop() {
   } while (token != "quit");
 }
 
-void UCI::parse_perft(std::istringstream& is) {
-  std::string    token;
-  Depth          depth = 0;
-  std::streampos pos   = is.tellg();
+void UCI::parse_perft(std::istringstream &is) {
+  std::string token;
+  Depth depth = 0;
+  std::streampos pos = is.tellg();
 
   if (is >> depth) {
     engine_.perft<Perft>(depth);
@@ -69,10 +69,11 @@ void UCI::parse_perft(std::istringstream& is) {
     is >> depth;
     engine_.perft<Perft_MP>(depth);
   } else
-    std::println("Wrong command format! Must be perft [depth], perft mp [depth]!");
+    std::println(
+        "Wrong command format! Must be perft [depth], perft mp [depth]!");
 }
 
-void UCI::parse_go(std::istringstream& is) {
+void UCI::parse_go(std::istringstream &is) {
   std::string token;
 
   TimeControl tc{};
@@ -103,7 +104,7 @@ void UCI::parse_go(std::istringstream& is) {
   engine_.go(tc);
 }
 
-void UCI::parse_pos(std::istringstream& is) {
+void UCI::parse_pos(std::istringstream &is) {
   std::string token, fen;
   is >> token;
 
@@ -114,10 +115,9 @@ void UCI::parse_pos(std::istringstream& is) {
     while (is >> token && token != "moves")
       fen += token + " ";
   } else {
-    std::println(
-      "Wrong command format! Must be 'position startpos [moves] <move-1> <move-2> ...' or 'position fen <fen> "
-      "[moves] <move-1> <move-2>'"
-    );
+    std::println("Wrong command format! Must be 'position startpos [moves] "
+                 "<move-1> <move-2> ...' or 'position fen <fen> "
+                 "[moves] <move-1> <move-2>'");
     return;
   }
 
@@ -128,24 +128,37 @@ void UCI::parse_pos(std::istringstream& is) {
 
   try {
     engine_.set_pos(fen, moves);
-  } catch (const std::invalid_argument& e) { std::println("Error: {}", e.what()); }
-}
-
-void UCI::parse_option(std::istringstream& is) {
-  std::string token, name;
-  is >> token;
-
-  if (token != "name") return;
-  is >> name;
-
-  is >> token;
-  if (token != "value") return;
-
-  if (name == "UCI_Chess960") {
-    bool chess960;
-    is >> std::boolalpha >> chess960;
-    engine_.set_chess960(chess960);
+  } catch (const std::invalid_argument &e) {
+    std::println("Error: {}", e.what());
   }
 }
 
-}  // namespace Lyra
+void UCI::parse_option(std::istringstream &is) {
+  std::string token, name, value;
+  is >> token;
+
+  if (token != "name")
+    return;
+
+  while (is >> token && token != "value")
+    name += (name.empty() ? "" : " ") + token;
+
+  while (is >> token)
+    value += (value.empty() ? "" : " ") + token;
+
+  if (name == "UCI_Chess960") {
+    engine_.set_chess960(value == "true");
+  } else if (name == "Clear Hash") {
+    engine_.clear_tt();
+  } else if (name == "Threads") {
+    size_t n = std::stoi(value);
+    if (n >= 1 && n <= 32)
+      engine_.set_threads(n);
+  } else if (name == "Hash") {
+    size_t mb = std::stoi(value);
+    if (mb >= 1 && mb <= 128)
+      engine_.set_tt_size(mb);
+  }
+}
+
+} // namespace Lyra

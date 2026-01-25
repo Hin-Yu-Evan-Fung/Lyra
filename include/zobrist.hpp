@@ -5,8 +5,6 @@
 
 namespace Lyra::Zobrist {
 
-using Key = U64;
-
 inline Key PIECE_KEYS[NPiece][NSquare];
 inline Key SIDE_KEY;
 inline Key CASTLE_KEYS[NCastling];
@@ -27,4 +25,4 @@ inline void init() {
     EP_KEYS[f] = prng.random();
 }
 
-}  // namespace Lyra::Zobrist
+} // namespace Lyra::Zobrist

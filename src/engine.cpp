@@ -8,7 +8,7 @@
 
 namespace Lyra {
 
-Engine::Engine() : pool_(THREADS) {}
+Engine::Engine() : pool_(THREADS, tt_), tt_(TT_SIZE) {}
 
 /******************************************\
 |==========================================|
@@ -17,22 +17,25 @@ Engine::Engine() : pool_(THREADS) {}
 \******************************************/
 
 void Engine::newgame() {
-  if (!is_busy()) { board_.set(start_pos.data()); }
+  if (!is_busy()) {
+    board_.set(start_pos.data());
+  }
 }
 
-void Engine::go(const TimeControl& tc) {
-  if (is_busy()) return;
+void Engine::go(const TimeControl &tc) {
+  if (is_busy())
+    return;
 
   pool_.stop_.store(false, std::memory_order::relaxed);
-  pool_.exec([tc, this](Thread& th) {
+  pool_.exec([tc, this](Thread &th) {
     th.worker_.reset(board_);
     th.worker_.start(tc);
   });
 }
 
-template <PerftMode PM>
-void Engine::perft(Depth d) {
-  if (!is_busy()) Lyra::perft<PM>(board_, d);
+template <PerftMode PM> void Engine::perft(Depth d) {
+  if (!is_busy())
+    Lyra::perft<PM>(board_, d);
 }
 
 /******************************************\
@@ -41,8 +44,10 @@ void Engine::perft(Depth d) {
 |==========================================|
 \******************************************/
 
-void Engine::set_pos(const std::string fen, const std::vector<std::string>& moves) {
-  if (is_busy()) return;
+void Engine::set_pos(const std::string fen,
+                     const std::vector<std::string> &moves) {
+  if (is_busy())
+    return;
   board_.set(fen);
 
   for (std::string move_str : moves) {
@@ -50,7 +55,7 @@ void Engine::set_pos(const std::string fen, const std::vector<std::string>& move
 
     for (Move move : list_moves(board_)) {
       std::string move_repr = MoveUtils::format(move, board_.chess960);
-      MoveFlag    flag      = MoveUtils::flag(move);
+      MoveFlag flag = MoveUtils::flag(move);
 
       if (move_repr == move_str || (flag == KingCastle && move_str == "O-O") ||
           (flag == QueenCastle && move_str == "O-O-O")) {
@@ -67,7 +72,18 @@ void Engine::set_pos(const std::string fen, const std::vector<std::string>& move
 }
 
 void Engine::set_threads(size_t num) {
-  if (!is_busy()) pool_.resize(num);
+  if (!is_busy())
+    pool_.resize(num, tt_);
+}
+
+void Engine::set_tt_size(size_t mb) {
+  if (!is_busy())
+    tt_.resize(mb);
+}
+
+void Engine::clear_tt() {
+  if (!is_busy())
+    tt_.clear();
 }
 
 void Engine::set_chess960(bool chess960) { board_.chess960 = chess960; }
@@ -75,4 +91,4 @@ void Engine::set_chess960(bool chess960) { board_.chess960 = chess960; }
 template void Engine::perft<Perft>(Depth d);
 template void Engine::perft<Perft_MP>(Depth d);
 
-}  // namespace Lyra
+} // namespace Lyra

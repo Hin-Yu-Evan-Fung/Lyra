@@ -7,7 +7,7 @@
 namespace Lyra {
 
 enum MovePickStage {
-  TT,
+  MAIN_TT,
   INIT_CAP,
   GOOD_CAP,
   KILLER_1,
@@ -59,7 +59,7 @@ class MovePicker {
 
   size_t start_ptr_ = 0;
   size_t end_ptr_   = MaxMoves - 1;
-  int    stage_     = TT;
+  int    stage_     = MAIN_TT;
 };
 
 }  // namespace Lyra

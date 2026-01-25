@@ -19,6 +19,7 @@ set(
     src/movepick.cpp
     src/clock.cpp
     src/eval.cpp
+    src/tt.cpp
     src/search.cpp
     src/engine.cpp
     src/uci.cpp

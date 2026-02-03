@@ -41,6 +41,9 @@ struct Undo {
   Score psq;
   int game_phase;
 
+  // Repetition checks
+  I8 reps;
+
   // Board variables that are not copied
   Square ep;
   Piece cap;
@@ -112,6 +115,7 @@ public:
   void do_move(Move move);
   template <Colour Us> void do_move(Move move);
   template <Colour Us> void undo_move();
+  void update_reps() const;
 
   // Bitboard getters
   constexpr BB bb() const;
@@ -139,8 +143,7 @@ public:
   bool see(Move move, Eval threshold) const;
 
   // Game State functions
-  bool is_draw() const;
-  bool is_reps() const;
+  bool is_draw(Ply ply) const;
   bool in_check() const;
 };
 

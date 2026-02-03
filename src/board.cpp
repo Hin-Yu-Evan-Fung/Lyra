@@ -275,21 +275,24 @@ Eval Board::eval() const {
 |==========================================|
 \******************************************/
 
-bool Board::is_draw() const {
-  bool not_checkmate =
-      (undo_->check_mask == FullBB || list_moves(*this).size());
-  if (undo_->rule50 >= Rule50Ply && not_checkmate)
+bool Board::is_draw(Ply ply) const {
+  if (undo_->rule50 >= Rule50Ply &&
+      (undo_->check_mask == FullBB || list_moves(*this).size()))
     return true;
-  return is_reps();
+  return undo_->reps && undo_->reps < ply;
 }
 
-bool Board::is_reps() const {
+void Board::update_reps() const {
+  undo_->reps = 0;
   int end = std::min((U16)undo_->rule50, undo_->ply);
   if (end >= 4)
-    for (int i = 2, reps = 0; i <= end; i += 2)
-      if (undo_->key == (undo_ - i)->key && ++reps >= 2)
-        return true;
-  return false;
+    for (int i = 2; i <= end; i += 2) {
+      Undo *prev = undo_ - i;
+      if (undo_->key == prev->key) {
+        undo_->reps = prev->reps ? -i : i;
+        break;
+      }
+    }
 }
 
 bool Board::in_check() const { return undo_->check_mask != FullBB; }

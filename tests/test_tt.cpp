@@ -1,6 +1,6 @@
-#include "defs.hpp"
-#include "move.hpp"
-#include "tt.hpp"
+#include "core/defs.hpp"
+#include "core/move.hpp"
+#include "utils/tt.hpp"
 #include <gtest/gtest.h>
 
 namespace Lyra {

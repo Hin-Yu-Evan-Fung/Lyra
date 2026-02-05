@@ -1,5 +1,5 @@
-#include "eval.hpp"
-#include "uci.hpp"
+#include "engine/uci.hpp"
+#include "search/eval.hpp"
 
 using namespace Lyra;
 

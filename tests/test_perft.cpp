@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "board.hpp"
-#include "defs.hpp"
-#include "perft.hpp"
+#include "board/board.hpp"
+#include "core/defs.hpp"
+#include "utils/perft.hpp"
 
 namespace Lyra {
 

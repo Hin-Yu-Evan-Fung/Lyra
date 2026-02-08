@@ -1,10 +1,10 @@
 #include "search/utils.hpp"
 
-#include <print>
-
 #include "core/move.hpp"
 #include "search/search.hpp"
 #include "utils/tt.hpp"
+
+#include <print>
 
 namespace Lyra {
 
@@ -22,8 +22,7 @@ void PVLine::update(const PVLine &other, Move best) {
 
 std::string PVLine::format(bool chess960) const {
   std::ostringstream os;
-  for (size_t i = 0; i <= length && moves[i]; i++)
-    os << MoveUtils::format(moves[i], chess960) << " ";
+  for (size_t i = 0; i <= length && moves[i]; i++) os << MoveUtils::format(moves[i], chess960) << " ";
   return os.str();
 }
 
@@ -35,18 +34,17 @@ std::string PVLine::format(bool chess960) const {
 
 void MOStats::clear() { ht.clear(); }
 
-void MOStats::update(const Board &board, StackEntry *ss, MoveBuf captures,
-                     MoveBuf quiets, Move best_move, Depth depth) {
+void MOStats::update(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move,
+                     Depth depth) {
   const bool is_capture = MoveUtils::is_capture(best_move);
   const Eval bonus = 300 * depth - 200;
 
   if (!is_capture) {
-    ss->killer.update(best_move);
+    se->killer.update(best_move);
     ht.update(board, best_move, bonus);
 
     for (Move m : quiets)
-      if (m)
-        ht.update(board, m, -bonus);
+      if (m) ht.update(board, m, -bonus);
   }
 }
 
@@ -68,17 +66,13 @@ void Worker::reset(const Board &board) {
   tt_hits = 0;
   fail_high = 0;
   fail_high_first = 0;
-  lmr_searches = 0;
-  lmr_researches = 0;
 }
 
 void Worker::uci_report(const PVLine &pv) {
   std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} "
                "hashfull {} pv {}",
-               depth_ + 1, seldepth_ + 1, EvalUtils::format(eval_),
-               clock_.elapsed(), nodes_,
-               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(),
-               pv.format(board_.chess960));
+               depth_ + 1, seldepth_ + 1, EvalUtils::format(eval_), clock_.elapsed(), nodes_,
+               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(), pv.format(board_.chess960));
   std::fflush(stdout);
 }
 

@@ -12,10 +12,8 @@ template <Colour Us> constexpr BB Board::threatened() {
 
   BB threatened = pawn_attack_bb<Them>(bb(Them, P)) | KING_ATK[ksq<Them>()];
   bitloop(bb(Them, N), [&](Square src) { threatened |= KNIGHT_ATK[src]; });
-  bitloop(bb(Them, B, Q),
-          [&](Square src) { threatened |= BISHOP_ATK[src][occ]; });
-  bitloop(bb(Them, R, Q),
-          [&](Square src) { threatened |= ROOK_ATK[src][occ]; });
+  bitloop(bb(Them, B, Q), [&](Square src) { threatened |= BISHOP_ATK[src][occ]; });
+  bitloop(bb(Them, R, Q), [&](Square src) { threatened |= ROOK_ATK[src][occ]; });
 
   return threatened;
 }
@@ -26,13 +24,11 @@ template <Colour Us> constexpr BB Board::checkers() {
   const BB occ = bb();
   const Square ksq = Board::ksq<Us>();
 
-  return (PAWN_ATK[Us][ksq] & bb(Them, P)) | (KNIGHT_ATK[ksq] & bb(Them, N)) |
-         (BISHOP_ATK[ksq][occ] & bb(Them, B, Q)) |
-         (ROOK_ATK[ksq][occ] & bb(Them, R, Q));
+  return (PAWN_ATK[Us][ksq] & bb(Them, P)) | (KNIGHT_ATK[ksq] & bb(Them, N)) | (BISHOP_ATK[ksq][occ] & bb(Them, B, Q))
+         | (ROOK_ATK[ksq][occ] & bb(Them, R, Q));
 }
 
-template <Colour Us, bool inCheck>
-constexpr void Board::update_pin_and_check_masks() {
+template <Colour Us, bool inCheck> constexpr void Board::update_pin_and_check_masks() {
   using enum Direction;
   constexpr Colour Them = ~Us;
 
@@ -47,8 +43,7 @@ constexpr void Board::update_pin_and_check_masks() {
     pin_mask = BTWN_BB[ksq][atk] | from(atk);
     switch (popcount(pin_mask & our_occ)) {
     case 0:
-      if constexpr (inCheck)
-        check_mask |= pin_mask;
+      if constexpr (inCheck) check_mask |= pin_mask;
       break;
     case 1:
       diag_pin |= pin_mask;
@@ -60,8 +55,7 @@ constexpr void Board::update_pin_and_check_masks() {
     pin_mask = BTWN_BB[ksq][atk] | from(atk);
     switch (popcount(pin_mask & our_occ)) {
     case 0:
-      if constexpr (inCheck)
-        check_mask |= pin_mask;
+      if constexpr (inCheck) check_mask |= pin_mask;
       break;
     case 1:
       hv_pin |= pin_mask;
@@ -70,8 +64,7 @@ constexpr void Board::update_pin_and_check_masks() {
 
   undo_->diag_pin = diag_pin;
   undo_->hv_pin = hv_pin;
-  if constexpr (inCheck)
-    undo_->check_mask |= check_mask;
+  if constexpr (inCheck) undo_->check_mask |= check_mask;
 }
 
 template <Colour Us> void Board::update_masks() {
@@ -88,8 +81,7 @@ template <Colour Us> void Board::update_masks() {
   } else // Double check
     undo_->check_mask = EmptyBB;
 
-  if (KING_ATK[ksq] & enemy_or_empty)
-    undo_->attacked = threatened<Us>();
+  if (KING_ATK[ksq] & enemy_or_empty) undo_->attacked = threatened<Us>();
 }
 
 } // namespace Lyra

@@ -1,13 +1,5 @@
 #include "board/board.hpp"
 
-#include <algorithm>
-#include <cassert>
-#include <cstring>
-#include <ios>
-#include <iostream>
-#include <print>
-#include <sstream>
-
 #include "board/castle.hpp"
 #include "board/mask.hpp"
 #include "board/movegen.hpp"
@@ -16,6 +8,14 @@
 #include "core/zobrist.hpp"
 #include "search/eval.hpp"
 #include "utils/utils.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <cstring>
+#include <ios>
+#include <iostream>
+#include <print>
+#include <sstream>
 
 namespace Lyra {
 
@@ -67,8 +67,7 @@ void Board::set(const std::string &fen) {
 
     if (std::isalpha(c)) {
       Piece pc = IOUtils::parse_piece(c);
-      colour_of(pc) == White ? set_piece<true, White>(pc, sq)
-                             : set_piece<true, Black>(pc, sq);
+      colour_of(pc) == White ? set_piece<true, White>(pc, sq) : set_piece<true, Black>(pc, sq);
       file++;
     } else if (std::isdigit(c)) {
       file += c - '0';
@@ -95,14 +94,12 @@ void Board::set(const std::string &fen) {
 
     if (upper == 'K') {
       rsq = relative_sq(s, H1);
-      while (on(rsq) != rook)
-        --rsq;
+      while (on(rsq) != rook) --rsq;
       castling = CastleMask::get_mask(s, false);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper == 'Q') {
       rsq = relative_sq(s, A1);
-      while (on(rsq) != rook)
-        ++rsq;
+      while (on(rsq) != rook) ++rsq;
       castling = CastleMask::get_mask(s, true);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper >= 'A' && upper <= 'H') {
@@ -130,10 +127,8 @@ void Board::set(const std::string &fen) {
   undo_->key = compute_key();
 
   // Basic board legality checks
-  if (ksq<White>() == NoSquare)
-    throw std::invalid_argument("Invalid fen! White king is not on the board!");
-  if (ksq<Black>() == NoSquare)
-    throw std::invalid_argument("Invalid fen! Black king is not on the board!");
+  if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
+  if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
 
   stm_ == White ? update_masks<White>() : update_masks<Black>();
 }
@@ -155,8 +150,7 @@ void Board::print() const {
 
   for (Rank r = Rank8; r >= Rank1; --r) {
     std::print(" {}   |", IOUtils::format_rank(r));
-    for (File f = FileA; f <= FileH; ++f)
-      std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
+    for (File f = FileA; f <= FileH; ++f) std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
 
     std::println("\n     +---+---+---+---+---+---+---+---+");
   }
@@ -180,8 +174,7 @@ std::string Board::fen() const {
       sq = make_square(f, r);
       pc = on(sq);
       if (pc != NoPiece) {
-        if (empty_count != 0)
-          out << empty_count;
+        if (empty_count != 0) out << empty_count;
         out << IOUtils::format_piece(pc);
         empty_count = 0;
       } else {
@@ -189,8 +182,7 @@ std::string Board::fen() const {
       }
     }
 
-    if (empty_count != 0)
-      out << empty_count;
+    if (empty_count != 0) out << empty_count;
     if (r != Rank1) // Move the piece back
       out << '/';
   }
@@ -215,14 +207,11 @@ Key Board::compute_key() const {
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
-    if (pc != NoPiece)
-      key ^= Zobrist::PIECE_KEYS[pc][sq];
+    if (pc != NoPiece) key ^= Zobrist::PIECE_KEYS[pc][sq];
   }
 
-  if (stm_ == Black)
-    key ^= Zobrist::SIDE_KEY;
-  if (undo_->ep != NoSquare)
-    key ^= Zobrist::EP_KEYS[file_of(undo_->ep)];
+  if (stm_ == Black) key ^= Zobrist::SIDE_KEY;
+  if (undo_->ep != NoSquare) key ^= Zobrist::EP_KEYS[file_of(undo_->ep)];
 
   key ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
 
@@ -234,8 +223,7 @@ Key Board::compute_pawn_key() const {
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
-    if (pt_of(pc) == P)
-      key ^= Zobrist::PIECE_KEYS[pc][sq];
+    if (pt_of(pc) == P) key ^= Zobrist::PIECE_KEYS[pc][sq];
   }
 
   return key;
@@ -253,8 +241,7 @@ Eval Board::compute_raw_eval() const {
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
-    if (pc == NoPiece)
-      continue;
+    if (pc == NoPiece) continue;
 
     score += EvalUtils::PSQT[pc][sq];
     game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
@@ -277,8 +264,7 @@ Eval Board::eval() const {
 
 bool Board::is_draw(Ply ply) const {
   if (undo_->rule50 >= Rule50Ply)
-    if (undo_->check_mask == FullBB || list_moves(*this).size())
-      return true;
+    if (undo_->check_mask == FullBB || list_moves(*this).size()) return true;
   return undo_->reps && undo_->reps < ply;
 }
 

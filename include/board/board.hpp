@@ -15,8 +15,7 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-constexpr std::string_view start_pos =
-    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ";
+constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ";
 
 /******************************************\
 |==========================================|
@@ -41,12 +40,12 @@ struct Undo {
   Score psq;
   int game_phase;
 
-  // Repetition checks
-  I8 reps;
-
   // Board variables that are not copied
   Square ep;
   Piece cap;
+
+  // Repetition checks
+  I8 reps;
 
   // Move generation masks
   BB check_mask, diag_pin, hv_pin, attacked;
@@ -72,16 +71,13 @@ class Board {
   Undo *history_;
 
   // Move and Undo Move helper functions
-  template <bool DoMove, Colour C>
-  constexpr void set_piece(Piece pc, Square sq);
+  template <bool DoMove, Colour C> constexpr void set_piece(Piece pc, Square sq);
   template <bool DoMove, Colour C> constexpr void pop_piece(Square sq);
-  template <bool DoMove, Colour C>
-  constexpr void move_piece(Square src, Square dst);
+  template <bool DoMove, Colour C> constexpr void move_piece(Square src, Square dst);
 
   // Board masks update functions
   template <Colour Us> void update_masks();
-  template <Colour Us, bool inCheck>
-  constexpr void update_pin_and_check_masks();
+  template <Colour Us, bool inCheck> constexpr void update_pin_and_check_masks();
   template <Colour Us> constexpr BB checkers();
   template <Colour Us> constexpr BB threatened();
   template <Colour Us> constexpr bool can_ep(Square ep);
@@ -150,6 +146,7 @@ public:
   // Game State functions
   bool is_draw(Ply ply) const;
   bool in_check() const;
+  template <Colour Us> bool has_non_pawn_material() const;
 };
 
 /******************************************\
@@ -172,25 +169,20 @@ constexpr Key Board::key() const { return undo_->key; }
 constexpr BB Board::bb() const { return colourBB_[White] | colourBB_[Black]; }
 constexpr BB Board::bb(Colour c) const { return colourBB_[c]; }
 constexpr BB Board::bb(PieceType pt) const { return pieceBB_[pt]; }
-constexpr BB Board::bb(PieceType pt1, PieceType pt2) const {
-  return bb(pt1) | bb(pt2);
-}
+constexpr BB Board::bb(PieceType pt1, PieceType pt2) const { return bb(pt1) | bb(pt2); }
 constexpr BB Board::bb(Colour c, PieceType pt) const { return bb(c) & bb(pt); }
-constexpr BB Board::bb(Colour c, PieceType pt1, PieceType pt2) const {
-  return bb(c) & bb(pt1, pt2);
-}
+constexpr BB Board::bb(Colour c, PieceType pt1, PieceType pt2) const { return bb(c) & bb(pt1, pt2); }
 
 /******************************************\
 |==========================================|
-|              Board Getters               |
+|              Board Helpers               |
 |==========================================|
 \******************************************/
 constexpr PieceType Board::pt_on(Square sq) const { return pt_of(board_[sq]); }
 constexpr Piece Board::on(Square sq) const { return board_[sq]; }
 
-template <Colour C> constexpr Square Board::ksq() const {
-  return BBUtils::lsb(bb(C, K));
-}
+template <Colour Us> constexpr Square Board::ksq() const { return BBUtils::lsb(bb(Us, K)); }
+template <Colour Us> bool Board::has_non_pawn_material() const { return bb(Us) ^ bb(Us, P); }
 
 /******************************************\
 |==========================================|
@@ -198,14 +190,12 @@ template <Colour C> constexpr Square Board::ksq() const {
 |==========================================|
 \******************************************/
 
-template <bool DoMove, Colour C>
-constexpr void Board::set_piece(Piece pc, Square sq) {
+template <bool DoMove, Colour C> constexpr void Board::set_piece(Piece pc, Square sq) {
   colourBB_[C] |= BBUtils::from(sq);
   pieceBB_[pt_of(pc)] |= BBUtils::from(sq);
   board_[sq] = pc;
 
-  if constexpr (!DoMove)
-    return;
+  if constexpr (!DoMove) return;
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
   undo_->psq += EvalUtils::PSQT[pc][sq];
@@ -218,24 +208,21 @@ template <bool DoMove, Colour C> constexpr void Board::pop_piece(Square sq) {
   pieceBB_[pt_of(pc)] &= ~BBUtils::from(sq);
   board_[sq] = NoPiece;
 
-  if constexpr (!DoMove)
-    return;
+  if constexpr (!DoMove) return;
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
   undo_->psq -= EvalUtils::PSQT[pc][sq];
   undo_->game_phase -= EvalUtils::GamePhaseInc[pt_of(pc)];
 }
 
-template <bool DoMove, Colour C>
-constexpr void Board::move_piece(Square src, Square dst) {
+template <bool DoMove, Colour C> constexpr void Board::move_piece(Square src, Square dst) {
   const Piece pc = board_[src];
   colourBB_[C] ^= BBUtils::from(src) ^ BBUtils::from(dst);
   pieceBB_[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
   board_[src] = NoPiece;
   board_[dst] = pc;
 
-  if constexpr (!DoMove)
-    return;
+  if constexpr (!DoMove) return;
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][src] ^ Zobrist::PIECE_KEYS[pc][dst];
   undo_->psq += EvalUtils::PSQT[pc][dst] - EvalUtils::PSQT[pc][src];
@@ -282,12 +269,9 @@ template <Colour Us> constexpr bool Board::can_ep(Square ep) {
   // If the enemy rook/queen sees the king after simulating the enpassant,
   // register the enpassant pin
   const bool has_attacker = PAWN_ATK[Them][ep] & pawns;
-  const bool no_hv_pin =
-      !(ep_rank & king) || !(ep_rank & pawns) || !(ep_rank & enemy_rq);
-  const bool ep_w_pin =
-      ep_w && ROOK_ATK[ksq][occ & ~(ep_target | ep_w)] & enemy_rq;
-  const bool ep_e_pin =
-      ep_e && ROOK_ATK[ksq][occ & ~(ep_target | ep_e)] & enemy_rq;
+  const bool no_hv_pin = !(ep_rank & king) || !(ep_rank & pawns) || !(ep_rank & enemy_rq);
+  const bool ep_w_pin = ep_w && ROOK_ATK[ksq][occ & ~(ep_target | ep_w)] & enemy_rq;
+  const bool ep_e_pin = ep_e && ROOK_ATK[ksq][occ & ~(ep_target | ep_e)] & enemy_rq;
 
   return has_attacker && (no_hv_pin || !(ep_w_pin || ep_e_pin));
 }

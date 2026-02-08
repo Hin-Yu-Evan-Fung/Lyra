@@ -1,11 +1,12 @@
 #include "core/move.hpp"
 
-#include <cstring>
-
 #include "board/board.hpp"
 #include "board/mask.hpp"
 #include "core/defs.hpp"
 #include "core/zobrist.hpp"
+
+#include <cassert>
+#include <cstring>
 
 namespace Lyra {
 
@@ -15,9 +16,7 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-void Board::do_move(Move move) {
-  return stm_ == White ? do_move<White>(move) : do_move<Black>(move);
-}
+void Board::do_move(Move move) { return stm_ == White ? do_move<White>(move) : do_move<Black>(move); }
 
 template <Colour Us> void Board::do_move(Move move) {
   constexpr Colour Them = ~Us;
@@ -39,7 +38,7 @@ template <Colour Us> void Board::do_move(Move move) {
   std::memcpy(undo_, prev, offsetof(Undo, ep));
 
   // Update new state
-  undo_->key ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
+  if (prev->ep != NoSquare) undo_->key ^= Zobrist::EP_KEYS[file_of(prev->ep)];
   undo_->ep = NoSquare;
   undo_->cap = cap;
   undo_->move = move;
@@ -52,8 +51,7 @@ template <Colour Us> void Board::do_move(Move move) {
   switch (flag) {
   case Quiet:
     move_piece<true, Us>(src, dst);
-    if (pc == Pawn)
-      undo_->rule50 = 0;
+    if (pc == Pawn) undo_->rule50 = 0;
     break;
   case Cap:
     pop_piece<true, Them>(dst);
@@ -64,8 +62,7 @@ template <Colour Us> void Board::do_move(Move move) {
     move_piece<true, Us>(src, dst);
     ep = forward<Us>(src);
     undo_->rule50 = 0;
-    if (!can_ep<Them>(ep))
-      break;
+    if (!can_ep<Them>(ep)) break;
     undo_->ep = ep;
     undo_->key ^= Zobrist::EP_KEYS[file_of(ep)];
     break;
@@ -122,6 +119,7 @@ template <Colour Us> void Board::undo_move() {
   constexpr Piece Pawn = make_piece(Us, P);
 
   const Move move = undo_->move;
+  assert(move != NullMove);
   const Piece cap = undo_->cap;
   const Square src = MoveUtils::src(move);
   const Square dst = MoveUtils::dst(move);
@@ -182,13 +180,14 @@ template <Colour Us> void Board::do_null_move() {
   std::memcpy(undo_, prev, offsetof(Undo, ep));
 
   // Update new state
-  undo_->key ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
+  if (prev->ep != NoSquare) undo_->key ^= Zobrist::EP_KEYS[file_of(prev->ep)];
   undo_->ep = NoSquare;
   undo_->cap = NoPiece;
   undo_->move = NullMove;
+  undo_->reps = 0;
 
-  undo_->ply++;
-  gameply_++;
+  undo_->rule50 = 0;
+  undo_->ply = 0;
   // Update board state
   undo_->key ^= Zobrist::SIDE_KEY;
   stm_ = ~stm_;
@@ -199,12 +198,15 @@ template <Colour Us> void Board::do_null_move() {
 template <Colour Us> void Board::undo_null_move() {
   undo_--;
   stm_ = ~stm_;
-  gameply_--;
 }
 
 template void Board::do_move<White>(Move move);
 template void Board::do_move<Black>(Move move);
 template void Board::undo_move<White>();
 template void Board::undo_move<Black>();
+template void Board::do_null_move<White>();
+template void Board::do_null_move<Black>();
+template void Board::undo_null_move<White>();
+template void Board::undo_null_move<Black>();
 
 } // namespace Lyra

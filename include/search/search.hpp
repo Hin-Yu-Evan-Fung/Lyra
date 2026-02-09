@@ -30,6 +30,8 @@ class Worker {
 
   template <Colour Us> bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
 
+  void update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move, Depth depth);
+
   // Worker info
   Clock clock_;
   std::atomic_bool &stop_;
@@ -44,7 +46,8 @@ class Worker {
   Move best_move_;
 
   // Tables
-  MOStats stats_;
+  MainHist ht_;
+  CapHist cap_ht_;
   TT &tt_;
 
   // Stats
@@ -76,6 +79,7 @@ template <Colour Us> void Worker::do_move(StackEntry *se, Move move) {
   board_.do_move<Us>(move);
   nodes_++;
   se->ply_from_null++;
+  se->move = move;
 }
 
 template <Colour Us> void Worker::undo_move(StackEntry *se) {
@@ -86,6 +90,7 @@ template <Colour Us> void Worker::undo_move(StackEntry *se) {
 template <Colour Us> void Worker::do_null_move(StackEntry *se) {
   board_.do_null_move<Us>();
   se->ply_from_null = 0;
+  se->move = NullMove;
 }
 
 template <Colour Us> void Worker::undo_null_move(StackEntry *se) {

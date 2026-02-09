@@ -22,16 +22,10 @@ struct PVLine {
 struct StackEntry {
   Killer killer;
   PVLine pv;
+  Move move;
   Ply ply;
   Ply ply_from_null;
   bool in_check;
-};
-
-struct MOStats {
-  MainHistory ht;
-
-  void clear();
-  void update(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move, Depth depth);
 };
 
 /******************************************\

@@ -4,29 +4,32 @@
 #include "core/bitboard.hpp"
 #include "core/defs.hpp"
 #include "core/move.hpp"
+#include "search/history.hpp"
 
 #include <algorithm>
 #include <iterator>
 
 namespace Lyra {
 
-static constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
-
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MOStats &stats, Move tt_move, Depth depth)
+MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MainHist &ht, const CapHist &cap_ht,
+                           Move tt_move, Depth depth)
     : board_(board)
     , killer_(killer)
-    , stats_(stats)
+    , ht_(ht)
+    , cap_ht_(cap_ht)
     , tt_move_(tt_move)
     , depth_(depth) {
   stage_ = MAIN_TT;
 }
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MOStats &stats, Move tt_move)
+MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MainHist &ht, const CapHist &cap_ht,
+                           Move tt_move)
     : board_(board)
     , killer_(killer)
-    , stats_(stats)
+    , ht_(ht)
+    , cap_ht_(cap_ht)
     , tt_move_(tt_move)
     , depth_(0) {
   if (board_.in_check())
@@ -69,16 +72,13 @@ template <Colour Us> Move MovePicker<Us>::pop_back() {
 \******************************************/
 
 template <Colour Us> Eval MovePicker<Us>::score_cap(Move move) {
-  using namespace MoveUtils;
-  // MVV LVA
-  PieceType attacker = board_.pt_on(src(move));
-  PieceType victim = is_ep(move) ? P : board_.pt_on(dst(move));
+  constexpr Eval MVV[NPieceType] = {0, 2400, 2400, 4800, 96000, 0};
 
-  Eval mvv_lva = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
-  return mvv_lva;
+  PieceType victim = is_ep(move) ? P : board_.pt_on(dst(move));
+  return MVV[victim] + cap_ht_.get(board_, move);
 }
 
-template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) { return stats_.ht.get(board_, move); }
+template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) { return ht_.get(board_, move); }
 
 /******************************************\
 |==========================================|

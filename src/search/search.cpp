@@ -2,6 +2,7 @@
 
 #include "core/defs.hpp"
 #include "core/move.hpp"
+#include "engine/params.hpp"
 #include "search/movepick.hpp"
 #include "search/utils.hpp"
 #include "utils/tt.hpp"
@@ -48,17 +49,17 @@ template <Colour Us> void Worker::aspwin() {
   Eval alpha = -EvalInf;
   Eval beta = EvalInf;
 
-  StackEntry stack[MaxDepth + StackOffset]{};
-  StackEntry *ss = stack;
+  StackEntry stack[MaxDepth + StackOffset + 10]{};
+  StackEntry *se = stack + StackOffset;
 
-  for (int i = 0; i < MaxDepth + StackOffset; i++) (ss + i)->ply = i;
+  for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
-  eval_ = negamax<Us, PV>(ss, alpha, beta, depth_ + 1);
+  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
 
   if (stop_.load(std::memory_order::relaxed)) return;
 
-  uci_report(ss->pv);
-  best_move_ = ss->pv.moves[0];
+  uci_report(se->pv);
+  best_move_ = se->pv.moves[0];
 }
 
 /******************************************\
@@ -162,7 +163,8 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
 
   // Clear killer moves
   (se + 1)->killer.clear();
-  MovePicker<Us> mp{board_, se->killer, stats_, tt_move, depth};
+
+  MovePicker<Us> mp{board_, se->killer, ht_, cap_ht_, tt_move, depth};
 
   while ((move = mp.next())) {
     move_count++;
@@ -244,7 +246,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
     if (move != best_move && move_count < 32) (is_cap ? captures : quiets).push_back(move);
   }
 
-  if (best >= beta) stats_.update(board_, se, captures, quiets, best_move, depth);
+  if (best >= beta) update_hist(board_, se, captures, quiets, best_move, depth);
 
   /********************************\
   |         Mate Detection         |
@@ -306,7 +308,8 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
 
   // Clear killer moves
   (se + 1)->killer.clear();
-  MovePicker<Us> mp{board_, se->killer, stats_, tt_move};
+
+  MovePicker<Us> mp{board_, se->killer, ht_, cap_ht_, tt_move};
 
   while ((move = mp.next())) {
     move_count++;

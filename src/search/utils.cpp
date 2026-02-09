@@ -1,5 +1,6 @@
 #include "search/utils.hpp"
 
+#include "core/defs.hpp"
 #include "core/move.hpp"
 #include "search/search.hpp"
 #include "utils/tt.hpp"
@@ -32,20 +33,24 @@ std::string PVLine::format(bool chess960) const {
 |==========================================|
 \******************************************/
 
-void MOStats::clear() { ht.clear(); }
-
-void MOStats::update(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move,
-                     Depth depth) {
+void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move,
+                         Depth depth) {
   const bool is_capture = MoveUtils::is_capture(best_move);
-  const Eval bonus = 300 * depth - 200;
+  const Eval bonus = std::max(300 * depth - 200, 2000);
 
   if (!is_capture) {
     se->killer.update(best_move);
-    ht.update(board, best_move, bonus);
+    ht_.update(board, best_move, bonus);
 
-    for (Move m : quiets)
-      if (m) ht.update(board, m, -bonus);
-  }
+    for (Move m : quiets) {
+      if (!m) continue;
+      ht_.update(board, m, -bonus);
+    }
+  } else
+    cap_ht_.update(board, best_move, bonus);
+
+  for (Move m : captures)
+    if (m) cap_ht_.update(board, m, -bonus);
 }
 
 /******************************************\
@@ -60,7 +65,9 @@ void Worker::reset(const Board &board) {
   nodes_ = 0;
   depth_ = 0;
   seldepth_ = 0;
-  stats_.clear();
+
+  ht_.clear();
+  cap_ht_.clear();
 
   tt_reads = 0;
   tt_hits = 0;

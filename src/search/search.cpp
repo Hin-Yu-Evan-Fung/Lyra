@@ -39,7 +39,6 @@ void Worker::start(TimeControl tc) {
 
   std::println("bestmove {}", MoveUtils::format(best_move_, board_.chess960));
   std::println("TT read/hit %: {}%", (float)tt_hits * 100 / (float)tt_reads);
-  std::println("First move fail high %: {}%", (float)fail_high_first * 100 / (float)fail_high);
 
   std::fflush(stdout);
 }
@@ -49,12 +48,13 @@ template <Colour Us> void Worker::aspwin() {
   Eval alpha = -EvalInf;
   Eval beta = EvalInf;
 
-  StackEntry stack[MaxDepth + StackOffset + 10]{};
+  StackEntry stack[MaxDepth + StackOffset + 1]{};
   StackEntry *se = stack + StackOffset;
 
+  for (int i = StackOffset; i > 0; i--) (se - i)->cont = &cont_tb_[wP][A1]; // Dummy entry
   for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
-  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
+  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1, false);
 
   if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -69,13 +69,14 @@ template <Colour Us> void Worker::aspwin() {
 \******************************************/
 
 // A null window search is used to prove that a move is not better than the upper score.
-template <Colour Us> Eval Worker::nw_search(StackEntry *se, Eval upper, Depth depth) {
-  return -negamax<~Us, NonPV>(se + 1, -(upper + 1), -upper, depth);
+template <Colour Us> Eval Worker::nw_search(StackEntry *se, Eval upper, Depth depth, bool cutnode) {
+  return -negamax<~Us, NonPV>(se + 1, -(upper + 1), -upper, depth, cutnode);
 }
 
 // Alpha = our guaranteed score from previous parts of the search
 // Beta = opp's guaranteed score from previos parts of the search
-template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
+template <Colour Us, Worker::NodeType NT>
+Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode) {
   constexpr bool pv = NT == PV;
 
   if (depth == 0) return qsearch<Us, NT>(se, alpha, beta);
@@ -134,15 +135,15 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
     \********************************/
 
     // Prune this node if the following applies:
-    // 1. It is safe to do null move pruning (not zugzwang, etc ...)
+    // 1. It is safe to do null move pruning(not zugzwang, etc...)
     // 2. Static eval indicates the move is going to fail high.
-    // 3. We prove that it will fail high even if we do nothing (null move) using a reduced search.
+    // 3. We prove that it will fail high even if we do nothing(null move) using a reduced search.
 
-    if (can_nmp<Us>(se, depth, eval, beta)) {
+    if (cutnode && can_nmp<Us>(se, depth, eval, beta)) {
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
-      val = nw_search<Us>(se, beta, depth - r);
+      val = nw_search<Us>(se, beta - 1, depth - r, false);
       undo_null_move<Us>(se);
 
       if (val >= beta) return beta;
@@ -164,13 +165,12 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
   // Clear killer moves
   (se + 1)->killer.clear();
 
-  MovePicker<Us> mp{board_, se->killer, ht_, cap_ht_, tt_move, depth};
+  MovePicker<Us> mp{board_, mo_stats(se), tt_move, depth};
 
   while ((move = mp.next())) {
     move_count++;
 
     const bool is_cap = MoveUtils::is_capture(move);
-    const bool is_good_cap = mp.stage() == GOOD_CAP;
     const Depth new_depth = depth - 1;
 
     do_move<Us>(se, move);
@@ -181,16 +181,11 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
 
     // Assume the first move is the best move.
     // Use a null window with reduced search to prove that later moves are worse.
-    if (depth >= 3 && move_count > 4 + pv && !is_good_cap) {
+    if (can_lmr(se, depth, move_count, pv, move)) {
       Depth r = lmr_reduction(depth, move_count);
-      // Reduce less for killers
-      r -= mp.stage() < INIT_QUIET;
-      // Reduce less for checks
-      r -= board_.in_check();
 
-      r = std::max(r, Depth(1));
-
-      val = nw_search<Us>(se, alpha, new_depth - r);
+      r = std::clamp((int)r, 1, new_depth - 1);
+      val = nw_search<Us>(se, alpha, new_depth - r, true);
 
       // If the later moves could be better, research it with full depth.
       full_search = val > alpha && r > 1;
@@ -202,11 +197,10 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
     \********************************/
 
     // If reduced search showed that the move could be good, search it at full depth.
-    if (full_search) val = nw_search<Us>(se, alpha, new_depth);
+    if (full_search) val = nw_search<Us>(se, alpha, new_depth, !cutnode);
 
     // If its the first move, or the later move is proven to be good, then do a full window search
-    if (pv && (move_count == 1 || (val > alpha && val < beta)))
-      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth);
+    if (pv && (move_count == 1 || val > alpha)) val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth, false);
 
     undo_move<Us>(se);
 
@@ -222,17 +216,10 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
 
     if (val > best) {
       best = val;
-      best_move = move;
-
       if (val > alpha) {
-        se->pv.update((se + 1)->pv, best_move);
-
-        if (val >= beta) {
-          if (move_count == 1) fail_high_first++;
-          fail_high++;
-          break;
-        }
-
+        best_move = move;
+        if (pv) se->pv.update((se + 1)->pv, best_move);
+        if (val >= beta) break;
         alpha = val;
       }
     }
@@ -242,7 +229,6 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
     \********************************/
 
     // Collect all the moves before fail high, and apply maluses to all of them in history
-
     if (move != best_move && move_count < 32) (is_cap ? captures : quiets).push_back(move);
   }
 
@@ -271,7 +257,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::negamax(StackEntry *se, E
 }
 
 template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
-  constexpr bool Pv = NT == PV;
+  constexpr bool pv = NT == PV;
 
   se->pv.clear();
   seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
@@ -289,7 +275,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
     TTEntry e = tt_entry.read(se->ply);
     tt_move = e.move;
 
-    if (!Pv && can_tt_cutoff(e, alpha, beta)) return e.value;
+    if (!pv && can_tt_cutoff(e, alpha, beta)) return e.value;
   }
 
   // ** Stand Pat ** //
@@ -302,17 +288,15 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
   alpha = std::max(alpha, best);
 
   // ** Main QSearch Loop ** //
-  int move_count = 0;
   Move move = NoMove;
   Move best_move = NoMove;
 
   // Clear killer moves
   (se + 1)->killer.clear();
 
-  MovePicker<Us> mp{board_, se->killer, ht_, cap_ht_, tt_move};
+  MovePicker<Us> mp{board_, mo_stats(se), tt_move};
 
   while ((move = mp.next())) {
-    move_count++;
 
     do_move<Us>(se, move);
     Eval val = -qsearch<~Us, NT>(se + 1, -beta, -alpha);
@@ -332,24 +316,12 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
       best = val;
       if (val > alpha) {
         best_move = move;
-
-        se->pv.update((se + 1)->pv, move);
-        if (val >= beta) {
-          if (move_count == 1) fail_high_first++;
-          fail_high++;
-          break;
-        }
-
+        if (pv) se->pv.update((se + 1)->pv, move);
+        if (val >= beta) break;
         alpha = val;
       }
     }
   }
-
-  /********************************\
-  |         Mate Detection         |
-  \********************************/
-
-  if (move_count == 0 && board_.in_check()) best = EvalUtils::mated_in(se->ply);
 
   /********************************\
   |            TT write            |

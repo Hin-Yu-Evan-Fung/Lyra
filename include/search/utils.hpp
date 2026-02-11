@@ -21,6 +21,7 @@ struct PVLine {
 
 struct StackEntry {
   Killer killer;
+  ContHist *cont;
   PVLine pv;
   Move move;
   Ply ply;
@@ -35,10 +36,10 @@ struct StackEntry {
 \******************************************/
 
 // Variable reduction formula for lmr
-constexpr Depth lmr_reduction(Depth depth, int move_count) { return 0.5 + std::log(depth) * std::log(move_count) / 4; }
+constexpr Depth lmr_reduction(Depth depth, int move_count) { return 0.75 + std::log(depth) * std::log(move_count) / 3; }
 
 // Variable reduction formula for nmp
-constexpr Depth nmp_reduction(Depth depth) { return std::min(Depth(3 + depth / 3), depth); }
+constexpr Depth nmp_reduction(Depth depth) { return std::min(Depth(3 + depth / 5), depth); }
 
 // Exact bound means value has been proven with full window search. Can cutoff.
 // Upper bound means value has a proven upper bound, can cutoff if alpha is too

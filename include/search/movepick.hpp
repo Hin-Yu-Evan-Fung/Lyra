@@ -3,6 +3,7 @@
 #include "board/board.hpp"
 #include "core/defs.hpp"
 #include "search/history.hpp"
+#include "utils/utils.hpp"
 
 namespace Lyra {
 
@@ -25,11 +26,19 @@ enum MovePickStage {
   QCAP,
 };
 
+using ContHistBuf = NDArray<ContHist *, 4>;
+
+struct MOStats {
+  const Killer &killer;
+  const MainHist &ht;
+  const CapHist &cap_ht;
+  const ContHistBuf cont_hb;
+};
+
 template <Colour Us> class MovePicker {
 public:
-  MovePicker(const Board &board, const Killer &killer, const MainHist &hist, const CapHist &cap_hist, Move tt_move,
-             Depth depth);
-  MovePicker(const Board &board, const Killer &killer, const MainHist &hist, const CapHist &cap_hist, Move tt_move);
+  MovePicker(const Board &board, const MOStats &stats, Move tt_move, Depth depth);
+  MovePicker(const Board &board, const MOStats &stats, Move tt_move);
 
   Move next();
   int stage() { return stage_; }
@@ -38,6 +47,7 @@ public:
   const Killer &killer_;
   const MainHist &ht_;
   const CapHist &cap_ht_;
+  const ContHistBuf cont_hb_;
   Move tt_move_;
   Depth depth_;
 

@@ -29,5 +29,6 @@ constexpr Eval EvalStop = 0;
 
 // History Constant
 constexpr Eval HistMax = 16384;
+constexpr U16 ContSize = 4;
 
 } // namespace Lyra

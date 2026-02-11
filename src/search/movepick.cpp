@@ -4,6 +4,7 @@
 #include "core/bitboard.hpp"
 #include "core/defs.hpp"
 #include "core/move.hpp"
+#include "engine/params.hpp"
 #include "search/history.hpp"
 
 #include <algorithm>
@@ -12,30 +13,33 @@
 namespace Lyra {
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MainHist &ht, const CapHist &cap_ht,
-                           Move tt_move, Depth depth)
+MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move, Depth depth)
     : board_(board)
-    , killer_(killer)
-    , ht_(ht)
-    , cap_ht_(cap_ht)
+    , killer_(stats.killer)
+    , ht_(stats.ht)
+    , cap_ht_(stats.cap_ht)
+    , cont_hb_(stats.cont_hb)
     , tt_move_(tt_move)
     , depth_(depth) {
   stage_ = MAIN_TT;
 }
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const Killer &killer, const MainHist &ht, const CapHist &cap_ht,
-                           Move tt_move)
+MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move)
     : board_(board)
-    , killer_(killer)
-    , ht_(ht)
-    , cap_ht_(cap_ht)
+    , killer_(stats.killer)
+    , ht_(stats.ht)
+    , cap_ht_(stats.cap_ht)
+    , cont_hb_(stats.cont_hb)
     , tt_move_(tt_move)
     , depth_(0) {
+
   if (board_.in_check())
     stage_ = EVASION_TT;
-  else
+  else {
     stage_ = QSEARCH_TT;
+    if (!MoveUtils::is_capture(tt_move)) tt_move = NoMove;
+  }
 }
 
 /******************************************\
@@ -78,7 +82,11 @@ template <Colour Us> Eval MovePicker<Us>::score_cap(Move move) {
   return MVV[victim] + cap_ht_.get(board_, move);
 }
 
-template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) { return ht_.get(board_, move); }
+template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) {
+  Eval hist = ht_.get(board_, move);
+  for (int i = 0; i < ContSize; i++) hist += cont_hb_[i]->get(board_, move);
+  return hist;
+}
 
 /******************************************\
 |==========================================|

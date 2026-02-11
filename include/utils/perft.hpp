@@ -16,9 +16,15 @@ enum PerftMode {
 };
 
 namespace {
+
 Killer killer;
 MainHist ht;
 CapHist cap_ht;
+ContHist cont;
+
+const ContHistBuf buf = {&cont, &cont, &cont, &cont};
+const MOStats stats = {killer, ht, cap_ht, buf};
+
 } // namespace
 
 template <bool Div, Colour Us> U64 perft(Board &board, Depth depth) {
@@ -49,7 +55,7 @@ template <bool Div, Colour Us> U64 perft(Board &board, Depth depth) {
 }
 
 template <bool Div, Colour Us> U64 perftmp(Board &board, Depth depth) {
-  MovePicker<Us> mp(board, killer, ht, cap_ht, NoMove, 0);
+  MovePicker<Us> mp(board, stats, NoMove, 0);
 
   if (!Div && depth <= 1) {
     U64 n = 0;

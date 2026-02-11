@@ -2,6 +2,7 @@
 
 #include "core/defs.hpp"
 #include "core/move.hpp"
+#include "search/movepick.hpp"
 #include "search/search.hpp"
 #include "utils/tt.hpp"
 
@@ -23,7 +24,7 @@ void PVLine::update(const PVLine &other, Move best) {
 
 std::string PVLine::format(bool chess960) const {
   std::ostringstream os;
-  for (size_t i = 0; i <= length && moves[i]; i++) os << MoveUtils::format(moves[i], chess960) << " ";
+  for (size_t i = 0; i < length; i++) os << MoveUtils::format(moves[i], chess960) << " ";
   return os.str();
 }
 
@@ -33,6 +34,17 @@ std::string PVLine::format(bool chess960) const {
 |==========================================|
 \******************************************/
 
+MOStats Worker::mo_stats(StackEntry *se) {
+  return {se->killer, ht_, cht_, {(se - 1)->cont, (se - 2)->cont, (se - 3)->cont, (se - 4)->cont}};
+}
+
+void Worker::update_cont(const Board &board, StackEntry *se, Move move, Eval bonus) {
+  for (int i = 0; i < ContSize; i++) {
+    if (i >= 2 && se->in_check) break;
+    if ((se - i)->move) (se - i)->cont->update(board, move, bonus);
+  }
+}
+
 void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move,
                          Depth depth) {
   const bool is_capture = MoveUtils::is_capture(best_move);
@@ -41,16 +53,18 @@ void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, M
   if (!is_capture) {
     se->killer.update(best_move);
     ht_.update(board, best_move, bonus);
+    update_cont(board, se, best_move, bonus);
 
     for (Move m : quiets) {
       if (!m) continue;
       ht_.update(board, m, -bonus);
+      update_cont(board, se, m, -bonus);
     }
   } else
-    cap_ht_.update(board, best_move, bonus);
+    cht_.update(board, best_move, bonus);
 
   for (Move m : captures)
-    if (m) cap_ht_.update(board, m, -bonus);
+    if (m) cht_.update(board, m, -bonus);
 }
 
 /******************************************\
@@ -67,7 +81,8 @@ void Worker::reset(const Board &board) {
   seldepth_ = 0;
 
   ht_.clear();
-  cap_ht_.clear();
+  cht_.clear();
+  cont_tb_.clear();
 
   tt_reads = 0;
   tt_hits = 0;

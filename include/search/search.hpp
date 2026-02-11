@@ -2,7 +2,9 @@
 
 #include "board/board.hpp"
 #include "core/defs.hpp"
+#include "core/move.hpp"
 #include "engine/clock.hpp"
+#include "search/movepick.hpp"
 #include "search/utils.hpp"
 #include "utils/tt.hpp"
 
@@ -19,8 +21,8 @@ class Worker {
   enum NodeType { PV, NonPV };
 
   template <Colour Us> void aspwin();
-  template <Colour Us, NodeType NT> Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth);
-  template <Colour Us> Eval nw_search(StackEntry *se, Eval upper, Depth depth);
+  template <Colour Us, NodeType NT> Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode);
+  template <Colour Us> Eval nw_search(StackEntry *se, Eval upper, Depth depth, bool cutnode);
   template <Colour Us, NodeType NT> Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 
   template <Colour Us> void do_move(StackEntry *se, Move move);
@@ -28,8 +30,11 @@ class Worker {
   template <Colour Us> void do_null_move(StackEntry *se);
   template <Colour Us> void undo_null_move(StackEntry *se);
 
-  template <Colour Us> bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
+  constexpr bool can_lmr(StackEntry *se, Depth depth, U16 move_count, bool pv, Move move);
+  template <Colour Us> constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
 
+  MOStats mo_stats(StackEntry *se);
+  void update_cont(const Board &board, StackEntry *se, Move move, Eval bonus);
   void update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move, Depth depth);
 
   // Worker info
@@ -47,7 +52,8 @@ class Worker {
 
   // Tables
   MainHist ht_;
-  CapHist cap_ht_;
+  CapHist cht_;
+  ContTable cont_tb_;
   TT &tt_;
 
   // Stats
@@ -76,26 +82,29 @@ public:
 \******************************************/
 
 template <Colour Us> void Worker::do_move(StackEntry *se, Move move) {
-  board_.do_move<Us>(move);
-  nodes_++;
+  se->cont = &cont_tb_.probe(board_, move);
   se->ply_from_null++;
   se->move = move;
+  nodes_++;
+  board_.do_move<Us>(move);
 }
 
 template <Colour Us> void Worker::undo_move(StackEntry *se) {
-  board_.undo_move<Us>();
   se->ply_from_null = (se - 1)->ply_from_null;
+  board_.undo_move<Us>();
 }
 
 template <Colour Us> void Worker::do_null_move(StackEntry *se) {
-  board_.do_null_move<Us>();
+  se->cont = &cont_tb_[wP][A1];
   se->ply_from_null = 0;
   se->move = NullMove;
+  nodes_++;
+  board_.do_null_move<Us>();
 }
 
 template <Colour Us> void Worker::undo_null_move(StackEntry *se) {
-  board_.undo_null_move<Us>();
   se->ply_from_null = (se - 1)->ply_from_null;
+  board_.undo_null_move<Us>();
 }
 
 /******************************************\
@@ -104,7 +113,11 @@ template <Colour Us> void Worker::undo_null_move(StackEntry *se) {
 |==========================================|
 \******************************************/
 
-template <Colour Us> bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
+constexpr bool Worker::can_lmr(StackEntry *se, Depth depth, U16 move_count, bool pv, Move move) {
+  return depth >= 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move) && !se->in_check;
+}
+
+template <Colour Us> constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
   return depth >= 2 && se->ply_from_null > 0 && eval >= beta && beta >= -EvalMateBound
          && board_.has_non_pawn_material<Us>();
 }

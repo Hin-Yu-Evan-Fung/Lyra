@@ -9,8 +9,6 @@
 
 namespace Lyra {
 
-using namespace MoveUtils;
-
 /******************************************\
 |==========================================|
 |               Killer Moves               |
@@ -50,39 +48,51 @@ template <Eval Max> struct Hist {
 |==========================================|
 \******************************************/
 
-struct MainHist {
-  void clear() { history.fill({}); }
+namespace {
 
-  Eval get(const Board &board, Move move) const {
-    const Piece attacker = board.on(src(move));
-    return history[attacker][dst(move)].eval;
-  }
-  void update(const Board &board, Move move, Eval bonus) {
-    const Piece attacker = board.on(src(move));
-    history[attacker][dst(move)].update(bonus);
-  }
+using namespace MoveUtils;
 
-private:
-  NDArray<Hist<HistMax>, NPiece, NSquare> history;
+constexpr Piece attacker(const Board &board, Move move) { return board.on(src(move)); }
+constexpr PieceType victim(const Board &board, Move move) { return is_ep(move) ? P : board.pt_on(dst(move)); }
+
+} // namespace
+
+class MainHist final : public NDArray<Hist<HistMax>, NPiece, NSquare> {
+  auto &ref(this auto &self, const Board &b, Move m) { return self[attacker(b, m)][dst(m)]; }
+
+public:
+  void clear() { fill({}); }
+  Eval get(const Board &b, Move m) const { return ref(b, m).eval; }
+  void update(const Board &b, Move m, Eval bon) { ref(b, m).update(bon); }
 };
 
-struct CapHist {
-  void clear() { history.fill({}); }
+class CapHist final : public NDArray<Hist<HistMax>, NPiece, NSquare, NPieceType> {
+  auto &ref(this auto &self, const Board &b, Move m) { return self[attacker(b, m)][dst(m)][victim(b, m)]; }
 
-  Eval get(const Board &board, Move move) const {
-    const Piece attacker = board.on(src(move));
-    const PieceType victim = is_ep(move) ? P : board.pt_on(dst(move));
-    return history[attacker][dst(move)][victim].eval;
+public:
+  void clear() { fill({}); }
+  Eval get(const Board &b, Move m) const { return ref(b, m).eval; }
+  void update(const Board &b, Move m, Eval bon) { ref(b, m).update(bon); }
+};
+
+class ContHist final : public NDArray<Hist<HistMax>, NPiece, NSquare> {
+  auto &ref(this auto &self, const Board &b, Move m) { return self[attacker(b, m)][dst(m)]; }
+
+public:
+  void clear() { fill({}); }
+  Eval get(const Board &b, Move m) const { return ref(b, m).eval; }
+  void update(const Board &b, Move m, Eval bon) { ref(b, m).update(bon); }
+};
+
+class ContTable final : public NDArray<ContHist, NPiece, NSquare> {
+  auto &ref(this auto &self, const Board &b, Move m) { return self[attacker(b, m)][dst(m)]; }
+
+public:
+  void clear() {
+    for (Piece pc = wP; pc <= bK; ++pc)
+      for (Square sq = A1; sq <= H8; ++sq) (*this)[pc][sq].clear();
   }
-
-  void update(const Board &board, Move move, Eval bonus) {
-    const Piece attacker = board.on(src(move));
-    const PieceType victim = is_ep(move) ? P : board.pt_on(dst(move));
-    history[attacker][dst(move)][victim].update(bonus);
-  }
-
-private:
-  NDArray<Hist<HistMax>, NPiece, NSquare, NPieceType> history;
+  ContHist &probe(const Board &b, Move m) { return ref(b, m); }
 };
 
 } // namespace Lyra

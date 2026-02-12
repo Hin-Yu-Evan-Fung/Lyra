@@ -72,8 +72,8 @@ inline Time now() {
 namespace EvalUtils {
 
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
-
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
+constexpr bool is_terminal(Eval v) { return v <= -EvalMateBound && v >= EvalMateBound; }
 
 // Remove the mate score's dependency on ply from root, as the same position can
 // be reached in different lines

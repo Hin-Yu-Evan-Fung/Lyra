@@ -20,7 +20,8 @@ MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_mov
     , cap_ht_(stats.cap_ht)
     , cont_hb_(stats.cont_hb)
     , tt_move_(tt_move)
-    , depth_(depth) {
+    , depth_(depth)
+    , skip_quiet_(false) {
   stage_ = MAIN_TT;
 }
 
@@ -32,7 +33,8 @@ MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_mov
     , cap_ht_(stats.cap_ht)
     , cont_hb_(stats.cont_hb)
     , tt_move_(tt_move)
-    , depth_(0) {
+    , depth_(0)
+    , skip_quiet_(false) {
 
   if (board_.in_check())
     stage_ = EVASION_TT;
@@ -171,11 +173,11 @@ template <Colour Us> Move MovePicker<Us>::next() {
     if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
     [[fallthrough]];
   case INIT_QUIET:
-    gen_score_quiet();
+    if (!skip_quiet_) gen_score_quiet();
     ++stage_;
     [[fallthrough]];
   case QUIET:
-    if (peek_front()) return pop_front();
+    if (!skip_quiet_ && peek_front()) return pop_front();
     ++stage_;
     [[fallthrough]];
   case BAD_CAP:

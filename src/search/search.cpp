@@ -45,8 +45,6 @@ void Worker::start(TimeControl tc) {
 
 // TODO: Aspiration windows
 template <Colour Us> void Worker::aspwin() {
-  Eval alpha = -EvalInf;
-  Eval beta = EvalInf;
 
   StackEntry stack[MaxDepth + StackOffset + 1]{};
   StackEntry *se = stack + StackOffset;
@@ -54,9 +52,45 @@ template <Colour Us> void Worker::aspwin() {
   for (int i = StackOffset; i > 0; i--) (se - i)->cont = &cont_tb_[wP][A1]; // Dummy entry
   for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
-  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1, false);
+  Eval alpha = -EvalInf;
+  Eval beta = EvalInf;
+  Eval delta = 10;
+  Depth r = 0;
 
-  if (stop_.load(std::memory_order::relaxed)) return;
+  // Initial guess of the score, because the score should be stable after depth 3
+  if (depth_ > 5) {
+    alpha = std::max(Eval(eval_ - delta), -EvalInf);
+    beta = std::min(Eval(eval_ + delta), EvalInf);
+  }
+
+  while (true) {
+
+    Depth reduced = depth_ + 1 - r;
+    Eval val = negamax<Us, PV>(se, alpha, beta, reduced, false);
+
+    if (stop_.load(std::memory_order::relaxed)) return;
+
+    /********************************\
+    |       Aspiration window        |
+    \********************************/
+
+    // Fail low, shift window down and research
+    // Fail high, shift window up and research, reduce depth by 1
+    // Value inside window, we can confidently update the score
+    if (val <= alpha) {
+      beta = (alpha + beta) / 2;
+      alpha = std::max(val - delta, -EvalInf);
+      r = 0;
+    } else if (val >= beta) {
+      beta = std::min(val + delta, EvalInf);
+      if (reduced > 1 && !EvalUtils::is_terminal(val)) r += 1;
+    } else {
+      eval_ = val;
+      break;
+    }
+
+    delta *= 1.5f;
+  }
 
   uci_report(se->pv);
   best_move_ = se->pv.moves[0];
@@ -172,6 +206,22 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
     const bool is_cap = MoveUtils::is_capture(move);
     const Depth new_depth = depth - 1;
+
+    if (!pv && !se->in_check) {
+
+      /********************************\
+      |        Late Move Pruning       |
+      \********************************/
+      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move ordering
+      if (can_lmp(depth, move_count)) mp.skip_quiet();
+
+      /********************************\
+      |          SEE Pruning           |
+      \********************************/
+
+      // Near leaf nodes, we can safely (hopefully!) prune moves that lose in terms of exchanges
+      if (mp.stage() > GOOD_CAP && can_see_prune(depth, move, best)) continue;
+    }
 
     do_move<Us>(se, move);
 
@@ -290,6 +340,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
   // ** Main QSearch Loop ** //
   Move move = NoMove;
   Move best_move = NoMove;
+  U16 move_count = 0;
 
   // Clear killer moves
   (se + 1)->killer.clear();
@@ -297,6 +348,18 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
   MovePicker<Us> mp{board_, mo_stats(se), tt_move};
 
   while ((move = mp.next())) {
+    move_count++;
+
+    if (!pv && !EvalUtils::is_terminal(best)) {
+
+      /********************************\
+      |           SEE Pruning          |
+      \********************************/
+
+      // Ignore moves with a bad see score,
+      // since they are likely to lead to bad positions.
+      if (!board_.see(move, -80)) continue;
+    }
 
     do_move<Us>(se, move);
     Eval val = -qsearch<~Us, NT>(se + 1, -beta, -alpha);
@@ -322,6 +385,12 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
       }
     }
   }
+
+  /********************************\
+    |         Mate Detection         |
+    \********************************/
+
+  if (move_count == 0 && !se->in_check) best = se->in_check ? EvalUtils::mated_in(se->ply) : EvalDraw;
 
   /********************************\
   |            TT write            |

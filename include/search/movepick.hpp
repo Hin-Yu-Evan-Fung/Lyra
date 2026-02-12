@@ -42,14 +42,7 @@ public:
 
   Move next();
   int stage() { return stage_; }
-
-  const Board &board_;
-  const Killer &killer_;
-  const MainHist &ht_;
-  const CapHist &cap_ht_;
-  const ContHistBuf cont_hb_;
-  Move tt_move_;
-  Depth depth_;
+  void skip_quiet() { skip_quiet_ = true; }
 
 private:
   void gen_score_cap(bool skip_see);
@@ -69,9 +62,18 @@ private:
   Move moves_[MaxMoves];
   Eval scores_[MaxMoves];
 
+  const Board &board_;
+  const Killer &killer_;
+  const MainHist &ht_;
+  const CapHist &cap_ht_;
+  const ContHistBuf cont_hb_;
+  Move tt_move_;
+  Depth depth_;
+
   size_t start_ptr_ = 0;
   size_t end_ptr_ = MaxMoves - 1;
   int stage_ = MAIN_TT;
+  bool skip_quiet_;
 };
 
 } // namespace Lyra

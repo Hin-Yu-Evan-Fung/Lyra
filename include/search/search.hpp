@@ -7,6 +7,7 @@
 #include "search/movepick.hpp"
 #include "search/utils.hpp"
 #include "utils/tt.hpp"
+#include "utils/utils.hpp"
 
 #include <atomic>
 
@@ -30,6 +31,8 @@ class Worker {
   template <Colour Us> void do_null_move(StackEntry *se);
   template <Colour Us> void undo_null_move(StackEntry *se);
 
+  constexpr bool can_lmp(Depth depth, U16 move_count);
+  constexpr bool can_see_prune(Depth depth, Move move, Eval best);
   constexpr bool can_lmr(StackEntry *se, Depth depth, U16 move_count, bool pv, Move move);
   template <Colour Us> constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
 
@@ -112,6 +115,13 @@ template <Colour Us> void Worker::undo_null_move(StackEntry *se) {
 |            Pruning Conditions            |
 |==========================================|
 \******************************************/
+
+constexpr bool Worker::can_lmp(Depth depth, U16 move_count) { return depth <= 8 && move_count >= 5 + depth * depth; }
+
+constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) {
+  return !EvalUtils::is_terminal(best) && depth <= 10
+         && !board_.see(move, MoveUtils::is_capture(move) ? -70 * depth : -20 * depth * depth);
+}
 
 constexpr bool Worker::can_lmr(StackEntry *se, Depth depth, U16 move_count, bool pv, Move move) {
   return depth >= 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move) && !se->in_check;

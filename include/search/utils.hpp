@@ -51,4 +51,14 @@ constexpr bool can_tt_cutoff(const TTEntry &entry, Eval alpha, Eval beta) {
   return std::array{false, true, value <= alpha, value >= beta}[entry.bound];
 }
 
+// Exact bound means value has been proven with full window search. Can cutoff.
+// Upper bound means value has a proven upper bound, can cutoff if alpha is too
+// good to be true.
+// Lower bound means value has a proven lower bound, can cutoff if beta is too
+// good to be true;
+constexpr bool can_use_tt_eval(const TTEntry &entry, Eval static_eval) {
+  const Eval value = entry.value;
+  return std::array{false, true, value<static_eval, value> static_eval}[entry.bound];
+}
+
 } // namespace Lyra::SearchUtils

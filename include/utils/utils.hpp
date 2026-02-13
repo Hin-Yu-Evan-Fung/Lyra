@@ -12,7 +12,8 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-template <typename T, size_t A, size_t... B> struct NDArray : public std::array<NDArray<T, B...>, A> {};
+template <typename T, size_t A, size_t... B>
+struct NDArray : public std::array<NDArray<T, B...>, A> {};
 
 template <typename T, size_t A> struct NDArray<T, A> : public std::array<T, A> {};
 
@@ -74,13 +75,18 @@ namespace EvalUtils {
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
 constexpr bool is_terminal(Eval v) { return v <= -EvalMateBound && v >= EvalMateBound; }
+constexpr bool is_valid(Eval v) { return std::abs(v) < EvalInf; }
 
 // Remove the mate score's dependency on ply from root, as the same position can
 // be reached in different lines
-constexpr Eval to_TT(Eval v, U16 ply) { return v >= EvalMateBound ? v + ply : v <= -EvalMateBound ? v - ply : v; }
+constexpr Eval to_TT(Eval v, U16 ply) {
+  return v >= EvalMateBound ? v + ply : v <= -EvalMateBound ? v - ply : v;
+}
 // Restore the mate score's dependency on ply from root, as the same position
 // can be reached in different lines
-constexpr Eval from_TT(Eval v, U16 ply) { return v >= EvalMateBound ? v - ply : v <= -EvalMateBound ? v + ply : v; }
+constexpr Eval from_TT(Eval v, U16 ply) {
+  return v >= EvalMateBound ? v - ply : v <= -EvalMateBound ? v + ply : v;
+}
 
 inline std::string format(Eval v) {
   if (v >= EvalMateBound)
@@ -112,7 +118,9 @@ constexpr std::string format_sq(Square sq) {
 
 constexpr File parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
 constexpr Rank parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
-constexpr Square parse_sq(const std::string &str) { return make_square(parse_file(str[0]), parse_rank(str[1])); }
+constexpr Square parse_sq(const std::string &str) {
+  return make_square(parse_file(str[0]), parse_rank(str[1]));
+}
 constexpr Piece parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
 
 } // namespace IOUtils

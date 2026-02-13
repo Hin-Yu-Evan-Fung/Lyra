@@ -14,6 +14,7 @@
 namespace Lyra {
 
 using namespace SearchUtils;
+using namespace EvalUtils;
 
 class ThreadPool;
 class Thread;
@@ -22,7 +23,8 @@ class Worker {
   enum NodeType { PV, NonPV };
 
   template <Colour Us> void aspwin();
-  template <Colour Us, NodeType NT> Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode);
+  template <Colour Us, NodeType NT>
+  Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode);
   template <Colour Us> Eval nw_search(StackEntry *se, Eval upper, Depth depth, bool cutnode);
   template <Colour Us, NodeType NT> Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 
@@ -38,7 +40,8 @@ class Worker {
 
   MOStats mo_stats(StackEntry *se);
   void update_cont(const Board &board, StackEntry *se, Move move, Eval bonus);
-  void update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move, Depth depth);
+  void update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets,
+                   Move best_move, Depth depth);
 
   // Worker info
   Clock clock_;
@@ -116,7 +119,9 @@ template <Colour Us> void Worker::undo_null_move(StackEntry *se) {
 |==========================================|
 \******************************************/
 
-constexpr bool Worker::can_lmp(Depth depth, U16 move_count) { return depth <= 8 && move_count >= 5 + depth * depth; }
+constexpr bool Worker::can_lmp(Depth depth, U16 move_count) {
+  return depth <= 8 && move_count >= 5 + depth * depth;
+}
 
 constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) {
   return !EvalUtils::is_terminal(best) && depth <= 10
@@ -127,7 +132,8 @@ constexpr bool Worker::can_lmr(StackEntry *se, Depth depth, U16 move_count, bool
   return depth >= 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move) && !se->in_check;
 }
 
-template <Colour Us> constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
+template <Colour Us>
+constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
   return depth >= 2 && se->ply_from_null > 0 && eval >= beta && beta >= -EvalMateBound
          && board_.has_non_pawn_material<Us>();
 }

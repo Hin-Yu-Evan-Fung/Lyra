@@ -12,6 +12,8 @@
 
 namespace Lyra {
 
+using namespace EvalUtils;
+
 /******************************************\
 |==========================================|
 |             Search Functions             |
@@ -135,8 +137,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (board_.is_draw(se->ply)) return EvalDraw;
     if (se->ply >= MaxDepth) return se->in_check ? EvalDraw : board_.eval();
 
-    alpha = std::max(alpha, EvalUtils::mated_in(se->ply));
-    beta = std::min(beta, EvalUtils::mate_in(se->ply + 1));
+    alpha = std::max(alpha, mated_in(se->ply));
+    beta = std::min(beta, mate_in(se->ply + 1));
     if (alpha >= beta) return alpha;
   }
 
@@ -152,18 +154,27 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   if (tt_hit) {
     tt_hits++;
     TTEntry e = tt_entry.read(se->ply);
-    tt_move = e.move;
 
     if (!pv && e.depth >= depth && can_tt_cutoff(e, alpha, beta)) return e.value;
+
+    tt_move = e.move;
   }
+
+  Eval eval = board_.eval();
 
   /********************************\
   |             Pruning            |
   \********************************/
-  Eval val = EvalDraw;
-  Eval eval = board_.eval();
 
-  if (!pv && !se->in_check) {
+  if (!pv && !se->in_check && is_valid(eval)) {
+
+    /********************************\
+    |        Futility Pruning        |
+    \********************************/
+
+    // Near a leaf node, prune all moves that are too good to be true.
+    if (depth <= 8 && eval - 100 * depth >= beta) return eval;
+
     /********************************\
     |        Null Move Pruning       |
     \********************************/
@@ -173,14 +184,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     // 2. Static eval indicates the move is going to fail high.
     // 3. We prove that it will fail high even if we do nothing(null move) using a reduced search.
 
-    if (cutnode && can_nmp<Us>(se, depth, eval, beta)) {
+    if (can_nmp<Us>(se, depth, eval, beta)) {
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
-      val = nw_search<Us>(se, beta - 1, depth - r, false);
+      Eval val = nw_search<Us>(se, beta - 1, depth - r, !cutnode);
       undo_null_move<Us>(se);
 
-      if (val >= beta) return beta;
+      if (val >= beta) return val;
     }
   }
 
@@ -212,7 +223,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       /********************************\
       |        Late Move Pruning       |
       \********************************/
-      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move ordering
+      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move
+      // ordering
       if (can_lmp(depth, move_count)) mp.skip_quiet();
 
       /********************************\
@@ -229,6 +241,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     |       Late Move Reduction      |
     \********************************/
 
+    Eval val;
     // Assume the first move is the best move.
     // Use a null window with reduced search to prove that later moves are worse.
     if (can_lmr(se, depth, move_count, pv, move)) {
@@ -250,7 +263,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (full_search) val = nw_search<Us>(se, alpha, new_depth, !cutnode);
 
     // If its the first move, or the later move is proven to be good, then do a full window search
-    if (pv && (move_count == 1 || val > alpha)) val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth, false);
+    if (pv && (move_count == 1 || val > alpha))
+      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth, false);
 
     undo_move<Us>(se);
 
@@ -306,7 +320,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   return best;
 }
 
-template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
+template <Colour Us, Worker::NodeType NT>
+Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   constexpr bool pv = NT == PV;
 
   se->pv.clear();
@@ -323,17 +338,20 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
   if (tt_hit) {
     tt_hits++;
     TTEntry e = tt_entry.read(se->ply);
-    tt_move = e.move;
 
     if (!pv && can_tt_cutoff(e, alpha, beta)) return e.value;
+
+    tt_move = e.move;
   }
+
+  Eval eval = board_.eval();
+  Eval best = eval;
 
   // ** Stand Pat ** //
   // The current eval is the lower bound because we can just not capture
   // anything (assume its not a zugzwang) If lower bound >= beta, then we fail
   // high (opponent has better options) If lower bound > alpha, then we update
   // alpha (the best we can do)
-  Eval best = board_.eval();
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
@@ -390,7 +408,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
     |         Mate Detection         |
     \********************************/
 
-  if (move_count == 0 && !se->in_check) best = se->in_check ? EvalUtils::mated_in(se->ply) : EvalDraw;
+  if (move_count == 0 && se->in_check) best = EvalUtils::mated_in(se->ply);
 
   /********************************\
   |            TT write            |
@@ -400,8 +418,7 @@ template <Colour Us, Worker::NodeType NT> Eval Worker::qsearch(StackEntry *se, E
 
   // clang-format off
   tt_entry.write(board_.key(), tt_.age(), DepthQS, se->ply,
-                 best >= beta ? TTBound::Lower :
-                                TTBound::Upper,
+                 best >= beta ? TTBound::Lower : TTBound::Upper,
                  best_move, 0, best);
   // clang-format on
 

@@ -22,6 +22,7 @@ constexpr Depth StackOffset = 4;
 
 // Eval constants
 constexpr Eval EvalInf = 30000;
+constexpr Eval EvalNone = -EvalInf - 1;
 constexpr Eval EvalMate = 29000;
 constexpr Eval EvalMateBound = EvalMate - MaxDepth;
 constexpr Eval EvalDraw = 0;

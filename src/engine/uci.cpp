@@ -52,9 +52,9 @@ void UCI::loop() {
 }
 
 void UCI::parse_perft(std::istringstream &is) {
-  std::string token;
-  Depth depth = 0;
-  std::streampos pos = is.tellg();
+  std::string    token;
+  Depth          depth = 0;
+  std::streampos pos   = is.tellg();
 
   if (is >> depth) {
     engine_.perft<Perft>(depth);

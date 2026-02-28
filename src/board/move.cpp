@@ -16,22 +16,24 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-void Board::do_move(Move move) { return stm_ == White ? do_move<White>(move) : do_move<Black>(move); }
+void Board::do_move(Move move) {
+  return stm_ == White ? do_move<White>(move) : do_move<Black>(move);
+}
 
 template <Colour Us> void Board::do_move(Move move) {
   constexpr Colour Them = ~Us;
-  constexpr Piece King = make_piece(Us, K);
-  constexpr Piece Pawn = make_piece(Us, P);
+  constexpr Piece  King = make_piece(Us, K);
+  constexpr Piece  Pawn = make_piece(Us, P);
 
-  const Square src = MoveUtils::src(move);
-  const Square dst = MoveUtils::dst(move);
-  const Piece pc = on(src);
+  const Square   src  = MoveUtils::src(move);
+  const Square   dst  = MoveUtils::dst(move);
+  const Piece    pc   = on(src);
   const MoveFlag flag = MoveUtils::flag(move);
-  Piece cap = on(dst);
+  Piece          cap  = on(dst);
 
-  Piece promo;
+  Piece  promo;
   Square rook_dst, king_dst, ep;
-  bool queen_side;
+  bool   queen_side;
 
   // Initialise new state
   Undo *prev = undo_++;
@@ -39,8 +41,8 @@ template <Colour Us> void Board::do_move(Move move) {
 
   // Update new state
   if (prev->ep != NoSquare) undo_->key ^= Zobrist::EP_KEYS[file_of(prev->ep)];
-  undo_->ep = NoSquare;
-  undo_->cap = cap;
+  undo_->ep   = NoSquare;
+  undo_->cap  = cap;
   undo_->move = move;
 
   // Increment move counters
@@ -60,7 +62,7 @@ template <Colour Us> void Board::do_move(Move move) {
     break;
   case DoublePush:
     move_piece<true, Us>(src, dst);
-    ep = forward<Us>(src);
+    ep            = forward<Us>(src);
     undo_->rule50 = 0;
     if (!can_ep<Them>(ep)) break;
     undo_->ep = ep;
@@ -69,8 +71,8 @@ template <Colour Us> void Board::do_move(Move move) {
   case KingCastle:
   case QueenCastle:
     queen_side = flag == QueenCastle;
-    rook_dst = castling_mask_.rook_dst<Us>(queen_side);
-    king_dst = castling_mask_.king_dst<Us>(queen_side);
+    rook_dst   = castling_mask_.rook_dst<Us>(queen_side);
+    king_dst   = castling_mask_.king_dst<Us>(queen_side);
     pop_piece<true, Us>(src);
     move_piece<true, Us>(dst, rook_dst);
     set_piece<true, Us>(King, king_dst);
@@ -91,11 +93,11 @@ template <Colour Us> void Board::do_move(Move move) {
     undo_->rule50 = 0;
     break;
   case EP:
-    ep = forward<Them>(dst);
+    ep  = forward<Them>(dst);
     cap = make_piece(Them, P);
     move_piece<true, Us>(src, dst);
     pop_piece<true, Them>(ep);
-    undo_->cap = cap;
+    undo_->cap    = cap;
     undo_->rule50 = 0;
     break;
   }
@@ -115,18 +117,18 @@ template <Colour Us> void Board::do_move(Move move) {
 
 template <Colour Us> void Board::undo_move() {
   constexpr Colour Them = ~Us;
-  constexpr Piece King = make_piece(Us, K);
-  constexpr Piece Pawn = make_piece(Us, P);
+  constexpr Piece  King = make_piece(Us, K);
+  constexpr Piece  Pawn = make_piece(Us, P);
 
   const Move move = undo_->move;
   assert(move != NullMove);
-  const Piece cap = undo_->cap;
-  const Square src = MoveUtils::src(move);
-  const Square dst = MoveUtils::dst(move);
+  const Piece    cap  = undo_->cap;
+  const Square   src  = MoveUtils::src(move);
+  const Square   dst  = MoveUtils::dst(move);
   const MoveFlag flag = MoveUtils::flag(move);
 
   Square rook_dst, king_dst;
-  bool queen_side;
+  bool   queen_side;
 
   switch (flag) {
   case Quiet:
@@ -140,8 +142,8 @@ template <Colour Us> void Board::undo_move() {
   case KingCastle:
   case QueenCastle:
     queen_side = flag == QueenCastle;
-    rook_dst = castling_mask_.rook_dst<Us>(queen_side);
-    king_dst = castling_mask_.king_dst<Us>(queen_side);
+    rook_dst   = castling_mask_.rook_dst<Us>(queen_side);
+    king_dst   = castling_mask_.king_dst<Us>(queen_side);
     pop_piece<false, Us>(king_dst);
     move_piece<false, Us>(rook_dst, dst);
     set_piece<false, Us>(King, src);
@@ -181,13 +183,13 @@ template <Colour Us> void Board::do_null_move() {
 
   // Update new state
   if (prev->ep != NoSquare) undo_->key ^= Zobrist::EP_KEYS[file_of(prev->ep)];
-  undo_->ep = NoSquare;
-  undo_->cap = NoPiece;
+  undo_->ep   = NoSquare;
+  undo_->cap  = NoPiece;
   undo_->move = NullMove;
   undo_->reps = 0;
 
   undo_->rule50 = 0;
-  undo_->ply = 0;
+  undo_->ply    = 0;
   // Update board state
   undo_->key ^= Zobrist::SIDE_KEY;
   stm_ = ~stm_;

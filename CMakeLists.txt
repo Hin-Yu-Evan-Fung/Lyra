@@ -25,6 +25,7 @@ set(
     src/search/movepick.cpp
     src/search/search.cpp
     src/search/utils.cpp
+    src/utils/bench.cpp
     src/utils/tt.cpp
 )
 

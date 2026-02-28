@@ -1,12 +1,12 @@
 #pragma once
 
+#include "search/search.hpp"
+
 #include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <memory>
 #include <vector>
-
-#include "search/search.hpp"
 
 namespace Lyra {
 
@@ -27,11 +27,11 @@ public:
 private:
   void loop();
 
-  std::condition_variable cv_;
-  std::mutex mtx_;
-  std::atomic_bool exit_;
-  std::atomic_bool busy_;
-  std::thread thread_;
+  std::condition_variable       cv_;
+  std::mutex                    mtx_;
+  std::atomic_bool              exit_;
+  std::atomic_bool              busy_;
+  std::thread                   thread_;
   std::function<void(Thread &)> func_;
 };
 

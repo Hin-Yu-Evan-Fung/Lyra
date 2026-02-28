@@ -5,7 +5,7 @@
 namespace Lyra::EvalUtils {
 
 Score PSQT[NPiece][NSquare];
-int GamePhaseInc[NPieceType] = {0, 1, 1, 2, 4, 0};
+int   GamePhaseInc[NPieceType] = {0, 1, 1, 2, 4, 0};
 
 constexpr Score PIECE_VALS[NPieceType] = {{82, 94},   {337, 281},  {365, 297},
                                           {477, 512}, {1025, 936}, {0, 0}};
@@ -79,9 +79,8 @@ constexpr Score BONUS[NPieceType][NSquare] = {
 void init() {
   for (PieceType pt = P; pt <= K; ++pt) {
     for (Square sq = A1; sq <= H8; ++sq) {
-      PSQT[make_piece(White, pt)][sq] = BONUS[pt][sq] + PIECE_VALS[pt];
-      PSQT[make_piece(Black, pt)][flip_rank(sq)] =
-          -PSQT[make_piece(White, pt)][sq];
+      PSQT[make_piece(White, pt)][sq]            = BONUS[pt][sq] + PIECE_VALS[pt];
+      PSQT[make_piece(Black, pt)][flip_rank(sq)] = -PSQT[make_piece(White, pt)][sq];
     }
   }
 }

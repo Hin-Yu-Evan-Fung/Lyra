@@ -1,23 +1,24 @@
 #pragma once
 
-#include <atomic>
-
 #include "utils/utils.hpp"
+
+#include <atomic>
 
 namespace Lyra {
 
 struct TimeControl {
-  Time time[NColour];
-  Time inc[NColour];
+  Time  time[NColour];
+  Time  inc[NColour];
   Depth depth;
-  U16 moves_to_go;
-  Time move_time;
-  bool is_infinite;
+  U16   moves_to_go;
+  Time  move_time;
+  bool  is_infinite;
 };
 
 class Clock {
 public:
-  Clock(std::atomic_bool &stop) : stop_(stop) {}
+  Clock(std::atomic_bool &stop)
+      : stop_(stop) {}
 
   void set(Colour stm, const TimeControl &tc);
   Time elapsed() { return now() - start_; }

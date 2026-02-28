@@ -109,15 +109,15 @@ namespace IOUtils {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
-constexpr char format_file(File f) { return static_cast<char>(f + 'a'); }
-constexpr char format_rank(Rank r) { return static_cast<char>(r + '1'); }
-constexpr char format_piece(Piece pc) { return PIECE_STR.at(pc); }
+constexpr char        format_file(File f) { return static_cast<char>(f + 'a'); }
+constexpr char        format_rank(Rank r) { return static_cast<char>(r + '1'); }
+constexpr char        format_piece(Piece pc) { return PIECE_STR.at(pc); }
 constexpr std::string format_sq(Square sq) {
   return sq == NoSquare ? "none" : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
 }
 
-constexpr File parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
-constexpr Rank parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
+constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
+constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
 constexpr Square parse_sq(const std::string &str) {
   return make_square(parse_file(str[0]), parse_rank(str[1]));
 }

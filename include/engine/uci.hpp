@@ -1,8 +1,8 @@
 #pragma once
 
-#include <sstream>
-
 #include "engine.hpp"
+
+#include <sstream>
 
 namespace Lyra {
 

@@ -26,6 +26,7 @@ set(
     src/search/search.cpp
     src/search/utils.cpp
     src/utils/bench.cpp
+    src/utils/perft.cpp
     src/utils/tt.cpp
 )
 

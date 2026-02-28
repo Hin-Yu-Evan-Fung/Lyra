@@ -34,8 +34,8 @@ void Engine::go(const TimeControl &tc) {
   });
 }
 
-template <PerftMode PM> void Engine::perft(Depth d) {
-  if (!is_busy()) Lyra::perft<PM>(board_, d);
+void Engine::perft(Depth d, PerftMode mode) {
+  if (!is_busy()) Lyra::perft(board_, d, mode);
 }
 
 /******************************************\
@@ -82,8 +82,5 @@ void Engine::clear_tt() {
 }
 
 void Engine::set_chess960(bool chess960) { board_.chess960 = chess960; }
-
-template void Engine::perft<Perft>(Depth d);
-template void Engine::perft<Perft_MP>(Depth d);
 
 } // namespace Lyra

@@ -4,6 +4,7 @@
 #include "utils/tt.hpp"
 
 #include <atomic>
+#include <print>
 #include <string_view>
 
 namespace Lyra {

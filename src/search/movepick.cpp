@@ -98,15 +98,15 @@ template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) {
 
 template <Colour Us> void MovePicker<Us>::gen_score_cap(bool skip_see) {
   start_ptr_ = 0;
-  end_ptr_ = MaxMoves - 1;
+  end_ptr_   = MaxMoves - 1;
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
     if (skip_see || board_.see(move, EvalDraw)) {
-      moves_[start_ptr_] = move;
+      moves_[start_ptr_]    = move;
       scores_[start_ptr_++] = score_cap(move);
     } else {
-      moves_[end_ptr_] = move;
+      moves_[end_ptr_]    = move;
       scores_[end_ptr_--] = score_cap(move);
     }
   });
@@ -118,7 +118,7 @@ template <Colour Us> void MovePicker<Us>::gen_score_quiet() {
   enum_moves<Us, GenQuiet>(board_, [&](Move move) {
     if (move == tt_move_ || move == killer_.moves[0] || move == killer_.moves[1]) return;
 
-    moves_[start_ptr_] = move;
+    moves_[start_ptr_]    = move;
     scores_[start_ptr_++] = score_quiet(move);
   });
 }
@@ -212,33 +212,33 @@ template <Colour Us> bool Board::is_legal(Move move) const {
   using namespace BBUtils;
   using enum Direction;
 
-  constexpr Direction Up = Us == White ? N : S;
-  constexpr Castle OO = Us == White ? WhiteOO : BlackOO;
-  constexpr Castle OOO = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Direction Up  = Us == White ? N : S;
+  constexpr Castle    OO  = Us == White ? WhiteOO : BlackOO;
+  constexpr Castle    OOO = Us == White ? WhiteOOO : BlackOOO;
 
   if (!move) return false;
 
   // Move params
-  const Square src = MoveUtils::src(move);
-  const Square dst = MoveUtils::dst(move);
-  const MoveFlag flag = MoveUtils::flag(move);
-  const Piece pc = on(src);
-  const PieceType pt = pt_of(pc);
-  const Piece cap = on(dst);
-  const bool is_castle = MoveUtils::is_castle(move);
-  const bool is_cap = MoveUtils::is_capture(move);
-  const bool is_promo = MoveUtils::is_promo(move);
-  const bool is_ep = flag == EP;
-  const bool is_dp = flag == DoublePush;
-  const bool is_quiet = flag == Quiet;
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
+  const Piece     pc        = on(src);
+  const PieceType pt        = pt_of(pc);
+  const Piece     cap       = on(dst);
+  const bool      is_castle = MoveUtils::is_castle(move);
+  const bool      is_cap    = MoveUtils::is_capture(move);
+  const bool      is_promo  = MoveUtils::is_promo(move);
+  const bool      is_ep     = flag == EP;
+  const bool      is_dp     = flag == DoublePush;
+  const bool      is_quiet  = flag == Quiet;
 
   // Board info
-  const Square ksq_ = ksq<Us>();
-  const BB occ = bb();
-  const BB hv_pin = undo_->hv_pin;
-  const BB diag_pin = undo_->diag_pin;
-  const BB check_mask = undo_->check_mask;
-  const BB attacked = undo_->attacked;
+  const Square ksq_       = ksq<Us>();
+  const BB     occ        = bb();
+  const BB     hv_pin     = undo_->hv_pin;
+  const BB     diag_pin   = undo_->diag_pin;
+  const BB     check_mask = undo_->check_mask;
+  const BB     attacked   = undo_->attacked;
 
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
@@ -253,7 +253,8 @@ template <Colour Us> bool Board::is_legal(Move move) const {
   // Check if the promotion flag is consistent
   const bool invalid_promo_flag = is_promo && pt_of(pc) != P;
 
-  if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag || invalid_promo_flag) return false;
+  if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag || invalid_promo_flag)
+    return false;
 
   if (is_castle) {
     if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
@@ -265,12 +266,14 @@ template <Colour Us> bool Board::is_legal(Move move) const {
 
   // Check if there is a pin and if so check if the movement is aligned to the
   // king
-  const bool valid_pin = !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
+  const bool valid_pin =
+      !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
 
   if (pt == P) {
     // Enpassant is illegal if the destination is incorrect, the attack pattern
     // is wrong, or the move results in check.
-    if (is_ep) return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
+    if (is_ep)
+      return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
     // Capture is illegal if the move does not correspond to the attack pattern
     if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
     // Double Push is illegal if there are pieces in the way
@@ -295,8 +298,9 @@ template bool Board::is_legal<Black>(Move move) const;
 \******************************************/
 
 inline BB Board::attackers_to(Square to, BB occ) const {
-  return (PAWN_ATK[Black][to] & bb(White, P)) | (PAWN_ATK[White][to] & bb(Black, P)) | (KNIGHT_ATK[to] & bb(N))
-         | (BISHOP_ATK[to][occ] & bb(B, Q)) | (ROOK_ATK[to][occ] & bb(R, Q)) | (KING_ATK[to] & bb(K));
+  return (PAWN_ATK[Black][to] & bb(White, P)) | (PAWN_ATK[White][to] & bb(Black, P))
+         | (KNIGHT_ATK[to] & bb(N)) | (BISHOP_ATK[to][occ] & bb(B, Q))
+         | (ROOK_ATK[to][occ] & bb(R, Q)) | (KING_ATK[to] & bb(K));
 }
 
 bool Board::see(Move move, Eval lower_bound) const {
@@ -305,15 +309,15 @@ bool Board::see(Move move, Eval lower_bound) const {
 
   constexpr Eval PIECE_VALS[NPieceType] = {150, 340, 360, 480, 1000, 0};
 
-  const Square src = MoveUtils::src(move);
-  const Square dst = MoveUtils::dst(move);
-  const MoveFlag flag = MoveUtils::flag(move);
-  const PieceType promo = MoveUtils::promoted_pt(move);
-  const PieceType att = pt_of(on(src));
-  const PieceType vic = pt_of(on(dst));
-  const Square ep_target = stm_ == White ? shift<Direction::N>(dst) : shift<Direction::S>(dst);
-  const BB diag_sliders = bb(B, Q);
-  const BB hv_sliders = bb(R, Q);
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
+  const PieceType promo     = MoveUtils::promoted_pt(move);
+  const PieceType att       = pt_of(on(src));
+  const PieceType vic       = pt_of(on(dst));
+  const Square    ep_target = stm_ == White ? shift<Direction::N>(dst) : shift<Direction::S>(dst);
+  const BB        diag_sliders = bb(B, Q);
+  const BB        hv_sliders   = bb(R, Q);
 
   // Calculate move value
   Eval gain = -lower_bound;
@@ -333,9 +337,9 @@ bool Board::see(Move move, Eval lower_bound) const {
   if (flag == EP) occ ^= from(ep_target);
 
   // Simulate the rest of the exchanges
-  Colour stm = ~stm_;
-  BB atks = attackers_to(dst, occ);
-  BB stm_atks, b;
+  Colour    stm  = ~stm_;
+  BB        atks = attackers_to(dst, occ);
+  BB        stm_atks, b;
   PieceType lva_pt = NoPieceType;
 
   // Switch sides in every iteration,

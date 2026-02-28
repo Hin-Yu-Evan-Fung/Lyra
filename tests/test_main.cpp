@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
-
 #include "core/bitboard.hpp"
 #include "core/zobrist.hpp"
+
+#include <gtest/gtest.h>
 
 using namespace Lyra;
 

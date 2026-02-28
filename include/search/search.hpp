@@ -6,6 +6,7 @@
 #include "engine/clock.hpp"
 #include "search/movepick.hpp"
 #include "search/utils.hpp"
+#include "utils/bench.hpp"
 #include "utils/tt.hpp"
 #include "utils/utils.hpp"
 
@@ -39,34 +40,28 @@ class Worker {
   template <Colour Us> constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
 
   MOStats mo_stats(StackEntry *se);
-  void update_cont(const Board &board, StackEntry *se, Move move, Eval bonus);
-  void update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets,
-                   Move best_move, Depth depth);
+  void    update_cont(const Board &board, StackEntry *se, Move move, Eval bonus);
+  void    update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets,
+                      Move best_move, Depth depth);
 
   // Worker info
-  Clock clock_;
+  Clock             clock_;
   std::atomic_bool &stop_;
-  Board board_;
-  size_t id_;
+  Board             board_;
+  size_t            id_;
 
   // Search info
   size_t nodes_;
-  Depth depth_;
-  Depth seldepth_;
-  Eval eval_;
-  Move best_move_;
+  Depth  depth_;
+  Depth  seldepth_;
+  Eval   eval_;
+  Move   best_move_;
 
   // Tables
-  MainHist ht_;
-  CapHist cht_;
+  MainHist  ht_;
+  CapHist   cht_;
   ContTable cont_tb_;
-  TT &tt_;
-
-  // Stats
-  U64 tt_reads;
-  U64 tt_hits;
-  U64 fail_high;
-  U64 fail_high_first;
+  TT       &tt_;
 
 public:
   Worker(std::atomic_bool &stop, size_t id, TT &tt)
@@ -79,6 +74,8 @@ public:
   void reset(const Board &board);
   void start(TimeControl tc);
   void uci_report(const PVLine &pv);
+
+  friend void run_bench(int argc, char **argv);
 };
 
 /******************************************\
@@ -101,9 +98,9 @@ template <Colour Us> void Worker::undo_move(StackEntry *se) {
 }
 
 template <Colour Us> void Worker::do_null_move(StackEntry *se) {
-  se->cont = &cont_tb_[wP][A1];
+  se->cont          = &cont_tb_[wP][A1];
   se->ply_from_null = 0;
-  se->move = NullMove;
+  se->move          = NullMove;
   nodes_++;
   board_.do_null_move<Us>();
 }

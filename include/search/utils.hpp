@@ -11,22 +11,22 @@ namespace Lyra::SearchUtils {
 using MoveBuf = std::vector<Move>;
 
 struct PVLine {
-  Move moves[MaxDepth];
+  Move   moves[MaxDepth];
   size_t length;
 
-  void update(const PVLine &other, Move best);
-  void clear() { length = 0; }
+  void        update(const PVLine &other, Move best);
+  void        clear() { length = 0; }
   std::string format(bool chess960) const;
 };
 
 struct StackEntry {
-  Killer killer;
+  Killer    killer;
   ContHist *cont;
-  PVLine pv;
-  Move move;
-  Ply ply;
-  Ply ply_from_null;
-  bool in_check;
+  PVLine    pv;
+  Move      move;
+  Ply       ply;
+  Ply       ply_from_null;
+  bool      in_check;
 };
 
 /******************************************\
@@ -36,7 +36,9 @@ struct StackEntry {
 \******************************************/
 
 // Variable reduction formula for lmr
-constexpr Depth lmr_reduction(Depth depth, int move_count) { return 0.75 + std::log(depth) * std::log(move_count) / 3; }
+constexpr Depth lmr_reduction(Depth depth, int move_count) {
+  return 0.75 + std::log(depth) * std::log(move_count) / 3;
+}
 
 // Variable reduction formula for nmp
 constexpr Depth nmp_reduction(Depth depth) { return std::min(Depth(3 + depth / 5), depth); }

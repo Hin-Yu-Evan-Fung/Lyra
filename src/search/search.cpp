@@ -40,35 +40,33 @@ void Worker::start(TimeControl tc) {
   }
 
   std::println("bestmove {}", MoveUtils::format(best_move_, board_.chess960));
-  std::println("TT read/hit %: {}%", (float)tt_hits * 100 / (float)tt_reads);
-
   std::fflush(stdout);
 }
 
 // TODO: Aspiration windows
 template <Colour Us> void Worker::aspwin() {
 
-  StackEntry stack[MaxDepth + StackOffset + 1]{};
+  StackEntry  stack[MaxDepth + StackOffset + 1]{};
   StackEntry *se = stack + StackOffset;
 
   for (int i = StackOffset; i > 0; i--) (se - i)->cont = &cont_tb_[wP][A1]; // Dummy entry
   for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
-  Eval alpha = -EvalInf;
-  Eval beta = EvalInf;
-  Eval delta = 10;
-  Depth r = 0;
+  Eval  alpha = -EvalInf;
+  Eval  beta  = EvalInf;
+  Eval  delta = 10;
+  Depth r     = 0;
 
   // Initial guess of the score, because the score should be stable after depth 3
   if (depth_ > 5) {
     alpha = std::max(Eval(eval_ - delta), -EvalInf);
-    beta = std::min(Eval(eval_ + delta), EvalInf);
+    beta  = std::min(Eval(eval_ + delta), EvalInf);
   }
 
   while (true) {
 
     Depth reduced = depth_ + 1 - r;
-    Eval val = negamax<Us, PV>(se, alpha, beta, reduced, false);
+    Eval  val     = negamax<Us, PV>(se, alpha, beta, reduced, false);
 
     if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -80,9 +78,9 @@ template <Colour Us> void Worker::aspwin() {
     // Fail high, shift window up and research, reduce depth by 1
     // Value inside window, we can confidently update the score
     if (val <= alpha) {
-      beta = (alpha + beta) / 2;
+      beta  = (alpha + beta) / 2;
       alpha = std::max(val - delta, -EvalInf);
-      r = 0;
+      r     = 0;
     } else if (val >= beta) {
       beta = std::min(val + delta, EvalInf);
       if (reduced > 1 && !EvalUtils::is_terminal(val)) r += 1;
@@ -123,7 +121,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   se->pv.clear();
   se->in_check = board_.in_check();
-  seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
+  seldepth_    = std::max(seldepth_, Depth(se->ply + 1));
 
   /********************************\
   |    Draw check / Mate Pruning   |
@@ -138,7 +136,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (se->ply >= MaxDepth) return se->in_check ? EvalDraw : board_.eval();
 
     alpha = std::max(alpha, mated_in(se->ply));
-    beta = std::min(beta, mate_in(se->ply + 1));
+    beta  = std::min(beta, mate_in(se->ply + 1));
     if (alpha >= beta) return alpha;
   }
 
@@ -147,12 +145,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   \********************************/
 
   auto [tt_hit, tt_entry] = tt_.probe(board_.key());
-  if (tt_entry.key != 0) tt_reads++;
 
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    tt_hits++;
     TTEntry e = tt_entry.read(se->ply);
 
     if (!pv && e.depth >= depth && can_tt_cutoff(e, alpha, beta)) return e.value;
@@ -201,9 +197,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   Eval best = -EvalInf;
   bool full_search;
-  int move_count = 0;
-  Move move = NoMove;
-  Move best_move = NoMove;
+  int  move_count = 0;
+  Move move       = NoMove;
+  Move best_move  = NoMove;
 
   MoveBuf captures(32), quiets(32);
 
@@ -215,7 +211,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   while ((move = mp.next())) {
     move_count++;
 
-    const bool is_cap = MoveUtils::is_capture(move);
+    const bool  is_cap    = MoveUtils::is_capture(move);
     const Depth new_depth = depth - 1;
 
     if (!pv && !se->in_check) {
@@ -247,7 +243,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (can_lmr(se, depth, move_count, pv, move)) {
       Depth r = lmr_reduction(depth, move_count);
 
-      r = std::clamp((int)r, 1, new_depth - 1);
+      r   = std::clamp((int)r, 1, new_depth - 1);
       val = nw_search<Us>(se, alpha, new_depth - r, true);
 
       // If the later moves could be better, research it with full depth.
@@ -331,12 +327,10 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   // ** TT lookup ** //
   auto [tt_hit, tt_entry] = tt_.probe(board_.key());
-  if (tt_entry.key != 0) tt_reads++;
 
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    tt_hits++;
     TTEntry e = tt_entry.read(se->ply);
 
     if (!pv && can_tt_cutoff(e, alpha, beta)) return e.value;
@@ -356,9 +350,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   alpha = std::max(alpha, best);
 
   // ** Main QSearch Loop ** //
-  Move move = NoMove;
-  Move best_move = NoMove;
-  U16 move_count = 0;
+  Move move       = NoMove;
+  Move best_move  = NoMove;
+  U16  move_count = 0;
 
   // Clear killer moves
   (se + 1)->killer.clear();

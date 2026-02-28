@@ -52,8 +52,10 @@ namespace {
 
 using namespace MoveUtils;
 
-constexpr Piece attacker(const Board &board, Move move) { return board.on(src(move)); }
-constexpr PieceType victim(const Board &board, Move move) { return is_ep(move) ? P : board.pt_on(dst(move)); }
+constexpr Piece     attacker(const Board &board, Move move) { return board.on(src(move)); }
+constexpr PieceType victim(const Board &board, Move move) {
+  return is_ep(move) ? P : board.pt_on(dst(move));
+}
 
 } // namespace
 
@@ -67,7 +69,9 @@ public:
 };
 
 class CapHist final : public NDArray<Hist<HistMax>, NPiece, NSquare, NPieceType> {
-  auto &ref(this auto &self, const Board &b, Move m) { return self[attacker(b, m)][dst(m)][victim(b, m)]; }
+  auto &ref(this auto &self, const Board &b, Move m) {
+    return self[attacker(b, m)][dst(m)][victim(b, m)];
+  }
 
 public:
   void clear() { fill({}); }

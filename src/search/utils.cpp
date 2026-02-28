@@ -17,7 +17,7 @@ namespace Lyra {
 \******************************************/
 
 void PVLine::update(const PVLine &other, Move best) {
-  length = other.length + 1;
+  length   = other.length + 1;
   moves[0] = best;
   std::copy_n(other.moves, other.length, moves + 1);
 }
@@ -45,10 +45,10 @@ void Worker::update_cont(const Board &board, StackEntry *se, Move move, Eval bon
   }
 }
 
-void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets, Move best_move,
-                         Depth depth) {
+void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, MoveBuf quiets,
+                         Move best_move, Depth depth) {
   const bool is_capture = MoveUtils::is_capture(best_move);
-  const Eval bonus = std::max(300 * depth - 200, 2000);
+  const Eval bonus      = std::max(300 * depth - 200, 2000);
 
   if (!is_capture) {
     se->killer.update(best_move);
@@ -76,25 +76,21 @@ void Worker::update_hist(const Board &board, StackEntry *se, MoveBuf captures, M
 void Worker::reset(const Board &board) {
   board_.copy(board);
   best_move_ = NoMove;
-  nodes_ = 0;
-  depth_ = 0;
-  seldepth_ = 0;
+  nodes_     = 0;
+  depth_     = 0;
+  seldepth_  = 0;
 
   ht_.clear();
   cht_.clear();
   cont_tb_.clear();
-
-  tt_reads = 0;
-  tt_hits = 0;
-  fail_high = 0;
-  fail_high_first = 0;
 }
 
 void Worker::uci_report(const PVLine &pv) {
   std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} "
                "hashfull {} pv {}",
                depth_ + 1, seldepth_ + 1, EvalUtils::format(eval_), clock_.elapsed(), nodes_,
-               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(), pv.format(board_.chess960));
+               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(),
+               pv.format(board_.chess960));
   std::fflush(stdout);
 }
 

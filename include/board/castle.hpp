@@ -22,15 +22,15 @@ struct CastleMask {
 
   static constexpr int index(Colour c, bool queen_side) noexcept;
 
-  void add_rights(Square ksq, Square rsq, Castle cr);
+  void           add_rights(Square ksq, Square rsq, Castle cr);
   constexpr void reset();
 
-  template <Colour C> constexpr Square rook_src(bool queen_side) const noexcept;
+  template <Colour C> constexpr Square        rook_src(bool queen_side) const noexcept;
   template <Colour C> static constexpr Square rook_dst(bool queen_side) noexcept;
   template <Colour C> static constexpr Square king_dst(bool queen_side) noexcept;
 
   static constexpr Castle get_mask(Colour c, bool queen_side) noexcept;
-  std::string to_str(Castle cr, bool chess960 = false) const;
+  std::string             to_str(Castle cr, bool chess960 = false) const;
 };
 
 /******************************************\
@@ -40,7 +40,7 @@ struct CastleMask {
 \******************************************/
 
 inline void CastleMask::add_rights(Square ksq, Square rsq, Castle cr) {
-  int idx = BBUtils::lsb(cr);
+  int idx      = BBUtils::lsb(cr);
   rook_sq[idx] = rsq;
   rights[ksq] &= ~cr;
   rights[rsq] &= ~cr;
@@ -51,8 +51,12 @@ constexpr void CastleMask::reset() {
   for (int i = 0; i < 4; i++) rook_sq[i] = NoSquare;
 }
 
-constexpr int CastleMask::index(Colour c, bool queen_side) noexcept { return (c << 1) | queen_side; }
-constexpr Castle CastleMask::get_mask(Colour c, bool queen_side) noexcept { return Castle(1 << index(c, queen_side)); }
+constexpr int CastleMask::index(Colour c, bool queen_side) noexcept {
+  return (c << 1) | queen_side;
+}
+constexpr Castle CastleMask::get_mask(Colour c, bool queen_side) noexcept {
+  return Castle(1 << index(c, queen_side));
+}
 
 template <Colour C> constexpr Square CastleMask::rook_src(bool queen_side) const noexcept {
   return rook_sq[index(C, queen_side)];

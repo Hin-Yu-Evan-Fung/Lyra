@@ -1,14 +1,14 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "board/board.hpp"
 #include "core/defs.hpp"
 #include "engine/thread.hpp"
 #include "search/search.hpp"
 #include "utils/perft.hpp"
 #include "utils/tt.hpp"
+
+#include <string>
+#include <vector>
 
 namespace Lyra {
 
@@ -18,14 +18,14 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-constexpr std::string_view NAME = "Lyra";
-constexpr std::string_view AUTHOR = "Evan Fung";
+constexpr std::string_view NAME    = "Lyra";
+constexpr std::string_view AUTHOR  = "Evan Fung";
 constexpr std::string_view VERSION = "1.0";
 
-constexpr size_t TT_SIZE = 32;
-constexpr size_t THREADS = 1;
-constexpr int MOVE_OVERHEAD = 300;
-constexpr U64 CLOCK_FREQ = 2048;
+constexpr size_t TT_SIZE       = 32;
+constexpr size_t THREADS       = 1;
+constexpr int    MOVE_OVERHEAD = 300;
+constexpr U64    CLOCK_FREQ    = 2048;
 
 class Engine {
 public:
@@ -37,9 +37,9 @@ public:
   void print_pos() { board_.print(); }
 
   template <PerftMode PM> void perft(Depth d);
-  void go(const TimeControl &tc);
-  void newgame();
-  void stop() { pool_.stop(); }
+  void                         go(const TimeControl &tc);
+  void                         newgame();
+  void                         stop() { pool_.stop(); }
 
   void clear_tt();
   void set_threads(size_t num);
@@ -47,9 +47,9 @@ public:
   void set_chess960(bool chess960);
 
 private:
-  Board board_;
+  Board      board_;
   ThreadPool pool_;
-  TT tt_;
+  TT         tt_;
 };
 
 } // namespace Lyra

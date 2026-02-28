@@ -29,9 +29,9 @@ enum MovePickStage {
 using ContHistBuf = NDArray<ContHist *, 4>;
 
 struct MOStats {
-  const Killer &killer;
-  const MainHist &ht;
-  const CapHist &cap_ht;
+  const Killer     &killer;
+  const MainHist   &ht;
+  const CapHist    &cap_ht;
   const ContHistBuf cont_hb;
 };
 
@@ -41,7 +41,7 @@ public:
   MovePicker(const Board &board, const MOStats &stats, Move tt_move);
 
   Move next();
-  int stage() { return stage_; }
+  int  stage() { return stage_; }
   void skip_quiet() { skip_quiet_ = true; }
 
 private:
@@ -52,7 +52,7 @@ private:
   Eval score_cap(Move move);
 
   size_t best_idx(size_t start, size_t end);
-  void swap(size_t idx1, size_t idx2);
+  void   swap(size_t idx1, size_t idx2);
 
   bool peek_front() { return start_ptr_ != 0; }
   bool peek_back() { return end_ptr_ != MaxMoves - 1; }
@@ -62,18 +62,18 @@ private:
   Move moves_[MaxMoves];
   Eval scores_[MaxMoves];
 
-  const Board &board_;
-  const Killer &killer_;
-  const MainHist &ht_;
-  const CapHist &cap_ht_;
+  const Board      &board_;
+  const Killer     &killer_;
+  const MainHist   &ht_;
+  const CapHist    &cap_ht_;
   const ContHistBuf cont_hb_;
-  Move tt_move_;
-  Depth depth_;
+  Move              tt_move_;
+  Depth             depth_;
 
   size_t start_ptr_ = 0;
-  size_t end_ptr_ = MaxMoves - 1;
-  int stage_ = MAIN_TT;
-  bool skip_quiet_;
+  size_t end_ptr_   = MaxMoves - 1;
+  int    stage_     = MAIN_TT;
+  bool   skip_quiet_;
 };
 
 } // namespace Lyra

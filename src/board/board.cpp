@@ -33,14 +33,14 @@ Board::Board() {
 Board::~Board() { delete[] history_; }
 
 void Board::reset() {
-  chess960 = false;
-  gameply_ = 0;
-  undo_ = history_;
-  undo_->ply = 0;
-  undo_->c_rights = NoCastle;
-  undo_->ep = NoSquare;
-  undo_->rule50 = 0;
-  undo_->psq = {};
+  chess960          = false;
+  gameply_          = 0;
+  undo_             = history_;
+  undo_->ply        = 0;
+  undo_->c_rights   = NoCastle;
+  undo_->ep         = NoSquare;
+  undo_->rule50     = 0;
+  undo_->psq        = {};
   undo_->game_phase = 0;
 
   memset(pieceBB_, BBUtils::EmptyBB, sizeof(pieceBB_));
@@ -52,10 +52,10 @@ void Board::reset() {
 
 void Board::set(const std::string &fen) {
   std::istringstream ss(fen);
-  std::string part;
+  std::string        part;
 
-  int file = FileA;
-  int rank = Rank8;
+  int    file = FileA;
+  int    rank = Rank8;
   Square sq;
 
   reset();
@@ -85,11 +85,11 @@ void Board::set(const std::string &fen) {
   ss >> std::skipws >> part;
   Castle castling = NoCastle;
   for (char c : part) {
-    Colour s = std::isupper(c) ? White : Black;
-    char upper = std::toupper(c);
+    Colour s     = std::isupper(c) ? White : Black;
+    char   upper = std::toupper(c);
 
-    Piece rook = make_piece(s, R);
-    Square ksq = s == White ? Board::ksq<White>() : Board::ksq<Black>();
+    Piece  rook = make_piece(s, R);
+    Square ksq  = s == White ? Board::ksq<White>() : Board::ksq<Black>();
     Square rsq;
 
     if (upper == 'K') {
@@ -103,7 +103,7 @@ void Board::set(const std::string &fen) {
       castling = CastleMask::get_mask(s, true);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper >= 'A' && upper <= 'H') {
-      rsq = relative_sq(s, make_square(IOUtils::parse_file(upper), Rank1));
+      rsq      = relative_sq(s, make_square(IOUtils::parse_file(upper), Rank1));
       castling = CastleMask::get_mask(s, ksq > rsq);
       castling_mask_.add_rights(ksq, rsq, castling);
     }
@@ -123,21 +123,23 @@ void Board::set(const std::string &fen) {
   ss >> std::skipws >> full_mv;
 
   undo_->rule50 = I8(fifty_mv);
-  gameply_ = I8(full_mv - 1) * 2 + I8(stm_);
-  undo_->key = compute_key();
+  gameply_      = I8(full_mv - 1) * 2 + I8(stm_);
+  undo_->key    = compute_key();
 
   // Basic board legality checks
-  if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
-  if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
+  if (ksq<White>() == NoSquare)
+    throw std::invalid_argument("Invalid fen! White king is not on the board!");
+  if (ksq<Black>() == NoSquare)
+    throw std::invalid_argument("Invalid fen! Black king is not on the board!");
 
   stm_ == White ? update_masks<White>() : update_masks<Black>();
 }
 
 void Board::copy(const Board &board) {
-  chess960 = board.chess960;
-  gameply_ = board.gameply_;
+  chess960       = board.chess960;
+  gameply_       = board.gameply_;
   castling_mask_ = board.castling_mask_;
-  stm_ = board.stm_;
+  stm_           = board.stm_;
   std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
   std::copy_n(board.colourBB_, NColour, colourBB_);
   std::copy_n(board.board_, NSquare, board_);
@@ -150,7 +152,8 @@ void Board::print() const {
 
   for (Rank r = Rank8; r >= Rank1; --r) {
     std::print(" {}   |", IOUtils::format_rank(r));
-    for (File f = FileA; f <= FileH; ++f) std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
+    for (File f = FileA; f <= FileH; ++f)
+      std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
 
     std::println("\n     +---+---+---+---+---+---+---+---+");
   }
@@ -165,8 +168,8 @@ void Board::print() const {
 
 std::string Board::fen() const {
   std::ostringstream out;
-  Square sq;
-  Piece pc;
+  Square             sq;
+  Piece              pc;
 
   for (Rank r = Rank8; r >= Rank1; --r) {
     int empty_count = 0;
@@ -237,7 +240,7 @@ Key Board::compute_pawn_key() const {
 
 Eval Board::compute_raw_eval() const {
   Score score{};
-  int game_phase = 0;
+  int   game_phase = 0;
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
@@ -270,7 +273,7 @@ bool Board::is_draw(Ply ply) const {
 
 void Board::update_reps() const {
   undo_->reps = 0;
-  int end = std::min((U16)undo_->rule50, undo_->ply);
+  int end     = std::min((U16)undo_->rule50, undo_->ply);
   if (end >= 4)
     for (int i = 2; i <= end; i += 2) {
       Undo *prev = undo_ - i;

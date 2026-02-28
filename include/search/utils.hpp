@@ -49,18 +49,27 @@ constexpr Depth nmp_reduction(Depth depth) { return std::min(Depth(3 + depth / 5
 // Lower bound means value has a proven lower bound, can cutoff if beta is too
 // good to be true;
 constexpr bool can_tt_cutoff(const TTEntry &entry, Eval alpha, Eval beta) {
-  const Eval value = entry.value;
-  return std::array{false, true, value <= alpha, value >= beta}[entry.bound];
+  switch (entry.bound) {
+  case TTBound::None: return false;
+  case TTBound::Exact: return true;
+  case TTBound::Upper: return entry.value <= alpha;
+  case TTBound::Lower: return entry.value >= beta;
+  }
+  return false;
 }
 
-// Exact bound means value has been proven with full window search. Can cutoff.
-// Upper bound means value has a proven upper bound, can cutoff if alpha is too
-// good to be true.
-// Lower bound means value has a proven lower bound, can cutoff if beta is too
+// Exact bound means value has been proven with full window search. Can use tt_eval.
+// Upper bound means value has a proven upper bound, can use tt_eval if current eval is too high.
+// Lower bound means value has a proven lower bound, can use tt_eval if current eval is too low.
 // good to be true;
-constexpr bool can_use_tt_eval(const TTEntry &entry, Eval static_eval) {
-  const Eval value = entry.value;
-  return std::array{false, true, value<static_eval, value> static_eval}[entry.bound];
+constexpr bool can_use_tt_eval(const TTEntry &entry, Eval eval) {
+  switch (entry.bound) {
+  case TTBound::None: return false;
+  case TTBound::Exact: return true;
+  case TTBound::Upper: return entry.value <= eval;
+  case TTBound::Lower: return entry.value >= eval;
+  }
+  return false;
 }
 
 } // namespace Lyra::SearchUtils

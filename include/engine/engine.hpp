@@ -36,10 +36,10 @@ public:
   void set_pos(const std::string fen, const std::vector<std::string> &moves);
   void print_pos() { board_.print(); }
 
-  template <PerftMode PM> void perft(Depth d);
-  void                         go(const TimeControl &tc);
-  void                         newgame();
-  void                         stop() { pool_.stop(); }
+  void perft(Depth d, PerftMode mode);
+  void go(const TimeControl &tc);
+  void newgame();
+  void stop() { pool_.stop(); }
 
   void clear_tt();
   void set_threads(size_t num);

@@ -57,7 +57,7 @@ void UCI::parse_perft(std::istringstream &is) {
   std::streampos pos   = is.tellg();
 
   if (is >> depth) {
-    engine_.perft<Perft>(depth);
+    engine_.perft(depth, PerftMode::Norm);
     return;
   }
 
@@ -67,7 +67,9 @@ void UCI::parse_perft(std::istringstream &is) {
 
   if (token == "mp") {
     is >> depth;
-    engine_.perft<Perft_MP>(depth);
+    engine_.perft(depth, PerftMode::MP);
+  } else if (token == "bench") {
+    perft_bench();
   } else
     std::println("Wrong command format! Must be perft [depth], perft mp [depth]!");
 }

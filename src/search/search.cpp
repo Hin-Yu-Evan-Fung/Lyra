@@ -102,18 +102,14 @@ template <Colour Us> void Worker::aspwin() {
 |==========================================|
 \******************************************/
 
-// A null window search is used to prove that a move is not better than the upper score.
-template <Colour Us> Eval Worker::nw_search(StackEntry *se, Eval upper, Depth depth, bool cutnode) {
-  return -negamax<~Us, NonPV>(se + 1, -(upper + 1), -upper, depth, cutnode);
-}
-
 // Alpha = our guaranteed score from previous parts of the search
 // Beta = opp's guaranteed score from previos parts of the search
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode) {
-  constexpr bool pv = NT == PV;
+  constexpr bool pv   = NT == PV;
+  const bool     root = se->ply == 0;
 
-  if (depth == 0) return qsearch<Us, NT>(se, alpha, beta);
+  if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   /********************************\
   |         Initialisation         |
@@ -121,7 +117,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   se->pv.clear();
   se->in_check = board_.in_check();
-  seldepth_    = std::max(seldepth_, Depth(se->ply + 1));
+  seldepth_    = root ? 0 : std::max(seldepth_, Depth(se->ply + 1));
 
   /********************************\
   |    Draw check / Mate Pruning   |
@@ -169,7 +165,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     \********************************/
 
     // Near a leaf node, prune all moves that are too good to be true.
-    if (depth <= 8 && eval - 100 * depth >= beta) return eval;
+    if (can_fp(depth, eval, beta)) return eval;
 
     /********************************\
     |        Null Move Pruning       |
@@ -184,12 +180,21 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
-      Eval val = nw_search<Us>(se, beta - 1, depth - r, !cutnode);
+      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r, false);
       undo_null_move<Us>(se);
 
       if (val >= beta) return val;
     }
   }
+
+  /********************************\
+  |  Internal Iterative Reduction  |
+  \********************************/
+
+  // If a pv node has no tt move or has a very shallow tt entry,
+  // then it usually means that this position is not that good,
+  // so we can reduce the depth search to avoid wasting time.
+  if ((pv || cutnode) && depth >= 6 && !tt_move) depth--;
 
   /********************************\
   |           Main Search          |
@@ -240,14 +245,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     Eval val;
     // Assume the first move is the best move.
     // Use a null window with reduced search to prove that later moves are worse.
-    if (can_lmr(se, depth, move_count, pv, move)) {
+    if (can_lmr(depth, move_count, pv, move)) {
       Depth r = lmr_reduction(depth, move_count);
 
-      r   = std::clamp((int)r, 1, new_depth - 1);
-      val = nw_search<Us>(se, alpha, new_depth - r, true);
+      Depth d = std::max(1, std::min(new_depth - r, (int)new_depth));
+      val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d, true);
 
       // If the later moves could be better, research it with full depth.
-      full_search = val > alpha && r > 1;
+      full_search = val > alpha && new_depth > d;
     } else
       full_search = !pv || move_count > 1;
 
@@ -256,7 +261,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     \********************************/
 
     // If reduced search showed that the move could be good, search it at full depth.
-    if (full_search) val = nw_search<Us>(se, alpha, new_depth, !cutnode);
+    if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth, !cutnode);
 
     // If its the first move, or the later move is proven to be good, then do a full window search
     if (pv && (move_count == 1 || val > alpha))

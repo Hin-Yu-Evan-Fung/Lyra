@@ -144,9 +144,9 @@ public:
   bool                      see(Move move, Eval threshold) const;
 
   // Game State functions
-  bool                      is_draw(Ply ply) const;
-  bool                      in_check() const;
-  template <Colour Us> bool has_non_pawn_material() const;
+  bool is_draw(Ply ply) const;
+  bool in_check() const;
+  bool has_non_pawn_material(Colour us) const;
 };
 
 /******************************************\
@@ -184,7 +184,6 @@ constexpr PieceType Board::pt_on(Square sq) const { return pt_of(board_[sq]); }
 constexpr Piece     Board::on(Square sq) const { return board_[sq]; }
 
 template <Colour Us> constexpr Square Board::ksq() const { return BBUtils::lsb(bb(Us, K)); }
-template <Colour Us> bool Board::has_non_pawn_material() const { return bb(Us) ^ bb(Us, P); }
 
 /******************************************\
 |==========================================|

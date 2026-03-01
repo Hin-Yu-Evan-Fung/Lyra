@@ -106,8 +106,9 @@ template <Colour Us> void Worker::aspwin() {
 // Beta = opp's guaranteed score from previos parts of the search
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode) {
-  constexpr bool pv   = NT == PV;
-  const bool     root = se->ply == 0;
+  constexpr bool pv       = NT == PV;
+  const bool     root     = se->ply == 0;
+  const bool     singular = se->excl != NoMove;
 
   if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
@@ -142,14 +143,20 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   auto [tt_hit, tt_entry] = tt_.probe(board_.key());
 
-  Move tt_move = NoMove;
+  TTBound tt_bound = TTBound::None;
+  Depth   tt_depth = 0;
+  Move    tt_move  = NoMove;
+  Eval    tt_value = EvalNone;
 
   if (tt_hit) {
     TTEntry e = tt_entry.read(se->ply);
 
-    if (!pv && e.depth >= depth && can_tt_cutoff(e, alpha, beta)) return e.value;
+    if (!pv && !singular && e.depth >= depth && can_tt_cutoff(e, alpha, beta)) return e.value;
 
-    tt_move = e.move;
+    tt_bound = e.bound;
+    tt_depth = e.depth;
+    tt_move  = e.move;
+    tt_value = e.value;
   }
 
   Eval eval = board_.eval();
@@ -158,7 +165,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |             Pruning            |
   \********************************/
 
-  if (!pv && !se->in_check && is_valid(eval)) {
+  if (!pv && !singular && !se->in_check && is_valid(eval)) {
 
     /********************************\
     |        Futility Pruning        |
@@ -176,7 +183,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     // 2. Static eval indicates the move is going to fail high.
     // 3. We prove that it will fail high even if we do nothing(null move) using a reduced search.
 
-    if (can_nmp<Us>(se, depth, eval, beta)) {
+    if (can_nmp(se, depth, eval, beta)) {
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
@@ -214,10 +221,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   MovePicker<Us> mp{board_, mo_stats(se), tt_move, depth};
 
   while ((move = mp.next())) {
+
+    if (move == se->excl) continue;
+
     move_count++;
 
-    const bool  is_cap    = MoveUtils::is_capture(move);
-    const Depth new_depth = depth - 1;
+    const bool is_cap = MoveUtils::is_capture(move);
 
     if (!pv && !se->in_check) {
 
@@ -235,6 +244,37 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       // Near leaf nodes, we can safely (hopefully!) prune moves that lose in terms of exchanges
       if (mp.stage() > GOOD_CAP && can_see_prune(depth, move, best)) continue;
     }
+
+    /********************************\
+    |       Singular Extensions      |
+    \********************************/
+
+    // Extend the search when the tt move seems to beat the other moves by a significant margin.
+
+    Depth new_depth = depth - 1;
+    Depth ext       = 0;
+
+    if (!root && move == tt_move && !singular
+        && can_singular(depth, tt_depth, tt_bound, tt_value)) {
+      Eval r_beta = std::max(tt_value - 2 * depth, -EvalMate);
+
+      se->excl = tt_move;
+      Eval val = negamax<Us, NonPV>(se, r_beta - 1, r_beta, (depth - 1) / 2, cutnode);
+      se->excl = NoMove;
+
+      if (val < r_beta - 20) // Double extend if singular move is way better than other moves
+        ext = 2;
+      else if (val < r_beta) // Single extend if singular move is better than other moves
+        ext = 1;
+      else if (val >= beta && !is_terminal(val)) // Multi cut pruning. Same as beta cutoff
+        return val;
+      else if (tt_value >= beta) // Move is probably too good to be true
+        ext = -1;
+      else if (tt_value <= alpha) // Move is probably going to fail low.
+        ext = -1;
+    }
+
+    new_depth += ext;
 
     do_move<Us>(se, move);
 
@@ -303,7 +343,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |         Mate Detection         |
   \********************************/
 
-  if (move_count == 0) best = se->in_check ? EvalUtils::mated_in(se->ply) : EvalDraw;
+  if (move_count == 0)
+    best = singular ? alpha : se->in_check ? EvalUtils::mated_in(se->ply) : EvalDraw;
 
   /********************************\
   |            TT write            |
@@ -311,12 +352,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   // If we fail high, we have a lower bound for how good this pos is.
   // If we are in PV and we have a best move, then we have an exact bound.
-
-  tt_entry.write(board_.key(), tt_.age(), depth, se->ply,
-                 best >= beta        ? TTBound::Lower
-                 : (pv && best_move) ? TTBound::Exact
-                                     : TTBound::Upper,
-                 best_move, 0, best);
+  if (!singular)
+    tt_entry.write(board_.key(), tt_.age(), depth, se->ply,
+                   best >= beta        ? TTBound::Lower
+                   : (pv && best_move) ? TTBound::Exact
+                                       : TTBound::Upper,
+                   best_move, 0, best);
 
   return best;
 }

@@ -286,4 +286,6 @@ void Board::update_reps() const {
 
 bool Board::in_check() const { return undo_->check_mask != FullBB; }
 
+bool Board::has_non_pawn_material(Colour us) const { return bb(us) ^ bb(us, P); }
+
 } // namespace Lyra

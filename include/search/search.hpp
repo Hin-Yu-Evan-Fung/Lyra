@@ -34,11 +34,12 @@ class Worker {
   template <Colour Us> void do_null_move(StackEntry *se);
   template <Colour Us> void undo_null_move(StackEntry *se);
 
-  constexpr bool                      can_fp(Depth depth, Eval eval, Eval beta);
-  constexpr bool                      can_lmp(Depth depth, U16 move_count);
-  constexpr bool                      can_see_prune(Depth depth, Move move, Eval best);
-  constexpr bool                      can_lmr(Depth depth, U16 move_count, bool pv, Move move);
-  template <Colour Us> constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
+  constexpr bool can_fp(Depth depth, Eval eval, Eval beta);
+  constexpr bool can_lmp(Depth depth, U16 move_count);
+  constexpr bool can_see_prune(Depth depth, Move move, Eval best);
+  constexpr bool can_lmr(Depth depth, U16 move_count, bool pv, Move move);
+  constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
+  constexpr bool can_singular(Depth depth, Depth tt_depth, TTBound tt_bound, Eval tt_value);
 
   MOStats mo_stats(StackEntry *se);
   void    update_cont(const Board &board, StackEntry *se, Move move, Eval bonus);
@@ -134,10 +135,14 @@ constexpr bool Worker::can_lmr(Depth depth, U16 move_count, bool pv, Move move) 
   return depth >= 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move);
 }
 
-template <Colour Us>
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
   return depth >= 2 && se->ply_from_null > 0 && eval >= beta && beta >= -EvalMateBound
-         && board_.has_non_pawn_material<Us>();
+         && board_.has_non_pawn_material(board_.stm());
+}
+
+constexpr bool Worker::can_singular(Depth depth, Depth tt_depth, TTBound tt_bound, Eval tt_value) {
+  return depth >= 8 && tt_depth >= depth - 3 && (tt_bound & TTBound::Lower)
+         && !is_terminal(tt_value);
 }
 
 } // namespace Lyra

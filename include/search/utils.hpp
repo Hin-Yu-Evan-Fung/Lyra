@@ -24,6 +24,7 @@ struct StackEntry {
   ContHist *cont;
   PVLine    pv;
   Move      move;
+  Move      excl;
   Ply       ply;
   Ply       ply_from_null;
   bool      in_check;

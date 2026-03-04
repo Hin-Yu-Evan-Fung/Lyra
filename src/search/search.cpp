@@ -187,10 +187,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
-      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r, false);
+      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r, !cutnode);
       undo_null_move<Us>(se);
 
-      if (val >= beta) return val;
+      if (val >= beta) return is_terminal(val) ? beta : val;
     }
   }
 
@@ -408,7 +408,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   while ((move = mp.next())) {
     move_count++;
 
-    if (!pv && !EvalUtils::is_terminal(best)) {
+    if (!EvalUtils::is_terminal(best)) {
 
       /********************************\
       |           SEE Pruning          |
@@ -416,7 +416,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
       // Ignore moves with a bad see score,
       // since they are likely to lead to bad positions.
-      if (!board_.see(move, -80)) continue;
+      if (!board_.see(move, -30)) continue;
     }
 
     do_move<Us>(se, move);

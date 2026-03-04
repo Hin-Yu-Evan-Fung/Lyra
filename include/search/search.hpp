@@ -123,12 +123,12 @@ constexpr bool Worker::can_fp(Depth depth, Eval eval, Eval beta) {
 }
 
 constexpr bool Worker::can_lmp(Depth depth, U16 move_count) {
-  return depth <= 8 && move_count >= 5 + depth * depth;
+  return depth <= 8 && move_count >= 3 + depth * depth;
 }
 
 constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) {
   return !EvalUtils::is_terminal(best) && depth <= 10
-         && !board_.see(move, MoveUtils::is_capture(move) ? -70 * depth : -20 * depth * depth);
+         && !board_.see(move, !MoveUtils::is_capture(move) ? -70 * depth : -20 * depth * depth);
 }
 
 constexpr bool Worker::can_lmr(Depth depth, U16 move_count, bool pv, Move move) {

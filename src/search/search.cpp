@@ -175,6 +175,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (can_fp(depth, eval, beta)) return eval;
 
     /********************************\
+    |            Razoring            |
+    \********************************/
+
+    if (alpha < 2000 && eval < alpha - 500 - 300 * depth * depth) {
+      Eval val = qsearch<Us, NonPV>(se, alpha, beta);
+      if (val <= alpha) return val;
+    }
+
+    /********************************\
     |        Null Move Pruning       |
     \********************************/
 

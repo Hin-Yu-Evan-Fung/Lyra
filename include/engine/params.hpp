@@ -35,8 +35,12 @@ constexpr Depth AspWinDepth = 5;
 constexpr Eval  AspWinDelta = 15;
 
 // Main search constants
-constexpr U16  HistBufSize              = 32;
-constexpr Eval SeePieceVals[NPieceType] = {170, 440, 460, 710, 1320, 0};
+constexpr U16   HistBufSize              = 32;
+constexpr Depth RFPDepth                 = 8;
+constexpr Eval  RFPFactor                = 100;
+constexpr Eval  RazorConstFactor         = 500;
+constexpr Eval  RazorQuadFactor          = 300;
+constexpr Eval  SeePieceVals[NPieceType] = {170, 440, 460, 710, 1320, 0};
 
 // Eval constants
 constexpr Eval EvalInf       = 30000;

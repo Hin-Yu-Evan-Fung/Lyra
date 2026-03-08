@@ -43,7 +43,11 @@ struct PackedTTEntry {
   std::atomic_uint64_t key;
   std::atomic_uint64_t data;
 
-  constexpr bool is_valid(Key pos_key) const { return (pos_key ^ key) == data; }
+  constexpr bool is_valid(Key pos_key) const {
+    const Key k = key.load(std::memory_order_relaxed);
+    const U64 d = data.load(std::memory_order_relaxed);
+    return pos_key == (k ^ d);
+  }
   constexpr void clear();
 
   TTEntry read(Ply ply) const;
@@ -56,10 +60,10 @@ private:
 
 class TT {
   PackedTTEntry *table_ = nullptr;
-  U64            hash_mask_;
+  U64            n_entries_;
   U8             age_;
 
-  size_t index(Key key) const { return key & hash_mask_; }
+  size_t index(Key key) const { return (U128(key) * U128(n_entries_)) >> 64; }
 
 public:
   TT(size_t mb);
@@ -71,7 +75,7 @@ public:
 
   void   resize(size_t mb);
   void   clear();
-  size_t size() const { return hash_mask_ + 1; }
+  size_t size() const { return n_entries_; }
   size_t hashfull() const;
 
   std::pair<bool, PackedTTEntry &> probe(Key key);

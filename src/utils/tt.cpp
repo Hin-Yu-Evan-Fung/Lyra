@@ -38,7 +38,7 @@ TTEntry PackedTTEntry::read(Ply ply) const {
       Depth((d & DepthMask) >> 7),
       TTBound((d & BoundMask) >> 14),
       Move((d & MoveMask) >> 16),
-      EvalUtils::from_TT(I16((d & EvalMask) >> 32), ply),
+      I16((d & EvalMask) >> 32),
       EvalUtils::from_TT(I16((d & ValueMask) >> 48), ply),
   };
 }
@@ -62,8 +62,7 @@ void PackedTTEntry::write(Key pos_key, U8 age, Depth depth, Ply ply, TTBound bou
   if (!(age != old.age || pos_key != old.key || bound == Exact || depth > old.depth)) return;
 
   const Move new_move = move || pos_key != old.key ? move : old.move;
-  save({pos_key, age, depth, bound, new_move, EvalUtils::to_TT(eval, ply),
-        EvalUtils::to_TT(value, ply)});
+  save({pos_key, age, depth, bound, new_move, eval, EvalUtils::to_TT(value, ply)});
 }
 
 /******************************************\
@@ -87,7 +86,7 @@ void TT::resize(size_t mb) {
   const size_t     n_entries  = (mb << 20) / entry_size;
 
   table_     = new PackedTTEntry[n_entries];
-  hash_mask_ = n_entries - 1;
+  n_entries_ = n_entries;
 
   if (table_ == nullptr) throw std::bad_alloc();
 }

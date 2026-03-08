@@ -17,10 +17,6 @@ enum MovePickStage {
   QUIET,
   BAD_CAP,
 
-  EVASION_TT,
-  EVASION_INIT,
-  EVASION,
-
   QSEARCH_TT,
   INIT_QCAP,
   QCAP,
@@ -45,7 +41,7 @@ public:
   void skip_quiet() { skip_quiet_ = true; }
 
 private:
-  void gen_score_cap(bool skip_see);
+  void gen_score_cap();
   void gen_score_quiet();
   void gen_score_evasion();
   Eval score_quiet(Move move);

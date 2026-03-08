@@ -379,6 +379,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
 
   if (clock_.stop(nodes_)) return EvalStop;
+  if (board_.is_draw(se->ply)) return EvalDraw;
+  if (se->ply >= MaxDepth) return se->in_check ? EvalDraw : board_.eval();
 
   // ** TT lookup ** //
   auto [tt_hit, tt_entry] = tt_.probe(board_.key());
@@ -452,12 +454,6 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       }
     }
   }
-
-  /********************************\
-    |         Mate Detection         |
-    \********************************/
-
-  if (move_count == 0 && se->in_check) best = EvalUtils::mated_in(se->ply);
 
   /********************************\
   |            TT write            |

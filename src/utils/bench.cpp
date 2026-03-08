@@ -84,7 +84,7 @@ void run_bench(int argc, char **argv) {
   std::atomic_bool stop;
 
   Board       board;
-  TT          tt{TT_SIZE};
+  TT          tt{TTSize};
   Worker      worker{stop, 0, tt};
   TimeControl tc;
 

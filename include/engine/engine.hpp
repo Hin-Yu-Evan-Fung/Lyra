@@ -18,15 +18,6 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-constexpr std::string_view NAME    = "Lyra";
-constexpr std::string_view AUTHOR  = "Evan Fung";
-constexpr std::string_view VERSION = "1.0";
-
-constexpr size_t TT_SIZE       = 32;
-constexpr size_t THREADS       = 1;
-constexpr int    MOVE_OVERHEAD = 300;
-constexpr U64    CLOCK_FREQ    = 2048;
-
 class Engine {
 public:
   Engine();

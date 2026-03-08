@@ -280,8 +280,6 @@ bool Board::see(Move move, Eval lower_bound) const {
   using namespace MoveUtils;
   using namespace BBUtils;
 
-  constexpr Eval PIECE_VALS[NPieceType] = {150, 340, 360, 480, 1000, 0};
-
   const Square    src       = MoveUtils::src(move);
   const Square    dst       = MoveUtils::dst(move);
   const MoveFlag  flag      = MoveUtils::flag(move);
@@ -295,13 +293,13 @@ bool Board::see(Move move, Eval lower_bound) const {
   // Calculate move value
   Eval gain = -lower_bound;
   if (is_castle(move)) return 0 <= gain;
-  if (is_capture(move)) gain += flag == EP ? PIECE_VALS[P] : PIECE_VALS[vic];
-  if (is_promo(move)) gain += PIECE_VALS[promo] - PIECE_VALS[att];
+  if (is_capture(move)) gain += flag == EP ? SeePieceVals[P] : SeePieceVals[vic];
+  if (is_promo(move)) gain += SeePieceVals[promo] - SeePieceVals[att];
 
   // If we are still losing after the capture then, it is a bad move
   if (gain < EvalDraw) return false;
   // Simulate recapture
-  gain -= is_promo(move) ? PIECE_VALS[promo] : PIECE_VALS[att];
+  gain -= is_promo(move) ? SeePieceVals[promo] : SeePieceVals[att];
   // If we are still winning after recapture then, it is a good move
   if (gain >= EvalDraw) return true;
 
@@ -339,7 +337,7 @@ bool Board::see(Move move, Eval lower_bound) const {
     // Switch sides
     stm = ~stm;
     // Speculate the gains after recapture (discourage drawing captures)
-    gain = -PIECE_VALS[lva_pt] - gain - 1;
+    gain = -SeePieceVals[lva_pt] - gain - 1;
 
     if (gain >= EvalDraw) {
       // If we capture with the king but the opponent can recapture, then they

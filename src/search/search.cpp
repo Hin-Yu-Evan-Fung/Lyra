@@ -29,10 +29,7 @@ void Worker::start(TimeControl tc) {
   }
 
   while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
-    if (stm == White)
-      aspwin<White>();
-    else
-      aspwin<Black>();
+    stm == White ? aspwin<White>() : aspwin<Black>();
 
     if (stop_.load(std::memory_order::relaxed)) break;
 
@@ -54,19 +51,19 @@ template <Colour Us> void Worker::aspwin() {
 
   Eval  alpha = -EvalInf;
   Eval  beta  = EvalInf;
-  Eval  delta = 10;
+  Eval  delta = AspWinDelta;
   Depth r     = 0;
 
   // Initial guess of the score, because the score should be stable after depth 3
-  if (depth_ > 5) {
+  if (depth_ > AspWinDepth) {
     alpha = std::max(Eval(eval_ - delta), -EvalInf);
     beta  = std::min(Eval(eval_ + delta), EvalInf);
   }
 
   while (true) {
 
-    Depth reduced = depth_ + 1 - r;
-    Eval  val     = negamax<Us, PV>(se, alpha, beta, reduced, false);
+    Depth r_depth = depth_ + 1 - r;
+    Eval  val     = negamax<Us, PV>(se, alpha, beta, r_depth, false);
 
     if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -83,13 +80,13 @@ template <Colour Us> void Worker::aspwin() {
       r     = 0;
     } else if (val >= beta) {
       beta = std::min(val + delta, EvalInf);
-      if (reduced > 1 && !EvalUtils::is_terminal(val)) r += 1;
+      if (r_depth > 1 && !is_terminal(val)) r += 1;
     } else {
       eval_ = val;
       break;
     }
 
-    delta *= 1.5f;
+    delta += delta / 2;
   }
 
   uci_report(se->pv);
@@ -222,7 +219,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   Move move       = NoMove;
   Move best_move  = NoMove;
 
-  MoveBuf captures(32), quiets(32);
+  MoveBuf captures(HistBufSize), quiets(HistBufSize);
 
   // Clear killer moves
   (se + 1)->killer.clear();
@@ -343,7 +340,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     \********************************/
 
     // Collect all the moves before fail high, and apply maluses to all of them in history
-    if (move != best_move && move_count < 32) (is_cap ? captures : quiets).push_back(move);
+    if (move != best_move && move_count < HistBufSize) (is_cap ? captures : quiets).push_back(move);
   }
 
   if (best >= beta) update_hist(board_, se, captures, quiets, best_move, depth);
@@ -407,9 +404,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   alpha = std::max(alpha, best);
 
   // ** Main QSearch Loop ** //
-  Move move       = NoMove;
-  Move best_move  = NoMove;
-  U16  move_count = 0;
+  Move move      = NoMove;
+  Move best_move = NoMove;
 
   // Clear killer moves
   (se + 1)->killer.clear();
@@ -417,16 +413,14 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   MovePicker<Us> mp{board_, mo_stats(se), tt_move};
 
   while ((move = mp.next())) {
-    move_count++;
 
-    if (!EvalUtils::is_terminal(best)) {
+    if (!is_terminal(best)) {
 
       /********************************\
       |           SEE Pruning          |
       \********************************/
 
-      // Ignore moves with a bad see score,
-      // since they are likely to lead to bad positions.
+      // Ignore moves that lose material. Usually not worth considering
       if (!board_.see(move, -30)) continue;
     }
 

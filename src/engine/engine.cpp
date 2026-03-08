@@ -9,8 +9,8 @@
 namespace Lyra {
 
 Engine::Engine()
-    : pool_(THREADS, tt_)
-    , tt_(TT_SIZE) {}
+    : pool_(NThreads, tt_)
+    , tt_(TTSize) {}
 
 /******************************************\
 |==========================================|

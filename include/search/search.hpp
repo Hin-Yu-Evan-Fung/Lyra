@@ -4,6 +4,7 @@
 #include "core/defs.hpp"
 #include "core/move.hpp"
 #include "engine/clock.hpp"
+#include "engine/params.hpp"
 #include "search/movepick.hpp"
 #include "search/utils.hpp"
 #include "utils/bench.hpp"
@@ -127,8 +128,8 @@ constexpr bool Worker::can_lmp(Depth depth, U16 move_count) {
 }
 
 constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) {
-  return !EvalUtils::is_terminal(best) && depth <= 10
-         && !board_.see(move, !MoveUtils::is_capture(move) ? -70 * depth : -20 * depth * depth);
+  return !is_terminal(best) && depth <= 10
+         && !board_.see(move, is_capture(move) ? -20 * depth * depth : -70 * depth);
 }
 
 constexpr bool Worker::can_lmr(Depth depth, U16 move_count, bool pv, Move move) {

@@ -162,20 +162,22 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |             Pruning            |
   \********************************/
 
-  if (!pv && !singular && !se->in_check && is_valid(eval)) {
+  if (!pv && !singular && !se->in_check) {
 
     /********************************\
     |        Futility Pruning        |
     \********************************/
 
-    // Near a leaf node, prune all moves that are too good to be true.
-    if (can_fp(depth, eval, beta)) return eval;
+    // If a move near the leaf nodes is far too good to be true, prune it.
+    if (can_rfp(depth, eval, beta)) return eval;
 
     /********************************\
     |            Razoring            |
     \********************************/
 
-    if (alpha < 2000 && eval < alpha - 500 - 300 * depth * depth) {
+    // Assume that a very bad position can only be saved by captures.
+    // If a qsearch does not save the score, prune it.
+    if (can_razor(depth, eval, alpha)) {
       Eval val = qsearch<Us, NonPV>(se, alpha, beta);
       if (val <= alpha) return val;
     }

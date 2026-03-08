@@ -35,7 +35,8 @@ class Worker {
   template <Colour Us> void do_null_move(StackEntry *se);
   template <Colour Us> void undo_null_move(StackEntry *se);
 
-  constexpr bool can_fp(Depth depth, Eval eval, Eval beta);
+  constexpr bool can_rfp(Depth depth, Eval eval, Eval beta);
+  constexpr bool can_razor(Depth depth, Eval eval, Eval alpha);
   constexpr bool can_lmp(Depth depth, U16 move_count);
   constexpr bool can_see_prune(Depth depth, Move move, Eval best);
   constexpr bool can_lmr(Depth depth, U16 move_count, bool pv, Move move);
@@ -119,8 +120,12 @@ template <Colour Us> void Worker::undo_null_move(StackEntry *se) {
 |==========================================|
 \******************************************/
 
-constexpr bool Worker::can_fp(Depth depth, Eval eval, Eval beta) {
-  return depth <= 8 && eval - 100 * depth >= beta;
+constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) {
+  return !is_win(eval) && !is_loss(beta) && depth <= RFPDepth && eval - RFPFactor * depth >= beta;
+}
+
+constexpr bool Worker::can_razor(Depth depth, Eval eval, Eval alpha) {
+  return !is_win(alpha) && eval < alpha - RazorConstFactor - RazorQuadFactor * depth * depth;
 }
 
 constexpr bool Worker::can_lmp(Depth depth, U16 move_count) {
@@ -137,7 +142,7 @@ constexpr bool Worker::can_lmr(Depth depth, U16 move_count, bool pv, Move move) 
 }
 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
-  return depth >= 2 && se->ply_from_null > 0 && eval >= beta && beta >= -EvalMateBound
+  return depth >= 2 && se->ply_from_null > 0 && eval >= beta && !is_loss(beta)
          && board_.has_non_pawn_material(board_.stm());
 }
 

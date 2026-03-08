@@ -74,7 +74,10 @@ namespace EvalUtils {
 
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
-constexpr bool is_terminal(Eval v) { return v <= -EvalMateBound && v >= EvalMateBound; }
+
+constexpr Eval is_loss(Eval v) { return v <= -EvalMateBound; }
+constexpr Eval is_win(Eval v) { return v >= EvalMateBound; }
+constexpr bool is_terminal(Eval v) { return is_win(v) || is_loss(v); }
 constexpr bool is_valid(Eval v) { return std::abs(v) < EvalInf; }
 
 // Remove the mate score's dependency on ply from root, as the same position can

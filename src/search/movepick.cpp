@@ -35,13 +35,8 @@ MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_mov
     , tt_move_(tt_move)
     , depth_(0)
     , skip_quiet_(false) {
-
-  if (board_.in_check())
-    stage_ = EVASION_TT;
-  else {
-    stage_ = QSEARCH_TT;
-    if (!MoveUtils::is_capture(tt_move)) tt_move = NoMove;
-  }
+  stage_ = QSEARCH_TT;
+  if (!is_capture(tt_move_)) tt_move_ = NoMove;
 }
 
 /******************************************\
@@ -96,13 +91,13 @@ template <Colour Us> Eval MovePicker<Us>::score_quiet(Move move) {
 |==========================================|
 \******************************************/
 
-template <Colour Us> void MovePicker<Us>::gen_score_cap(bool skip_see) {
+template <Colour Us> void MovePicker<Us>::gen_score_cap() {
   start_ptr_ = 0;
   end_ptr_   = MaxMoves - 1;
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
-    if (skip_see || board_.see(move, EvalDraw)) {
+    if (stage_ == INIT_QCAP || board_.see(move, EvalDraw)) {
       moves_[start_ptr_]    = move;
       scores_[start_ptr_++] = score_cap(move);
     } else {
@@ -123,20 +118,6 @@ template <Colour Us> void MovePicker<Us>::gen_score_quiet() {
   });
 }
 
-template <Colour Us> void MovePicker<Us>::gen_score_evasion() {
-  start_ptr_ = 0;
-  enum_moves<Us, GenAll>(board_, [&](Move move) {
-    if (move == tt_move_) return;
-
-    moves_[start_ptr_] = move;
-
-    if (MoveUtils::is_capture(move))
-      scores_[start_ptr_++] = score_cap(move);
-    else
-      scores_[start_ptr_++] = score_quiet(move);
-  });
-}
-
 /******************************************\
 |==========================================|
 |            Next Move Function            |
@@ -149,48 +130,40 @@ template <Colour Us> Move MovePicker<Us>::next() {
   switch (stage_) {
   case MAIN_TT:
   case QSEARCH_TT:
-  case EVASION_TT:
     ++stage_;
     if (tt_move_) return tt_move_;
-    [[fallthrough]];
+    return next();
   case INIT_CAP:
   case INIT_QCAP:
-    gen_score_cap(stage_ == INIT_QCAP);
+    gen_score_cap();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case GOOD_CAP:
     if (peek_front()) return pop_front();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case KILLER_1:
     ++stage_;
     killer = killer_.moves[0];
     if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
-    [[fallthrough]];
+    return next();
   case KILLER_2:
     ++stage_;
     killer = killer_.moves[1];
     if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
-    [[fallthrough]];
+    return next();
   case INIT_QUIET:
     if (!skip_quiet_) gen_score_quiet();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case QUIET:
     if (!skip_quiet_ && peek_front()) return pop_front();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case BAD_CAP:
     if (peek_back()) return pop_back();
     return NoMove;
   case QCAP:
-    if (peek_front()) return pop_front();
-    return NoMove;
-  case EVASION_INIT:
-    gen_score_evasion();
-    ++stage_;
-    [[fallthrough]];
-  case EVASION:
     if (peek_front()) return pop_front();
     return NoMove;
   };

@@ -15,28 +15,34 @@ namespace Lyra {
 template <Colour Us>
 MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move, Depth depth)
     : board_(board)
-    , killer_(stats.killer)
     , ht_(stats.ht)
     , cap_ht_(stats.cap_ht)
     , cont_hb_(stats.cont_hb)
+    , killer0_(stats.killer.moves[0])
+    , killer1_(stats.killer.moves[1])
     , tt_move_(tt_move)
     , depth_(depth)
     , skip_quiet_(false) {
-  stage_ = MAIN_TT;
+  stage_ = MAIN_TT + (tt_move_ == NoMove);
+
+  if (killer0_ == tt_move_ || is_capture(killer0_) || !board.is_legal<Us>(killer0_))
+    killer0_ = NoMove;
+  if (killer1_ == tt_move_ || is_capture(killer1_) || !board.is_legal<Us>(killer1_))
+    killer1_ = NoMove;
 }
 
 template <Colour Us>
 MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move)
     : board_(board)
-    , killer_(stats.killer)
     , ht_(stats.ht)
     , cap_ht_(stats.cap_ht)
     , cont_hb_(stats.cont_hb)
+    , killer0_(stats.killer.moves[0])
+    , killer1_(stats.killer.moves[1])
     , tt_move_(tt_move)
     , depth_(0)
     , skip_quiet_(false) {
-  stage_ = QSEARCH_TT;
-  if (!is_capture(tt_move_)) tt_move_ = NoMove;
+  stage_ = QSEARCH_TT + (tt_move_ == NoMove || !is_capture(tt_move_));
 }
 
 /******************************************\
@@ -111,7 +117,7 @@ template <Colour Us> void MovePicker<Us>::gen_score_quiet() {
   start_ptr_ = 0;
 
   enum_moves<Us, GenQuiet>(board_, [&](Move move) {
-    if (move == tt_move_ || move == killer_.moves[0] || move == killer_.moves[1]) return;
+    if (move == tt_move_ || move == killer0_ || move == killer1_) return;
 
     moves_[start_ptr_]    = move;
     scores_[start_ptr_++] = score_quiet(move);
@@ -125,8 +131,6 @@ template <Colour Us> void MovePicker<Us>::gen_score_quiet() {
 \******************************************/
 
 template <Colour Us> Move MovePicker<Us>::next() {
-  Move killer;
-
   switch (stage_) {
   case MAIN_TT:
   case QSEARCH_TT:
@@ -144,13 +148,11 @@ template <Colour Us> Move MovePicker<Us>::next() {
     return next();
   case KILLER_1:
     ++stage_;
-    killer = killer_.moves[0];
-    if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
+    if (killer0_) return killer0_;
     return next();
   case KILLER_2:
     ++stage_;
-    killer = killer_.moves[1];
-    if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
+    if (killer1_) return killer1_;
     return next();
   case INIT_QUIET:
     if (!skip_quiet_) gen_score_quiet();

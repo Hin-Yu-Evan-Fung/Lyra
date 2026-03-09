@@ -43,6 +43,8 @@ void UCI::loop() {
       parse_pos(is);
     else if (token == "b")
       engine_.print_pos();
+    else if (token == "eval")
+      engine_.print_eval();
     else if (token == "setoption")
       parse_option(is);
     else if (token == "perft")

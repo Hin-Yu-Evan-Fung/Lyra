@@ -83,7 +83,6 @@ class Board {
   template <Colour Us> constexpr bool               can_ep(Square ep);
 
   // Functions that compute from scratch
-  Eval                  compute_raw_eval() const;
   Key                   compute_key() const;
   Key                   compute_pawn_key() const;
   std::pair<Score, int> compute_psq() const; // (PSQT score, Game Phase)
@@ -134,6 +133,7 @@ public:
   constexpr CastleMask  castle_mask() const;
   constexpr Key         key() const;
   Eval                  eval() const;
+  Eval                  compute_raw_eval() const;
 
   // Movegen Helpers
   template <Colour Us, bool QueenSide> constexpr bool can_castle() const;

@@ -59,10 +59,11 @@ private:
   Eval scores_[MaxMoves];
 
   const Board      &board_;
-  const Killer     &killer_;
   const MainHist   &ht_;
   const CapHist    &cap_ht_;
   const ContHistBuf cont_hb_;
+  Move              killer0_;
+  Move              killer1_;
   Move              tt_move_;
   Depth             depth_;
 

@@ -79,8 +79,8 @@ constexpr Score BONUS[NPieceType][NSquare] = {
 void init() {
   for (PieceType pt = P; pt <= K; ++pt) {
     for (Square sq = A1; sq <= H8; ++sq) {
-      PSQT[make_piece(White, pt)][sq]            = BONUS[pt][sq] + PIECE_VALS[pt];
-      PSQT[make_piece(Black, pt)][flip_rank(sq)] = -PSQT[make_piece(White, pt)][sq];
+      PSQT[make_piece(White, pt)][sq] = BONUS[pt][sq] + PIECE_VALS[pt];
+      PSQT[make_piece(Black, pt)][sq] = -BONUS[pt][flip_rank(sq)] - PIECE_VALS[pt];
     }
   }
 }

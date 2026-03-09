@@ -125,7 +125,8 @@ constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) {
 }
 
 constexpr bool Worker::can_razor(Depth depth, Eval eval, Eval alpha) {
-  return !is_win(alpha) && eval < alpha - RazorConstFactor - RazorQuadFactor * depth * depth;
+  return !is_win(alpha) && !is_loss(eval)
+         && eval < alpha - RazorConstFactor - RazorQuadFactor * depth * depth;
 }
 
 constexpr bool Worker::can_lmp(Depth depth, U16 move_count) {
@@ -142,7 +143,7 @@ constexpr bool Worker::can_lmr(Depth depth, U16 move_count, bool pv, Move move) 
 }
 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
-  return depth >= 2 && se->ply_from_null > 0 && eval >= beta && !is_loss(beta)
+  return depth >= 2 && se->ply_from_null > 0 && eval >= beta && !is_win(eval) && !is_loss(beta)
          && board_.has_non_pawn_material(board_.stm());
 }
 

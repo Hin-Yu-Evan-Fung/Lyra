@@ -127,7 +127,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   if (se->ply) {
     if (clock_.stop(nodes_)) return EvalStop;
     if (board_.is_draw(se->ply)) return EvalDraw;
-    if (se->ply >= MaxDepth) return se->in_check ? EvalDraw : board_.eval();
+    if (se->ply >= MaxDepth - 1) return se->in_check ? EvalDraw : board_.eval();
 
     alpha = std::max(alpha, mated_in(se->ply));
     beta  = std::min(beta, mate_in(se->ply + 1));
@@ -198,7 +198,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r, !cutnode);
       undo_null_move<Us>(se);
 
-      if (val >= beta) return is_terminal(val) ? beta : val;
+      if (val >= beta) return is_win(val) ? beta : val;
     }
   }
 
@@ -262,7 +262,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     Depth new_depth = depth - 1;
     Depth ext       = 0;
 
-    if (!root && move == tt_move && !singular
+    if (!root && move == tt_move && !singular && se->ply < 2 * depth_
         && can_singular(depth, tt_depth, tt_bound, tt_value)) {
       Eval r_beta = std::max(tt_value - 2 * depth, -EvalMate);
 
@@ -379,7 +379,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   if (clock_.stop(nodes_)) return EvalStop;
   if (board_.is_draw(se->ply)) return EvalDraw;
-  if (se->ply >= MaxDepth) return se->in_check ? EvalDraw : board_.eval();
+  if (se->ply >= MaxDepth - 1) return se->in_check ? EvalDraw : board_.eval();
 
   // ** TT lookup ** //
   auto [tt_hit, tt_entry] = tt_.probe(board_.key());

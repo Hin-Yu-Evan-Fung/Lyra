@@ -5,6 +5,7 @@
 #include "utils/perft.hpp"
 
 #include <atomic>
+#include <print>
 
 namespace Lyra {
 
@@ -17,6 +18,11 @@ Engine::Engine()
 |                 Methods                  |
 |==========================================|
 \******************************************/
+
+void Engine::print_eval() {
+  std::println("Incremental Eval: {}", board_.eval());
+  std::println("Raw Eval: {}", board_.compute_raw_eval());
+}
 
 void Engine::newgame() {
   if (!is_busy()) {

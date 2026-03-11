@@ -212,6 +212,39 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   if ((pv || cutnode) && depth >= 6 && !tt_move) depth--;
 
   /********************************\
+  |            Prob Cut            |
+  \********************************/
+
+  // If a position looks like its going to fail high after a qsearch, search it to a lower depth to
+  // prove it. If it actually fails high, cut it off.
+  const Eval r_beta = beta + 250;
+
+  if (!pv && depth >= 5 && !is_terminal(beta) && !(tt_depth >= depth - 3 && tt_value < r_beta)) {
+    MovePicker<Us> mp{MovePickerType::ProbCut, board_, mo_stats(se), tt_move, depth, r_beta - eval};
+
+    Move move;
+
+    while ((move = mp.next())) {
+
+      if (move == se->excl) continue;
+
+      do_move<Us>(se, move);
+
+      Eval val = -qsearch<~Us, NonPV>(se + 1, -r_beta, -r_beta + 1);
+
+      if (val >= r_beta && depth > 4)
+        val = -negamax<~Us, NonPV>(se + 1, -r_beta, -r_beta + 1, depth - 4, !cutnode);
+
+      undo_move<Us>(se);
+
+      if (val >= r_beta) {
+        tt_entry.write(board_.key(), tt_.age(), depth - 3, se->ply, TTBound::Lower, move, 0, val);
+        if (!is_terminal(val)) return val;
+      }
+    }
+  }
+
+  /********************************\
   |           Main Search          |
   \********************************/
 
@@ -226,7 +259,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   // Clear killer moves
   (se + 1)->killer.clear();
 
-  MovePicker<Us> mp{board_, mo_stats(se), tt_move, depth};
+  MovePicker<Us> mp{MovePickerType::Main, board_, mo_stats(se), tt_move, depth};
 
   while ((move = mp.next())) {
 
@@ -234,7 +267,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
     move_count++;
 
-    const bool is_cap = MoveUtils::is_capture(move);
+    const bool is_cap = is_capture(move);
 
     if (!pv && !se->in_check) {
 
@@ -296,7 +329,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (can_lmr(depth, move_count, pv, move)) {
       Depth r = lmr_reduction(depth, move_count);
 
-      Depth d = std::max(1, std::min(new_depth - r, (int)new_depth));
+      Depth d = std::clamp(new_depth - r, 1, new_depth + 1);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d, true);
 
       // If the later moves could be better, research it with full depth.
@@ -412,7 +445,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   // Clear killer moves
   (se + 1)->killer.clear();
 
-  MovePicker<Us> mp{board_, mo_stats(se), tt_move};
+  MovePicker<Us> mp{MovePickerType::QSearch, board_, mo_stats(se), tt_move, DepthQS};
 
   while ((move = mp.next())) {
 

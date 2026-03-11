@@ -48,7 +48,7 @@ template <bool Div, Colour Us> U64 perft(Board &board, Depth depth) {
 }
 
 template <bool Div, Colour Us> U64 perftmp(Board &board, Depth depth) {
-  MovePicker<Us> mp(board, stats, NoMove, 0);
+  MovePicker<Us> mp(MovePickerType::Main, board, stats, NoMove, 0);
 
   if (!Div && depth <= 1) {
     U64 n = 0;
@@ -84,12 +84,14 @@ void perft(Board &board, Depth depth, PerftMode mode) {
   Time start = now();
   U64  nodes = 0;
 
+  // clang-format off
   if (mode == PerftMode::MP)
     nodes = board.stm() == White ? perftmp<true, White>(board, depth)
                                  : perftmp<true, Black>(board, depth);
   else
-    nodes =
-        board.stm() == White ? perft<true, White>(board, depth) : perft<true, Black>(board, depth);
+    nodes = board.stm() == White ? perft<true, White>(board, depth)
+                                 : perft<true, Black>(board, depth);
+  // clang-format on
 
   Time elapsed = now() - start;
 

@@ -7,6 +7,12 @@
 
 namespace Lyra {
 
+enum class MovePickerType {
+  Main,
+  QSearch,
+  ProbCut,
+};
+
 enum MovePickStage {
   MAIN_TT,
   INIT_CAP,
@@ -20,6 +26,10 @@ enum MovePickStage {
   QSEARCH_TT,
   INIT_QCAP,
   QCAP,
+
+  PROBCUB_TT,
+  INIT_PROBCUT,
+  PROBCUT_CAP,
 };
 
 using ContHistBuf = NDArray<ContHist *, 4>;
@@ -33,8 +43,8 @@ struct MOStats {
 
 template <Colour Us> class MovePicker {
 public:
-  MovePicker(const Board &board, const MOStats &stats, Move tt_move, Depth depth);
-  MovePicker(const Board &board, const MOStats &stats, Move tt_move);
+  MovePicker(MovePickerType type, const Board &board, const MOStats &stats, Move tt_move,
+             Depth depth = DepthQS, Eval threshold = 0);
 
   Move next();
   int  stage() { return stage_; }
@@ -58,6 +68,7 @@ private:
   Move moves_[MaxMoves];
   Eval scores_[MaxMoves];
 
+  MovePickerType    type_;
   const Board      &board_;
   const MainHist   &ht_;
   const CapHist    &cap_ht_;
@@ -66,6 +77,7 @@ private:
   Move              killer1_;
   Move              tt_move_;
   Depth             depth_;
+  Eval              threshold_;
 
   size_t start_ptr_ = 0;
   size_t end_ptr_   = MaxMoves - 1;

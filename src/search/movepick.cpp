@@ -13,8 +13,10 @@
 namespace Lyra {
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move, Depth depth)
-    : board_(board)
+MovePicker<Us>::MovePicker(MovePickerType type, const Board &board, const MOStats &stats,
+                           Move tt_move, Depth depth, Eval threshold)
+    : type_(type)
+    , board_(board)
     , ht_(stats.ht)
     , cap_ht_(stats.cap_ht)
     , cont_hb_(stats.cont_hb)
@@ -22,27 +24,26 @@ MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_mov
     , killer1_(stats.killer.moves[1])
     , tt_move_(tt_move)
     , depth_(depth)
+    , threshold_(threshold)
     , skip_quiet_(false) {
-  stage_ = MAIN_TT + (tt_move_ == NoMove);
+
+  switch (type) {
+  case MovePickerType::Main: // Do not ignore tt move
+    stage_ = MAIN_TT + (tt_move_ == NoMove);
+    break;
+  case MovePickerType::QSearch: // Ignore tt move if not capture
+    stage_ = QSEARCH_TT + (tt_move_ == NoMove || !is_capture(tt_move_));
+    break;
+  case MovePickerType::ProbCut: // Ignore tt move if not good capture
+    stage_ = PROBCUB_TT
+             + (tt_move_ == NoMove || !is_capture(tt_move_) || !board_.see(tt_move_, threshold_));
+    break;
+  }
 
   if (killer0_ == tt_move_ || is_capture(killer0_) || !board.is_legal<Us>(killer0_))
     killer0_ = NoMove;
   if (killer1_ == tt_move_ || is_capture(killer1_) || !board.is_legal<Us>(killer1_))
     killer1_ = NoMove;
-}
-
-template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, const MOStats &stats, Move tt_move)
-    : board_(board)
-    , ht_(stats.ht)
-    , cap_ht_(stats.cap_ht)
-    , cont_hb_(stats.cont_hb)
-    , killer0_(stats.killer.moves[0])
-    , killer1_(stats.killer.moves[1])
-    , tt_move_(tt_move)
-    , depth_(0)
-    , skip_quiet_(false) {
-  stage_ = QSEARCH_TT + (tt_move_ == NoMove || !is_capture(tt_move_));
 }
 
 /******************************************\
@@ -103,7 +104,7 @@ template <Colour Us> void MovePicker<Us>::gen_score_cap() {
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
-    if (stage_ == INIT_QCAP || board_.see(move, EvalDraw)) {
+    if (stage_ == INIT_QCAP || board_.see(move, threshold_)) {
       moves_[start_ptr_]    = move;
       scores_[start_ptr_++] = score_cap(move);
     } else {
@@ -134,11 +135,13 @@ template <Colour Us> Move MovePicker<Us>::next() {
   switch (stage_) {
   case MAIN_TT:
   case QSEARCH_TT:
+  case PROBCUB_TT:
     ++stage_;
     if (tt_move_) return tt_move_;
     return next();
   case INIT_CAP:
   case INIT_QCAP:
+  case INIT_PROBCUT:
     gen_score_cap();
     ++stage_;
     return next();
@@ -165,6 +168,7 @@ template <Colour Us> Move MovePicker<Us>::next() {
   case BAD_CAP:
     if (peek_back()) return pop_back();
     return NoMove;
+  case PROBCUT_CAP:
   case QCAP:
     if (peek_front()) return pop_front();
     return NoMove;
@@ -217,13 +221,14 @@ template <Colour Us> bool Board::is_legal(Move move) const {
 
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
-  // Check if the captured piece is theirs or not (Except for castling where we
-  // can capture our own rook)
+  // Check if the captured piece is theirs or not (Except for castling
+  // where we can capture our own rook)
   const bool invalid_cap = !is_castle && cap != NoPiece && colour_of(cap) == Us;
-  // Check if the squares makes sense (Chess960 allows for src == dst for
-  // castling)
+  // Check if the squares makes sense (Chess960 allows for src == dst
+  // for castling)
   const bool invalid_sq = !is_castle && src == dst;
-  // Check if the capture flag is consistent with a piece being captured
+  // Check if the capture flag is consistent with a piece being
+  // captured
   const bool invalid_cap_flag = !is_castle && !is_ep && is_cap == (cap == NoPiece);
   // Check if the promotion flag is consistent
   const bool invalid_promo_flag = is_promo && pt_of(pc) != P;
@@ -239,22 +244,23 @@ template <Colour Us> bool Board::is_legal(Move move) const {
 
   if (pt == K) return KING_ATK[src] & from(dst) && !(attacked & from(dst));
 
-  // Check if there is a pin and if so check if the movement is aligned to the
-  // king
+  // Check if there is a pin and if so check if the movement is aligned
+  // to the king
   const bool valid_pin =
       !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
 
   if (pt == P) {
-    // Enpassant is illegal if the destination is incorrect, the attack pattern
-    // is wrong, or the move results in check.
+    // Enpassant is illegal if the destination is incorrect, the attack
+    // pattern is wrong, or the move results in check.
     if (is_ep)
       return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
-    // Capture is illegal if the move does not correspond to the attack pattern
+    // Capture is illegal if the move does not correspond to the attack
+    // pattern
     if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
     // Double Push is illegal if there are pieces in the way
     if (is_dp && (BTWN_BB[src][dst] | from(dst)) & occ) return false;
-    // Single Push is illegal if its the wrong pattern and there are pieces in
-    // the way
+    // Single Push is illegal if its the wrong pattern and there are
+    // pieces in the way
     if (is_quiet && (dst != forward<Us>(src) || from(dst) & occ)) return false;
 
     return valid_pin && from(dst) & check_mask;
@@ -338,12 +344,13 @@ bool Board::see(Move move, Eval lower_bound) const {
 
     // Switch sides
     stm = ~stm;
-    // Speculate the gains after recapture (discourage drawing captures)
+    // Speculate the gains after recapture (discourage drawing
+    // captures)
     gain = -SeePieceVals[lva_pt] - gain - 1;
 
     if (gain >= EvalDraw) {
-      // If we capture with the king but the opponent can recapture, then they
-      // win
+      // If we capture with the king but the opponent can recapture,
+      // then they win
       if (lva_pt == K && atks & bb(stm)) return stm == stm_;
       break;
     }

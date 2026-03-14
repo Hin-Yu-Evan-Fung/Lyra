@@ -1,12 +1,12 @@
 #pragma once
 
-#include <atomic>
-
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
 #include "history.hpp"
 #include "tt.hpp"
+
+#include <atomic>
 
 namespace Lyra {
 
@@ -14,18 +14,18 @@ class ThreadPool;
 class Thread;
 
 struct PVLine {
-  Move moves[MaxDepth];
+  Move   moves[MaxDepth];
   size_t length;
 
-  void update(const PVLine &other, Move best);
-  void clear() { length = 0; }
+  void        update(const PVLine &other, Move best);
+  void        clear() { length = 0; }
   std::string format(bool chess960) const;
 };
 
 struct StackEntry {
   Killer killer;
   PVLine pv;
-  U16 ply;
+  U16    ply;
 };
 
 class Worker {
@@ -37,17 +37,17 @@ class Worker {
   template <Colour Us, NodeType NT = Root>
   Eval qsearch(Board &board, StackEntry *ss, Eval alpha, Eval beta);
 
-  Clock clock_;
+  Clock             clock_;
   std::atomic_bool &stop_;
 
-  Board root_;
+  Board  root_;
   size_t id_;
 
   size_t nodes_;
-  Depth depth_;
-  Depth seldepth_;
-  Eval eval_;
-  Move best_move_;
+  Depth  depth_;
+  Depth  seldepth_;
+  Eval   eval_;
+  Move   best_move_;
 
   MainHistory history_;
 
@@ -55,8 +55,13 @@ class Worker {
 
 public:
   Worker(std::atomic_bool &stop, size_t id, TT &tt)
-      : clock_(stop), stop_(stop), id_(id), tt_(tt) {}
-  bool is_main() { return id_ == 0; }
+      : clock_(stop)
+      , stop_(stop)
+      , id_(id)
+      , tt_(tt) {}
+  bool         is_main() { return id_ == 0; }
+  const Clock &clock() { return clock_; }
+  size_t       nodes() { return nodes_; }
 
   void reset(const Board &board);
   void start(TimeControl tc);

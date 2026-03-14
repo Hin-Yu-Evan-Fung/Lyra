@@ -27,19 +27,19 @@ enum MovePickStage {
 
 template <Colour Us>
 class MovePicker {
- public:
-  MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move, Depth depth);
-  MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move);
+public:
+  MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move, Depth depth);
+  MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move);
 
   Move next();
 
-  const Board& board_;
-  Killer*      killer_;
-  MainHistory* history_;
+  const Board &board_;
+  Killer      *killer_;
+  MainHistory *history_;
   Move         tt_move_;
   Depth        depth_;
 
- private:
+private:
   void gen_score_cap();
   void gen_score_quiet();
   void gen_score_evasion();
@@ -62,4 +62,4 @@ class MovePicker {
   int    stage_     = MAIN_TT;
 };
 
-}  // namespace Lyra
+} // namespace Lyra

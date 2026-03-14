@@ -1,6 +1,7 @@
 #include "defs.hpp"
 #include "move.hpp"
 #include "tt.hpp"
+
 #include <gtest/gtest.h>
 
 namespace Lyra {
@@ -21,8 +22,7 @@ TEST(tt, basic_read_write) {
 
 TEST(tt, mate_value) {
   PackedTTEntry entry;
-  entry.write(0x123, 0x1, 5, 5, TTBound::Exact, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Exact, NullMove, EvalMateBound, EvalMate);
 
   TTEntry ttentry = entry.read(5);
 
@@ -37,12 +37,9 @@ TEST(tt, mate_value) {
 TEST(tt, depth_replacement) {
   PackedTTEntry entry;
 
-  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x1, 6, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x1, 6, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   TTEntry ttentry = entry.read(5);
   ASSERT_EQ(ttentry.depth, 6);
@@ -51,12 +48,9 @@ TEST(tt, depth_replacement) {
 TEST(tt, bound_replacement) {
   PackedTTEntry entry;
 
-  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x1, 4, 5, TTBound::Exact, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x1, 4, 5, TTBound::Exact, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   TTEntry ttentry = entry.read(5);
   ASSERT_EQ(ttentry.bound, TTBound::Exact);
@@ -65,12 +59,9 @@ TEST(tt, bound_replacement) {
 TEST(tt, age_replacement) {
   PackedTTEntry entry;
 
-  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x2, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x123, 0x2, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x2, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x123, 0x2, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   TTEntry ttentry = entry.read(5);
   ASSERT_EQ(ttentry.age, 0x2);
@@ -84,12 +75,9 @@ TEST(tt, age_replacement) {
 TEST(tt, key_replacement) {
   PackedTTEntry entry;
 
-  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x12, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
-  entry.write(0x12, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x12, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
+  entry.write(0x12, 0x1, 4, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   TTEntry ttentry = entry.read(5);
   ASSERT_EQ(ttentry.age, 0x1);
@@ -103,8 +91,7 @@ TEST(tt, key_replacement) {
 TEST(tt, validity) {
   PackedTTEntry entry;
 
-  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-              EvalMate);
+  entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   ASSERT_TRUE(entry.is_valid(0x123));
   ASSERT_FALSE(entry.is_valid(0x12));
@@ -115,8 +102,7 @@ TEST(tt, probe) {
 
   auto [tt_hit, tt_entry] = tt.probe(0x123);
 
-  tt_entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound,
-                 EvalMate);
+  tt_entry.write(0x123, 0x1, 5, 5, TTBound::Lower, NullMove, EvalMateBound, EvalMate);
 
   auto [tt_hit_2, tt_entry_2] = tt.probe(0x123);
 

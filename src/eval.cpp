@@ -6,16 +6,10 @@
 namespace Lyra::EvalUtils {
 
 Score PSQT[NPiece][NSquare];
-int   GamePhaseInc[NPieceType]         = {0, 1, 1, 2, 4, 0};
+int   GamePhaseInc[NPieceType] = {0, 1, 1, 2, 4, 0};
 
-constexpr Score PIECE_VALS[NPieceType] = {
-  {82,   94 },
-  {337,  281},
-  {365,  297},
-  {477,  512},
-  {1025, 936},
-  {0,    0  }
-};
+constexpr Score PIECE_VALS[NPieceType] = {{82, 94},   {337, 281},  {365, 297},
+                                          {477, 512}, {1025, 936}, {0, 0}};
 
 // clang-format off
 constexpr Score BONUS[NPieceType][NSquare] = {
@@ -92,4 +86,4 @@ void init() {
   }
 }
 
-}  // namespace Lyra::EvalUtils
+} // namespace Lyra::EvalUtils

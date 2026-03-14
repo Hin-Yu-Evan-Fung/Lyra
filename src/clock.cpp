@@ -1,14 +1,14 @@
 #include "clock.hpp"
 
-#include <atomic>
-#include <print>
-
 #include "defs.hpp"
 #include "engine.hpp"
 
+#include <atomic>
+#include <print>
+
 namespace Lyra {
 
-void Clock::set(Colour stm, const TimeControl& tc) {
+void Clock::set(Colour stm, const TimeControl &tc) {
   if (tc.is_infinite || tc.depth) {
     opt_ = max_ = 0;
     max_depth_  = tc.depth;
@@ -59,4 +59,4 @@ bool Clock::stop(U64 nodes) {
   return stop;
 }
 
-}  // namespace Lyra
+} // namespace Lyra

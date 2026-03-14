@@ -1,11 +1,11 @@
 #include "tt.hpp"
 
+#include "defs.hpp"
+#include "utils.hpp"
+
 #include <atomic>
 #include <cassert>
 #include <new>
-
-#include "defs.hpp"
-#include "utils.hpp"
 
 namespace Lyra {
 
@@ -15,11 +15,11 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-constexpr U64 AgeMask = 0x7FUL;
+constexpr U64 AgeMask   = 0x7FUL;
 constexpr U64 DepthMask = 0x7FUL << 7;
 constexpr U64 BoundMask = 0x3UL << 14;
-constexpr U64 MoveMask = 0xFFFFUL << 16;
-constexpr U64 EvalMask = 0xFFFFUL << 32;
+constexpr U64 MoveMask  = 0xFFFFUL << 16;
+constexpr U64 EvalMask  = 0xFFFFUL << 32;
 constexpr U64 ValueMask = 0xFFFFUL << 48;
 
 constexpr void PackedTTEntry::clear() {
@@ -28,8 +28,8 @@ constexpr void PackedTTEntry::clear() {
 }
 
 TTEntry PackedTTEntry::read(Ply ply) const {
-  U64 k = key.load(std::memory_order_relaxed);
-  U64 d = data.load(std::memory_order_relaxed);
+  U64 k       = key.load(std::memory_order_relaxed);
+  U64 d       = data.load(std::memory_order_relaxed);
   Key pos_key = k ^ d;
 
   return {
@@ -55,13 +55,11 @@ constexpr void PackedTTEntry::save(TTEntry e) {
   data.store(d, std::memory_order_relaxed);
 }
 
-void PackedTTEntry::write(Key pos_key, U8 age, Depth depth, Ply ply,
-                          TTBound bound, Move move, Eval eval, Eval value) {
+void PackedTTEntry::write(Key pos_key, U8 age, Depth depth, Ply ply, TTBound bound, Move move,
+                          Eval eval, Eval value) {
   const TTEntry &old = read(ply);
   // Replace strategy
-  if (!(age != old.age || pos_key != old.key || bound == Exact ||
-        depth > old.depth))
-    return;
+  if (!(age != old.age || pos_key != old.key || bound == Exact || depth > old.depth)) return;
 
   const Move new_move = move || pos_key != old.key ? move : old.move;
   save({pos_key, age, depth, bound, new_move, EvalUtils::to_TT(eval, ply),
@@ -74,28 +72,28 @@ void PackedTTEntry::write(Key pos_key, U8 age, Depth depth, Ply ply,
 |==========================================|
 \******************************************/
 
-TT::TT(size_t mb) : age_(0) { resize(mb); }
+TT::TT(size_t mb)
+    : age_(0) {
+  resize(mb);
+}
 TT::~TT() { delete[] table_; }
 
 void TT::incr_age() { age_ = (age_ + 1) & AgeMask; }
 
 void TT::resize(size_t mb) {
-  if (table_ != nullptr)
-    delete[] table_;
+  if (table_ != nullptr) delete[] table_;
 
   constexpr size_t entry_size = sizeof(PackedTTEntry);
-  const size_t n_entries = (mb << 20) / entry_size;
+  const size_t     n_entries  = (mb << 20) / entry_size;
 
-  table_ = new PackedTTEntry[n_entries];
+  table_     = new PackedTTEntry[n_entries];
   hash_mask_ = n_entries - 1;
 
-  if (table_ == nullptr)
-    throw std::bad_alloc();
+  if (table_ == nullptr) throw std::bad_alloc();
 }
 
 void TT::clear() {
-  for (size_t i = 0; i < size(); i++)
-    table_[i].clear();
+  for (size_t i = 0; i < size(); i++) table_[i].clear();
 }
 
 size_t TT::hashfull() const {

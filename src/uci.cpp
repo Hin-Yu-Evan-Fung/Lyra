@@ -1,12 +1,12 @@
 #include "uci.hpp"
 
+#include "perft.hpp"
+
 #include <ios>
 #include <iostream>
 #include <print>
 #include <sstream>
 #include <string>
-
-#include "perft.hpp"
 
 namespace Lyra {
 
@@ -52,12 +52,12 @@ void UCI::loop() {
 }
 
 void UCI::parse_perft(std::istringstream &is) {
-  std::string token;
-  Depth depth = 0;
-  std::streampos pos = is.tellg();
+  std::string    token;
+  Depth          depth = 0;
+  std::streampos pos   = is.tellg();
 
   if (is >> depth) {
-    engine_.perft<Perft>(depth);
+    engine_.perft(PerftMode::Normal, depth);
     return;
   }
 
@@ -67,10 +67,11 @@ void UCI::parse_perft(std::istringstream &is) {
 
   if (token == "mp") {
     is >> depth;
-    engine_.perft<Perft_MP>(depth);
+    engine_.perft(PerftMode::MovePick, depth);
+  } else if (token == "bench") {
+    perft_bench();
   } else
-    std::println(
-        "Wrong command format! Must be perft [depth], perft mp [depth]!");
+    std::println("Wrong command format! Must be perft [depth], perft mp [depth]!");
 }
 
 void UCI::parse_go(std::istringstream &is) {
@@ -112,8 +113,7 @@ void UCI::parse_pos(std::istringstream &is) {
     fen = start_pos.data();
     is >> token;
   } else if (token == "fen") {
-    while (is >> token && token != "moves")
-      fen += token + " ";
+    while (is >> token && token != "moves") fen += token + " ";
   } else {
     std::println("Wrong command format! Must be 'position startpos [moves] "
                  "<move-1> <move-2> ...' or 'position fen <fen> "
@@ -123,8 +123,7 @@ void UCI::parse_pos(std::istringstream &is) {
 
   std::vector<std::string> moves;
 
-  while (is >> token)
-    moves.push_back(token);
+  while (is >> token) moves.push_back(token);
 
   try {
     engine_.set_pos(fen, moves);
@@ -137,14 +136,11 @@ void UCI::parse_option(std::istringstream &is) {
   std::string token, name, value;
   is >> token;
 
-  if (token != "name")
-    return;
+  if (token != "name") return;
 
-  while (is >> token && token != "value")
-    name += (name.empty() ? "" : " ") + token;
+  while (is >> token && token != "value") name += (name.empty() ? "" : " ") + token;
 
-  while (is >> token)
-    value += (value.empty() ? "" : " ") + token;
+  while (is >> token) value += (value.empty() ? "" : " ") + token;
 
   if (name == "UCI_Chess960") {
     engine_.set_chess960(value == "true");
@@ -152,12 +148,10 @@ void UCI::parse_option(std::istringstream &is) {
     engine_.clear_tt();
   } else if (name == "Threads") {
     size_t n = std::stoi(value);
-    if (n >= 1 && n <= 32)
-      engine_.set_threads(n);
+    if (n >= 1 && n <= 32) engine_.set_threads(n);
   } else if (name == "Hash") {
     size_t mb = std::stoi(value);
-    if (mb >= 1 && mb <= 128)
-      engine_.set_tt_size(mb);
+    if (mb >= 1 && mb <= 128) engine_.set_tt_size(mb);
   }
 }
 

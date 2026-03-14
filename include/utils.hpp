@@ -1,8 +1,9 @@
 #pragma once
 
-#include <chrono>
-
 #include "defs.hpp"
+#include "params.hpp"
+
+#include <chrono>
 
 namespace Lyra {
 /******************************************\
@@ -14,8 +15,7 @@ namespace Lyra {
 template <typename T, size_t A, size_t... B>
 struct NDArray : public std::array<NDArray<T, B...>, A> {};
 
-template <typename T, size_t A>
-struct NDArray<T, A> : public std::array<T, A> {};
+template <typename T, size_t A> struct NDArray<T, A> : public std::array<T, A> {};
 
 /******************************************\
 |==========================================|
@@ -25,7 +25,8 @@ struct NDArray<T, A> : public std::array<T, A> {};
 
 struct PRNG {
 public:
-  PRNG() : PRNG(0x6B51FF299F6A3AEE) {}
+  PRNG()
+      : PRNG(0x6B51FF299F6A3AEE) {}
   PRNG(U64 seed) {
     s0 = seed;
     s1 = seed * 2;
@@ -106,27 +107,19 @@ namespace IOUtils {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
-constexpr char format_file(File f) { return static_cast<char>(f + 'a'); }
-constexpr char format_rank(Rank r) { return static_cast<char>(r + '1'); }
-constexpr char format_piece(Piece pc) { return PIECE_STR.at(pc); }
+constexpr char        format_file(File f) { return static_cast<char>(f + 'a'); }
+constexpr char        format_rank(Rank r) { return static_cast<char>(r + '1'); }
+constexpr char        format_piece(Piece pc) { return PIECE_STR.at(pc); }
 constexpr std::string format_sq(Square sq) {
-  return sq == NoSquare
-             ? "none"
-             : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
+  return sq == NoSquare ? "none" : std::string{format_file(file_of(sq)), format_rank(rank_of(sq))};
 }
 
-constexpr File parse_file(const char c) {
-  return static_cast<File>(std::tolower(c) - 'a');
-}
-constexpr Rank parse_rank(const char c) {
-  return static_cast<Rank>(std::tolower(c) - '1');
-}
+constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
+constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
 constexpr Square parse_sq(const std::string &str) {
   return make_square(parse_file(str[0]), parse_rank(str[1]));
 }
-constexpr Piece parse_piece(const char c) {
-  return static_cast<Piece>(PIECE_STR.find(c));
-}
+constexpr Piece parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
 
 } // namespace IOUtils
 

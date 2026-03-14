@@ -1,27 +1,36 @@
 #include "movepick.hpp"
 
-#include <algorithm>
-#include <iterator>
-
 #include "bitboard.hpp"
 #include "defs.hpp"
 #include "move.hpp"
 #include "movegen.hpp"
 #include "search.hpp"
 
+#include <algorithm>
+#include <iterator>
+
 namespace Lyra {
 
-static constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
+constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move, Depth depth)
-  : board_(board), killer_(killer), history_(history), tt_move_(tt_move), depth_(depth) {
+MovePicker<Us>::MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move,
+                           Depth depth)
+    : board_(board)
+    , killer_(killer)
+    , history_(history)
+    , tt_move_(tt_move)
+    , depth_(depth) {
   stage_ = MAIN_TT;
 }
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board& board, Killer* killer, MainHistory* history, Move tt_move)
-  : board_(board), killer_(killer), history_(history), tt_move_(tt_move), depth_(0) {
+MovePicker<Us>::MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move)
+    : board_(board)
+    , killer_(killer)
+    , history_(history)
+    , tt_move_(tt_move)
+    , depth_(0) {
   if (board_.in_check())
     stage_ = EVASION_TT;
   else
@@ -69,9 +78,9 @@ template <Colour Us>
 Eval MovePicker<Us>::score_cap(Move move) {
   // MVV LVA
   PieceType attacker = pt_of(board_.on(MoveUtils::src(move)));
-  PieceType victim   = pt_of(board_.on(MoveUtils::dst(move)));
+  PieceType victim   = is_ep(move) ? P : pt_of(board_.on(MoveUtils::dst(move)));
 
-  Eval mvv_lva       = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
+  Eval mvv_lva = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
   return mvv_lva;
 }
 
@@ -222,7 +231,7 @@ bool Board::is_legal(Move move) const {
   const Piece     cap       = on(dst);
   const bool      is_castle = MoveUtils::is_castle(move);
   const bool      is_cap    = MoveUtils::is_capture(move);
-  const bool      is_ep     = flag == EP;
+  const bool      is_ep     = MoveUtils::is_ep(move);
   const bool      is_dp     = flag == DoublePush;
   const bool      is_quiet  = flag == Quiet;
 
@@ -236,7 +245,8 @@ bool Board::is_legal(Move move) const {
 
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
-  // Check if the captured piece is theirs or not (Except for castling where we can capture our own rook)
+  // Check if the captured piece is theirs or not (Except for castling where we can capture our own
+  // rook)
   const bool invalid_cap = !is_castle && cap != NoPiece && colour_of(cap) == Us;
   // Check if the squares makes sense (Chess960 allows for src == dst for castling)
   const bool invalid_sq = !is_castle && src == dst;
@@ -254,11 +264,14 @@ bool Board::is_legal(Move move) const {
   if (pt == K) return KING_ATK[src] & from(dst) && !(attacked & from(dst));
 
   // Check if there is a pin and if so check if the movement is aligned to the king
-  const bool valid_pin = !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
+  const bool valid_pin =
+      !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
 
   if (pt == P) {
-    // Enpassant is illegal if the destination is incorrect, the attack pattern is wrong, or the move results in check.
-    if (is_ep) return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
+    // Enpassant is illegal if the destination is incorrect, the attack pattern is wrong, or the
+    // move results in check.
+    if (is_ep)
+      return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
     // Capture is illegal if the move does not correspond to the attack pattern
     if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
     // Double Push is illegal if there are pieces in the way
@@ -282,8 +295,9 @@ template bool Board::is_legal<Black>(Move move) const;
 \******************************************/
 
 inline BB Board::attackers_to(Square to, BB occ) const {
-  return (PAWN_ATK[Black][to] & bb(White, P)) | (PAWN_ATK[White][to] & bb(Black, P)) | (KNIGHT_ATK[to] & bb(N)) |
-         (BISHOP_ATK[to][occ] & bb(B, Q)) | (ROOK_ATK[to][occ] & bb(R, Q)) | (KING_ATK[to] & bb(K));
+  return (PAWN_ATK[Black][to] & bb(White, P)) | (PAWN_ATK[White][to] & bb(Black, P))
+         | (KNIGHT_ATK[to] & bb(N)) | (BISHOP_ATK[to][occ] & bb(B, Q))
+         | (ROOK_ATK[to][occ] & bb(R, Q)) | (KING_ATK[to] & bb(K));
 }
 
 bool Board::see(Move move, Eval lower_bound) const {
@@ -292,20 +306,19 @@ bool Board::see(Move move, Eval lower_bound) const {
 
   constexpr Eval PIECE_VALS[NPieceType] = {150, 340, 360, 480, 1000, 0};
 
-  const Square    src                   = MoveUtils::src(move);
-  const Square    dst                   = MoveUtils::dst(move);
-  const MoveFlag  flag                  = MoveUtils::flag(move);
-  const PieceType promo                 = MoveUtils::promoted_pt(move);
-  const PieceType att                   = pt_of(on(src));
-  const PieceType vic                   = pt_of(on(dst));
-  const Square    ep_target             = stm_ == White ? shift<Direction::N>(dst) : shift<Direction::S>(dst);
-  const BB        diag_sliders          = bb(B, Q);
-  const BB        hv_sliders            = bb(R, Q);
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const PieceType promo     = MoveUtils::promoted_pt(move);
+  const PieceType att       = pt_of(on(src));
+  const PieceType vic       = pt_of(on(dst));
+  const Square    ep_target = stm_ == White ? shift<Direction::N>(dst) : shift<Direction::S>(dst);
+  const BB        diag_sliders = bb(B, Q);
+  const BB        hv_sliders   = bb(R, Q);
 
   // Calculate move value
   Eval gain = -lower_bound;
   if (is_castle(move)) return 0 <= gain;
-  if (is_capture(move)) gain += flag == EP ? PIECE_VALS[P] : PIECE_VALS[vic];
+  if (is_capture(move)) gain += is_ep(move) ? PIECE_VALS[P] : PIECE_VALS[vic];
   if (is_promo(move)) gain += PIECE_VALS[promo] - PIECE_VALS[att];
 
   // If we are still losing after the capture then, it is a bad move
@@ -317,7 +330,7 @@ bool Board::see(Move move, Eval lower_bound) const {
 
   // Simulate the capture
   BB occ = (bb() ^ from(src)) | from(dst);
-  if (flag == EP) occ ^= from(ep_target);
+  if (is_ep(move)) occ ^= from(ep_target);
 
   // Simulate the rest of the exchanges
   Colour    stm  = ~stm_;
@@ -337,8 +350,8 @@ bool Board::see(Move move, Eval lower_bound) const {
     for (const PieceType pt : {P, N, B, R, Q, K}) {
       if (!(b = stm_atks & bb(stm, pt))) continue;
       // Remove attacking piece
-      lva_pt  = pt;
-      occ    ^= from(lsb(b));
+      lva_pt = pt;
+      occ ^= from(lsb(b));
       break;
     }
 
@@ -361,4 +374,4 @@ bool Board::see(Move move, Eval lower_bound) const {
   return stm != stm_;
 }
 
-}  // namespace Lyra
+} // namespace Lyra

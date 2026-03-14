@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
-
 #include "bitboard.hpp"
 #include "zobrist.hpp"
 
+#include <gtest/gtest.h>
+
 using namespace Lyra;
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   BBUtils::init();
   Zobrist::init();

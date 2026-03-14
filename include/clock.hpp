@@ -1,8 +1,8 @@
 #pragma once
 
-#include <atomic>
-
 #include "utils.hpp"
+
+#include <atomic>
 
 namespace Lyra {
 
@@ -16,19 +16,20 @@ struct TimeControl {
 };
 
 class Clock {
- public:
-  Clock(std::atomic_bool& stop) : stop_(stop) {}
+public:
+  Clock(std::atomic_bool &stop)
+      : stop_(stop) {}
 
-  void set(Colour stm, const TimeControl& tc);
-  Time elapsed() { return now() - start_; }
+  void set(Colour stm, const TimeControl &tc);
+  Time elapsed() const { return now() - start_; }
 
   bool stop_iter(Depth depth);
   bool stop(U64 nodes);
 
- private:
+private:
   void calc_time();
 
-  std::atomic_bool& stop_;
+  std::atomic_bool &stop_;
 
   Time start_;
   Time opt_;
@@ -39,4 +40,4 @@ class Clock {
   std::atomic_uint64_t total_nodes;
 };
 
-}  // namespace Lyra
+} // namespace Lyra

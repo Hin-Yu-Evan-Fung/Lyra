@@ -1,9 +1,10 @@
 #pragma once
 
-#include <immintrin.h>
-
 #include "defs.hpp"
 #include "immintrin.h"
+
+#include <immintrin.h>
+#include <stdexcept>
 
 namespace Lyra {
 
@@ -49,9 +50,8 @@ inline int    popcount(BB bb) { return _mm_popcnt_u64(bb); }
 constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>
-constexpr void bitloop(BB bb, Func&& func) {
-  for (; bb; bb &= bb - 1)
-    func(lsb(bb));
+constexpr void bitloop(BB bb, Func &&func) {
+  for (; bb; bb &= bb - 1) func(lsb(bb));
 }
 
 /******************************************\
@@ -87,7 +87,7 @@ constexpr BB shift(BB b) {
 \******************************************/
 
 struct Magic {
-  BB* attacks;
+  BB *attacks;
   BB  mask;
   BB  operator[](BB occ) { return attacks[index(occ)]; }
 #ifdef USE_PEXT
@@ -132,8 +132,10 @@ constexpr BB attack_bb(PieceType att, Square sq, BB occ) {
   }
 }
 
-constexpr bool is_aligned(Square sq1, Square sq2, Square sq3) { return LINE_BB[sq1][sq2] & from(sq3); }
+constexpr bool is_aligned(Square sq1, Square sq2, Square sq3) {
+  return LINE_BB[sq1][sq2] & from(sq3);
+}
 
-}  // namespace BBUtils
+} // namespace BBUtils
 
-}  // namespace Lyra
+} // namespace Lyra

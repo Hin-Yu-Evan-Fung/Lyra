@@ -21,10 +21,16 @@ class Worker {
   template <Colour Us>
   void aspwin();
   template <Colour Us, NodeType NT>
-  Eval search(StackEntry *se, Eval alpha, Eval beta, Depth depth);
+  Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT>
-  Eval    qsearch(StackEntry *se, Eval alpha, Eval beta);
+  Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
+
+  // Helpers
   MOStats mostats(StackEntry *se);
+  template <Colour Us>
+  constexpr void do_move(StackEntry *se, Move move);
+  template <Colour Us>
+  constexpr void undo_move(StackEntry *se);
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -57,5 +63,22 @@ public:
   void uci_report(const PVLine &pv) const;
   void report_best_move() const;
 };
+
+/******************************************\
+|==========================================|
+|            Do Move / Undo Move           |
+|==========================================|
+\******************************************/
+
+template <Colour Us>
+constexpr void Worker::do_move(StackEntry *se, Move move) {
+  ++nodes_;
+  board_.do_move<Us>(move);
+}
+
+template <Colour Us>
+constexpr void Worker::undo_move(StackEntry *se) {
+  board_.undo_move<Us>();
+}
 
 } // namespace Lyra

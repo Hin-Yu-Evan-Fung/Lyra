@@ -4,7 +4,6 @@
 #include "defs.hpp"
 #include "move.hpp"
 #include "movegen.hpp"
-#include "search.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -14,27 +13,27 @@ namespace Lyra {
 constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move,
+MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats mostats, Move tt_move,
                            Depth depth)
     : board_(board)
-    , killer_(killer)
-    , history_(history)
+    , killer_(*mostats.killer)
+    , history_(mostats.hist)
     , tt_move_(tt_move)
     , depth_(depth) {
-  stage_ = MAIN_TT;
-}
 
-template <Colour Us>
-MovePicker<Us>::MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move)
-    : board_(board)
-    , killer_(killer)
-    , history_(history)
-    , tt_move_(tt_move)
-    , depth_(0) {
-  if (board_.in_check())
-    stage_ = EVASION_TT;
-  else
-    stage_ = QSEARCH_TT;
+  switch (type) {
+  case MPType::Main: stage_ = MAIN_TT; break;
+  case MPType::QSearch: stage_ = QSEARCH_TT; break;
+  }
+
+  if (type == MPType::QSearch && !is_capture(tt_move_)) {
+    tt_move_ = NoMove;
+  }
+
+  if (killer_[0] == tt_move_ || is_capture(killer_[0]) || !board.is_legal<Us>(killer_[0]))
+    killer_[0] = NoMove;
+  if (killer_[1] == tt_move_ || is_capture(killer_[1]) || !board.is_legal<Us>(killer_[1]))
+    killer_[1] = NoMove;
 }
 
 /******************************************\
@@ -86,7 +85,8 @@ Eval MovePicker<Us>::score_cap(Move move) {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  return history_->get(board_, move).eval;
+  const PieceFromTo &p = piece_from_to(board_, move);
+  return (*history_)[p.pc][p.to];
 }
 
 /******************************************\
@@ -117,25 +117,10 @@ void MovePicker<Us>::gen_score_quiet() {
   start_ptr_ = 0;
 
   enum_moves<Us, GenQuiet>(board_, [&](Move move) {
-    if (move == tt_move_ || move == killer_->moves[0] || move == killer_->moves[1]) return;
+    if (move == tt_move_ || move == killer_[0] || move == killer_[1]) return;
 
     moves_[start_ptr_]    = move;
     scores_[start_ptr_++] = score_quiet(move);
-  });
-}
-
-template <Colour Us>
-void MovePicker<Us>::gen_score_evasion() {
-  start_ptr_ = 0;
-  enum_moves<Us, GenAll>(board_, [&](Move move) {
-    if (move == tt_move_) return;
-
-    moves_[start_ptr_] = move;
-
-    if (MoveUtils::is_capture(move))
-      scores_[start_ptr_++] = score_cap(move);
-    else
-      scores_[start_ptr_++] = score_quiet(move);
   });
 }
 
@@ -147,53 +132,41 @@ void MovePicker<Us>::gen_score_evasion() {
 
 template <Colour Us>
 Move MovePicker<Us>::next() {
-  Move killer;
-
   switch (stage_) {
   case MAIN_TT:
   case QSEARCH_TT:
-  case EVASION_TT:
     ++stage_;
-    if (board_.is_legal<Us>(tt_move_)) return tt_move_;
-    [[fallthrough]];
+    if (tt_move_) return tt_move_;
+    return next();
   case INIT_CAP:
   case QSEARCH_INIT:
     gen_score_cap();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case GOOD_CAP:
     if (peek_front()) return pop_front();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case KILLER_1:
     ++stage_;
-    killer = killer_->moves[0];
-    if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
-    [[fallthrough]];
+    if (killer_[0]) return killer_[0];
+    return next();
   case KILLER_2:
     ++stage_;
-    killer = killer_->moves[1];
-    if (killer != tt_move_ && board_.is_legal<Us>(killer)) return killer;
-    [[fallthrough]];
+    if (killer_[1]) return killer_[1];
+    return next();
   case INIT_QUIET:
     gen_score_quiet();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case QUIET:
     if (peek_front()) return pop_front();
     ++stage_;
-    [[fallthrough]];
+    return next();
   case BAD_CAP:
     if (peek_back()) return pop_back();
     return NoMove;
   case QSEARCH:
-    if (peek_front()) return pop_front();
-    return NoMove;
-  case EVASION_INIT:
-    gen_score_evasion();
-    ++stage_;
-    [[fallthrough]];
-  case EVASION:
     if (peek_front()) return pop_front();
     return NoMove;
   };

@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_PEXT -Wall -flto -fno-rtti -msse2 -msse3 -msse4 -msse4.1 -mpopcnt -mavx2 -mbmi -mbmi2 -mmmx -funroll-loops -finline -fomit-frame-pointer")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O3 -g -fsanitize=undefined, address")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O3 -g -fsanitize=undefined,address")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -g")
 
 include_directories(include)
@@ -21,9 +21,11 @@ set(
     src/movepick.cpp
     src/clock.cpp
     src/eval.cpp
+    src/history.cpp
     src/perft.cpp
     src/tt.cpp
     src/search.cpp
+    src/search_utils.cpp
     src/engine.cpp
     src/uci.cpp
 )
@@ -39,7 +41,6 @@ FetchContent_Declare(
   GIT_TAG        v1.15.2
 )
 FetchContent_MakeAvailable(googletest) # This line is mandatory to actually load GTest
-
 
 enable_testing()
 

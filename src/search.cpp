@@ -1,6 +1,7 @@
 #include "search.hpp"
 
 #include "defs.hpp"
+#include "history.hpp"
 #include "movepick.hpp"
 #include "tt.hpp"
 #include "utils.hpp"
@@ -8,54 +9,12 @@
 #include <atomic>
 #include <cstdio>
 #include <print>
+#include <stdexcept>
 
 namespace Lyra {
 
-/******************************************\
-|==========================================|
-|                  PVLine                  |
-|==========================================|
-\******************************************/
-
-void PVLine::update(const PVLine &other, Move best) {
-  length   = other.length + 1;
-  moves[0] = best;
-  std::copy_n(other.moves, other.length, &moves[1]);
-}
-
-std::string PVLine::format(bool chess960) const {
-  std::ostringstream os;
-  for (size_t i = 0; i < length; i++) os << MoveUtils::format(moves[i], chess960) << " ";
-  return os.str();
-}
-
-/******************************************\
-|==========================================|
-|              Search Helpers              |
-|==========================================|
-\******************************************/
-
-void Worker::reset(const Board &board) {
-  root_.copy(board);
-  best_move_ = NoMove;
-  nodes_     = 0;
-  depth_     = 0;
-  seldepth_  = 0;
-
-  history_.clear();
-}
-
-void Worker::uci_report(const PVLine &pv) {
-  std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} "
-               "hashfull {} pv {}",
-               depth_ + 1, seldepth_ + 1, EvalUtils::format(eval_), clock_.elapsed(), nodes_,
-               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(),
-               pv.format(root_.chess960));
-  std::fflush(stdout);
-}
-
 void Worker::start(TimeControl tc) {
-  Colour stm = root_.stm();
+  Colour stm = board_.stm();
 
   if (is_main()) {
     clock_.set(stm, tc);
@@ -73,8 +32,7 @@ void Worker::start(TimeControl tc) {
     depth_ += 1;
   }
 
-  std::println("bestmove {}", MoveUtils::format(best_move_, root_.chess960));
-  std::fflush(stdout);
+  report_best_move();
 }
 
 // TODO: Aspiration windows
@@ -88,7 +46,7 @@ void Worker::aspwin() {
 
   for (int i = 0; i < MaxDepth; i++) (ss + i)->ply = i;
 
-  eval_ = search<Us>(root_, ss, alpha, beta, depth_ + 1);
+  eval_ = search<Us, PV>(ss, alpha, beta, depth_ + 1);
 
   if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -106,38 +64,49 @@ void Worker::aspwin() {
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::search(Board &board, StackEntry *ss, Eval alpha, Eval beta, Depth depth) {
-  if (depth == 0) return qsearch<Us, PV>(board, ss, alpha, beta);
+Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
+  constexpr bool pv   = NT == PV;
+  const bool     root = se->ply == 0;
 
-  ss->pv.clear();
-  seldepth_ = std::max(seldepth_, Depth(ss->ply + 1));
+  if (depth == 0) return qsearch<Us, PV>(se, alpha, beta);
 
-  if (NT != Root) {
+  se->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
+
+  /********************************\
+  |      Mate Distance Pruning     |
+  \********************************/
+
+  if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
-    if (board.is_draw()) return EvalDraw;
-    if (ss->ply >= MaxDepth) return board.in_check() ? EvalDraw : board.eval();
+    if (board_.is_draw(se->ply)) return EvalDraw;
+    if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
-    alpha = std::max(alpha, EvalUtils::mated_in(ss->ply));
+    alpha = std::max(alpha, EvalUtils::mated_in(se->ply));
     // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
-    beta = std::min(beta, EvalUtils::mate_in(ss->ply + 1));
+    beta = std::min(beta, EvalUtils::mate_in(se->ply + 1));
     // if our guaranteed score is better than the opponent's guaranteed score,
     // no need to continue to search this.
     if (alpha >= beta) return alpha;
   }
 
-  // ** TT lookup ** //
-  auto [tt_hit, tt_entry] = tt_.probe(board.key());
+  /********************************\
+  |   Transposition Table Lookup   |
+  \********************************/
 
-  Move    tt_move  = NoMove;
-  TTBound tt_bound = TTBound::Upper;
+  auto [tt_hit, tt_entry] = tt_.probe(board_.key());
+
+  Move tt_move = NoMove;
 
   if (tt_hit) {
-    TTEntry entry = tt_entry.read(ss->ply);
+    TTEntry entry = tt_entry.read(se->ply);
     tt_move       = entry.move;
   }
 
-  // ** Main Search Loop ** //
+  /********************************\
+  |        Main Search Loop        |
+  \********************************/
 
   Eval best       = -EvalInf;
   int  move_count = 0;
@@ -145,54 +114,66 @@ Eval Worker::search(Board &board, StackEntry *ss, Eval alpha, Eval beta, Depth d
   Move best_move  = NoMove;
 
   // Clear killer moves
-  (ss + 1)->killer.clear();
-  MovePicker<Us> mp{board, &ss->killer, &history_, tt_move, depth};
+  (se + 1)->killer.fill(NoMove);
+  MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
     move_count++;
 
     nodes_++;
-    // ** Recursive Search ** //
-    board.do_move<Us>(move);
-    Eval val = -search<~Us, PV>(board, ss + 1, -beta, -alpha, depth - 1);
-    board.undo_move<Us>();
+
+    board_.do_move<Us>(move);
+    Eval val = -search<~Us, PV>(se + 1, -beta, -alpha, depth - 1);
+    board_.undo_move<Us>();
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
-    // Update best score
+    /********************************\
+    |       Alpha Beta Pruning       |
+    \********************************/
+
+    // If val > alpha, update pv and alpha.
+    // If val >= beta (Fail High), this is too good to be played, prune this branch.
+
     if (val > best) {
       best = val;
-
-      if constexpr (NT == PV) tt_bound = TTBound::Exact;
-
-      // If val > alpha (our global best score), update pv and alpha.
       if (val > alpha) {
         best_move = move;
-        // If val >= beta (fail high), stop searching this branch,
-        // as we won't go down this path and we have a lower bound for the eval
-        if (val >= beta) {
-          // If we fail high, then we have a lower bound for how good this
-          // position is.
-          tt_bound = TTBound::Lower;
-          break;
-        }
-
-        ss->pv.update((ss + 1)->pv, move);
+        if (pv) se->pv.update((se + 1)->pv, best_move);
+        if (val >= beta) break;
         alpha = val;
       }
     }
   }
 
+  /********************************\
+  |         Update History         |
+  \********************************/
+
   if (best_move && !MoveUtils::is_capture(best_move)) {
-    ss->killer.update(best_move);
-    history_.get(board, best_move).update(300 * depth - 250);
+    const PieceFromTo &p = piece_from_to(board_, best_move);
+    update_killer(se->killer, best_move);
+    update_hist(history_[p.pc][p.to], 300 * depth - 250);
   }
 
-  if (move_count == 0) best = board.in_check() ? EvalUtils::mated_in(ss->ply) : EvalDraw;
+  /********************************\
+  |        Draw / mate score       |
+  \********************************/
 
-  tt_entry.write(board.key(), tt_.age(), depth, ss->ply, tt_bound, best_move, 0, best);
+  if (move_count == 0) best = board_.in_check() ? EvalUtils::mated_in(se->ply) : EvalDraw;
 
+  /********************************\
+  |   Transposition table write    |
+  \********************************/
+
+  // If we fail high, we have a lower bound for how good this pos is.
+  // If we are in PV and we have a best move, then we have an exact bound.
+  tt_entry.write(board_.key(), tt_.age(), depth, se->ply,
+                 best >= beta        ? TTBound::Lower
+                 : (pv && best_move) ? TTBound::Exact
+                                     : TTBound::Upper,
+                 best_move, 0, best);
   return best;
 }
 
@@ -200,77 +181,88 @@ Eval Worker::search(Board &board, StackEntry *ss, Eval alpha, Eval beta, Depth d
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::qsearch(Board &board, StackEntry *ss, Eval alpha, Eval beta) {
+Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
+  constexpr bool pv = NT == PV;
+
+  se->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
+
   if (clock_.stop(nodes_)) return EvalStop;
+  if (board_.is_draw(se->ply)) return EvalDraw;
+  if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
 
-  ss->pv.clear();
-  seldepth_ = std::max(seldepth_, Depth(ss->ply + 1));
+  /********************************\
+  |   Transposition Table Lookup   |
+  \********************************/
 
-  // ** Stand Pat ** //
+  auto [tt_hit, tt_entry] = tt_.probe(board_.key());
+
+  Move tt_move = NoMove;
+
+  if (tt_hit) {
+    TTEntry entry = tt_entry.read(se->ply);
+    tt_move       = entry.move;
+  }
+
+  /********************************\
+  |            Stand pat           |
+  \********************************/
+
   // The current eval is the lower bound because we can just not capture
   // anything (assume its not a zugzwang) If lower bound >= beta, then we fail
   // high (opponent has better options) If lower bound > alpha, then we update
   // alpha (the best we can do)
-  Eval best = board.eval();
+  Eval best = board_.eval();
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
-  // ** TT lookup ** //
-  auto [tt_hit, tt_entry] = tt_.probe(board.key());
+  /********************************\
+  |        Main Qsearch Loop       |
+  \********************************/
 
-  Move    tt_move  = NoMove;
-  TTBound tt_bound = TTBound::Upper;
-
-  if (tt_hit) {
-    TTEntry entry = tt_entry.read(ss->ply);
-    tt_move       = entry.move;
-  }
-
-  // ** Main QSearch Loop ** //
-  int  move_count = 0;
-  Move move       = NoMove;
-  Move best_move  = NoMove;
+  Move move      = NoMove;
+  Move best_move = NoMove;
 
   // Clear killer moves
-  (ss + 1)->killer.clear();
-  MovePicker<Us> mp{board, &ss->killer, &history_, tt_move};
+  (se + 1)->killer.fill(NoMove);
+  MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
 
   while ((move = mp.next())) {
-    move_count++;
 
     nodes_++;
-    // ** Recursive Search ** //
-    board.do_move<Us>(move);
-    Eval val = -qsearch<~Us, PV>(board, ss + 1, -beta, -alpha);
-    board.undo_move<Us>();
+
+    board_.do_move<Us>(move);
+    Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
+    board_.undo_move<Us>();
 
     // If we are stopping, return a placeholder score
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
-    // Update best score
+    /********************************\
+    |       Alpha Beta Pruning       |
+    \********************************/
+
+    // If val > alpha, update pv and alpha.
+    // If val >= beta (Fail High), this is too good to be played, prune this branch.
+
     if (val > best) {
       best = val;
-      // If val > alpha (our global best score), update pv and alpha.
       if (val > alpha) {
         best_move = move;
-        // If val >= beta (fail high), stop searching this branch,
-        // as we won't go down this path and we have a lower bound for the eval
-        if (val >= beta) {
-          // If we fail high, then we have a lower bound for how good this
-          // position is.
-          tt_bound = TTBound::Lower;
-          break;
-        }
-
-        ss->pv.update((ss + 1)->pv, move);
+        if (pv) se->pv.update((se + 1)->pv, best_move);
+        if (val >= beta) break;
         alpha = val;
       }
     }
   }
 
-  if (move_count == 0 && board.in_check()) best = EvalUtils::mated_in(ss->ply);
+  /********************************\
+  |   Transposition table write    |
+  \********************************/
 
-  tt_entry.write(board.key(), tt_.age(), DepthQS, ss->ply, tt_bound, best_move, 0, best);
+  // If we fail high, we have a lower bound for how good this pos is.
+  tt_entry.write(board_.key(), tt_.age(), DepthQS, se->ply,
+                 best >= beta ? TTBound::Lower : TTBound::Upper, best_move, 0, best);
 
   return best;
 }

@@ -10,12 +10,13 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-using I8  = int8_t;
-using I16 = int16_t;
-using I32 = int32_t;
-using U8  = uint8_t;
-using U16 = uint16_t;
-using U64 = uint64_t;
+using I8   = int8_t;
+using I16  = int16_t;
+using I32  = int32_t;
+using U8   = uint8_t;
+using U16  = uint16_t;
+using U64  = uint64_t;
+using U128 = __uint128_t;
 
 using Key   = U64;
 using Ply   = U16;
@@ -173,11 +174,13 @@ constexpr Castle relative_castle(Colour c, Castle cr) noexcept {
   return c == White ? cr : Castle(cr << 2);
 }
 
-template <Colour C> constexpr Square forward(Square sq) noexcept {
+template <Colour C>
+constexpr Square forward(Square sq) noexcept {
   return static_cast<Square>(C == White ? sq + I8(Direction::N) : sq + I8(Direction::S));
 }
 
-template <Direction dir> constexpr Square shift(Square sq) {
+template <Direction dir>
+constexpr Square shift(Square sq) {
   return static_cast<Square>(sq + I8(dir));
 }
 

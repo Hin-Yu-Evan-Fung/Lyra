@@ -12,20 +12,21 @@ DEBUG_FLAGS := -O3 -g
 CXXFLAGS := $(CXXSTD) $(COMMON_FLAGS) $(RELEASE_FLAGS) -Iinclude
 
 SRC := \
-	src/main.cpp \
+	src/bitboard.cpp \
 	src/board.cpp \
 	src/move.cpp \
-	src/bitboard.cpp \
-	src/clock.cpp \
-	src/engine.cpp \
 	src/thread.cpp \
-	src/uci.cpp \
-	src/eval.cpp \
 	src/movepick.cpp \
-	src/search.cpp \
-	src/utils.cpp \
+	src/clock.cpp \
+	src/eval.cpp \
+	src/history.cpp \
 	src/perft.cpp \
-	src/tt.cpp
+	src/tt.cpp \
+	src/search.cpp \
+	src/search_utils.cpp \
+	src/engine.cpp \
+	src/uci.cpp \
+	src/main.cpp 
 
 OBJ := $(SRC:.cpp=.o)
 

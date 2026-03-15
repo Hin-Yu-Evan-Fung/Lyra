@@ -112,6 +112,7 @@ void Board::do_move(Move move) {
   stm_ = ~stm_;
 
   update_masks<Them>();
+  update_reps();
 }
 
 template <Colour Us>

@@ -25,17 +25,15 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-Board::Board() {
-  history_ = new Undo[MaxPly];
+Board::Board()
+    : history_(MaxPly) {
   reset();
 }
-
-Board::~Board() { delete[] history_; }
 
 void Board::reset() {
   chess960          = false;
   gameply_          = 0;
-  undo_             = history_;
+  undo_             = history_.data();
   undo_->ply        = 0;
   undo_->c_rights   = NoCastle;
   undo_->ep         = NoSquare;
@@ -143,8 +141,8 @@ void Board::copy(const Board &board) {
   std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
   std::copy_n(board.colourBB_, NColour, colourBB_);
   std::copy_n(board.board_, NSquare, board_);
-  std::copy_n(board.history_, board.undo_->ply + 1, history_);
-  undo_ = history_ + board.undo_->ply;
+  std::copy_n(board.history_.begin(), board.undo_->ply + 1, history_.begin());
+  undo_ = history_.data() + board.undo_->ply;
 }
 
 void Board::print() const {
@@ -265,20 +263,27 @@ Eval Board::eval() const {
 |==========================================|
 \******************************************/
 
-bool Board::is_draw() const {
-  bool not_checkmate = (undo_->check_mask == FullBB || list_moves(*this).size());
-  if (undo_->rule50 >= Rule50Ply && not_checkmate) return true;
-  return is_reps();
+bool Board::is_draw(Ply ply) const {
+  if (undo_->rule50 >= Rule50Ply)
+    if (undo_->check_mask == FullBB || list_moves(*this).size()) return true;
+  return undo_->reps && undo_->reps < ply;
 }
 
-bool Board::is_reps() const {
-  int end = std::min((U16)undo_->rule50, undo_->ply);
+void Board::update_reps() const {
+  undo_->reps = 0;
+  int end     = std::min((U16)undo_->rule50, undo_->ply);
   if (end >= 4)
-    for (int i = 2, reps = 0; i <= end; i += 2)
-      if (undo_->key == (undo_ - i)->key && ++reps >= 2) return true;
-  return false;
+    for (int i = 2; i <= end; i += 2) {
+      Undo *prev = undo_ - i;
+      if (undo_->key == prev->key) {
+        undo_->reps = prev->reps ? -i : i;
+        break;
+      }
+    }
 }
 
 bool Board::in_check() const { return undo_->check_mask != FullBB; }
+
+bool Board::has_non_pawn_material(Colour us) const { return bb(us) ^ bb(us, K) ^ bb(us, P); }
 
 } // namespace Lyra

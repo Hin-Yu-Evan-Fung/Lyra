@@ -4,6 +4,8 @@
 #include "clock.hpp"
 #include "defs.hpp"
 #include "history.hpp"
+#include "movepick.hpp"
+#include "search_utils.hpp"
 #include "tt.hpp"
 
 #include <atomic>
@@ -13,34 +15,21 @@ namespace Lyra {
 class ThreadPool;
 class Thread;
 
-struct PVLine {
-  Move   moves[MaxDepth];
-  size_t length;
-
-  void        update(const PVLine &other, Move best);
-  void        clear() { length = 0; }
-  std::string format(bool chess960) const;
-};
-
-struct StackEntry {
-  Killer killer;
-  PVLine pv;
-  U16    ply;
-};
-
 class Worker {
-  enum NodeType { Root, PV, NonPV };
+  enum NodeType { PV, NonPV };
 
-  template <Colour Us> void aspwin();
-  template <Colour Us, NodeType NT = Root>
-  Eval search(Board &board, StackEntry *ss, Eval alpha, Eval beta, Depth depth);
-  template <Colour Us, NodeType NT = Root>
-  Eval qsearch(Board &board, StackEntry *ss, Eval alpha, Eval beta);
+  template <Colour Us>
+  void aspwin();
+  template <Colour Us, NodeType NT>
+  Eval search(StackEntry *se, Eval alpha, Eval beta, Depth depth);
+  template <Colour Us, NodeType NT>
+  Eval    qsearch(StackEntry *se, Eval alpha, Eval beta);
+  MOStats mostats(StackEntry *se);
 
   Clock             clock_;
   std::atomic_bool &stop_;
 
-  Board  root_;
+  Board  board_;
   size_t id_;
 
   size_t nodes_;
@@ -49,7 +38,7 @@ class Worker {
   Eval   eval_;
   Move   best_move_;
 
-  MainHistory history_;
+  MainHist history_;
 
   TT &tt_;
 
@@ -65,7 +54,8 @@ public:
 
   void reset(const Board &board);
   void start(TimeControl tc);
-  void uci_report(const PVLine &pv);
+  void uci_report(const PVLine &pv) const;
+  void report_best_move() const;
 };
 
 } // namespace Lyra

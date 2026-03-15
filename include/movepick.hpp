@@ -2,9 +2,11 @@
 
 #include "board.hpp"
 #include "defs.hpp"
-#include "search.hpp"
+#include "history.hpp"
 
 namespace Lyra {
+
+enum class MPType { Main, QSearch };
 
 enum MovePickStage {
   MAIN_TT,
@@ -16,28 +18,28 @@ enum MovePickStage {
   QUIET,
   BAD_CAP,
 
-  EVASION_TT,
-  EVASION_INIT,
-  EVASION,
-
   QSEARCH_TT,
   QSEARCH_INIT,
   QSEARCH,
 };
 
+struct MOStats {
+  const Killer   *killer;
+  const MainHist *hist;
+};
+
 template <Colour Us>
 class MovePicker {
 public:
-  MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move, Depth depth);
-  MovePicker(const Board &board, Killer *killer, MainHistory *history, Move tt_move);
+  MovePicker(MPType type, const Board &board, MOStats stats, Move tt_move, Depth depth);
 
   Move next();
 
-  const Board &board_;
-  Killer      *killer_;
-  MainHistory *history_;
-  Move         tt_move_;
-  Depth        depth_;
+  const Board    &board_;
+  Killer          killer_;
+  const MainHist *history_;
+  Move            tt_move_;
+  Depth           depth_;
 
 private:
   void gen_score_cap();

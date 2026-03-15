@@ -15,7 +15,8 @@ namespace Lyra {
 template <typename T, size_t A, size_t... B>
 struct NDArray : public std::array<NDArray<T, B...>, A> {};
 
-template <typename T, size_t A> struct NDArray<T, A> : public std::array<T, A> {};
+template <typename T, size_t A>
+struct NDArray<T, A> : public std::array<T, A> {};
 
 /******************************************\
 |==========================================|
@@ -74,17 +75,17 @@ namespace EvalUtils {
 
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
+constexpr Eval is_loss(Eval v) { return v <= -EvalMateBound; }
+constexpr Eval is_win(Eval v) { return v >= EvalMateBound; }
+constexpr bool is_terminal(Eval v) { return is_win(v) || is_loss(v); }
+constexpr bool is_valid(Eval v) { return std::abs(v) < EvalInf; }
 
 // Remove the mate score's dependency on ply from root, as the same position can
 // be reached in different lines
-constexpr Eval to_TT(Eval v, U16 ply) {
-  return v >= EvalMateBound ? v + ply : v <= -EvalMateBound ? v - ply : v;
-}
+constexpr Eval to_TT(Eval v, U16 ply) { return is_win(v) ? v + ply : is_loss(v) ? v - ply : v; }
 // Restore the mate score's dependency on ply from root, as the same position
 // can be reached in different lines
-constexpr Eval from_TT(Eval v, U16 ply) {
-  return v >= EvalMateBound ? v - ply : v <= -EvalMateBound ? v + ply : v;
-}
+constexpr Eval from_TT(Eval v, U16 ply) { return is_win(v) ? v - ply : is_loss(v) ? v + ply : v; }
 
 inline std::string format(Eval v) {
   if (v >= EvalMateBound)

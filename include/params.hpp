@@ -26,6 +26,6 @@ constexpr Eval   EvalStop      = 0;
 constexpr Depth DepthQS     = 0;
 constexpr Depth StackOffset = 2;
 
-constexpr Eval HistoryMax = 16384;
+constexpr Eval HistMax = 16384;
 
 } // namespace Lyra

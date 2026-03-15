@@ -18,6 +18,7 @@ constexpr Ply    MaxPly        = 2048;
 constexpr size_t MaxMoves      = 256;
 constexpr Ply    Rule50Ply     = 100;
 constexpr Eval   EvalInf       = 30000;
+constexpr Eval   EvalInvalid   = -EvalInf - 1;
 constexpr Eval   EvalMate      = 29000;
 constexpr Eval   EvalMateBound = EvalMate - MaxDepth;
 constexpr Eval   EvalDraw      = 0;

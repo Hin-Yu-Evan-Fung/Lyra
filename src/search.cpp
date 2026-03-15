@@ -2,14 +2,12 @@
 
 #include "defs.hpp"
 #include "history.hpp"
+#include "move.hpp"
 #include "movepick.hpp"
 #include "tt.hpp"
 #include "utils.hpp"
 
 #include <atomic>
-#include <cstdio>
-#include <print>
-#include <stdexcept>
 
 namespace Lyra {
 
@@ -46,7 +44,7 @@ void Worker::aspwin() {
 
   for (int i = 0; i < MaxDepth; i++) (ss + i)->ply = i;
 
-  eval_ = search<Us, PV>(ss, alpha, beta, depth_ + 1);
+  eval_ = negamax<Us, PV>(ss, alpha, beta, depth_ + 1);
 
   if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -64,7 +62,7 @@ void Worker::aspwin() {
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
+Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv   = NT == PV;
   const bool     root = se->ply == 0;
 
@@ -108,23 +106,53 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |        Main Search Loop        |
   \********************************/
 
-  Eval best       = -EvalInf;
-  int  move_count = 0;
-  Move move       = NoMove;
-  Move best_move  = NoMove;
-
-  // Clear killer moves
+  // Clear child killer moves
   (se + 1)->killer.fill(NoMove);
+
+  Eval best        = -EvalInf;
+  Eval val         = EvalInvalid;
+  int  move_count  = 0;
+  Move move        = NoMove;
+  Move best_move   = NoMove;
+  bool full_search = false;
+
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
+    Depth new_depth = depth - 1;
+
     move_count++;
+    do_move<Us>(se, move);
 
-    nodes_++;
+    /********************************\
+    |       Late Move Reduction      |
+    \********************************/
 
-    board_.do_move<Us>(move);
-    Eval val = -search<~Us, PV>(se + 1, -beta, -alpha, depth - 1);
-    board_.undo_move<Us>();
+    // 1. Assume the first move is the best move.
+    // 2. Use a null window with reduced search to prove that later moves are worse.
+    if (depth > 2 && move_count > 2 + pv && !MoveUtils::is_promo(move)
+        && !MoveUtils::is_capture(move)) {
+      Depth r = 1;
+
+      Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
+      val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
+      full_search = val > alpha && new_depth > d;
+    } else {
+      full_search = !pv || move_count > 1;
+    }
+
+    /********************************\
+    |   Principal Variation Search   |
+    \********************************/
+
+    // 3. If reduced search showed that the move could be good, search it at full depth.
+    if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
+
+    // 4. If its the first move, or the later move is promising, then do a full window search
+    if (pv && (move_count == 1 || val > alpha))
+      val = -negamax<~Us, PV>(se + 1, -beta, -alpha, new_depth);
+
+    undo_move<Us>(se);
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
@@ -229,11 +257,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   while ((move = mp.next())) {
 
-    nodes_++;
-
-    board_.do_move<Us>(move);
+    do_move<Us>(se, move);
     Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
-    board_.undo_move<Us>();
+    undo_move<Us>(se);
 
     // If we are stopping, return a placeholder score
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;

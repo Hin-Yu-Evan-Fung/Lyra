@@ -4,6 +4,7 @@
 #include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
+#include "search_utils.hpp"
 #include "tt.hpp"
 #include "utils.hpp"
 
@@ -66,7 +67,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv   = NT == PV;
   const bool     root = se->ply == 0;
 
-  if (depth == 0) return qsearch<Us, PV>(se, alpha, beta);
+  if (depth == 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
   seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
@@ -99,7 +100,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (tt_hit) {
     TTEntry entry = tt_entry.read(se->ply);
-    tt_move       = entry.move;
+
+    if (!pv && entry.depth >= depth && can_tt_cutoff(entry, alpha, beta)) {
+      return entry.value;
+    }
+
+    tt_move = entry.move;
   }
 
   /********************************\
@@ -150,7 +156,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     // 4. If its the first move, or the later move is promising, then do a full window search
     if (pv && (move_count == 1 || val > alpha))
-      val = -negamax<~Us, PV>(se + 1, -beta, -alpha, new_depth);
+      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth);
 
     undo_move<Us>(se);
 
@@ -229,7 +235,12 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   if (tt_hit) {
     TTEntry entry = tt_entry.read(se->ply);
-    tt_move       = entry.move;
+
+    if (!pv && can_tt_cutoff(entry, alpha, beta)) {
+      return entry.value;
+    }
+
+    tt_move = entry.move;
   }
 
   /********************************\

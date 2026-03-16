@@ -2,6 +2,7 @@
 
 #include "defs.hpp"
 #include "history.hpp"
+#include "tt.hpp"
 
 #include <cstddef>
 
@@ -21,5 +22,26 @@ struct StackEntry {
   PVLine pv;
   U16    ply;
 };
+
+/******************************************\
+|==========================================|
+|               Search Utils               |
+|==========================================|
+\******************************************/
+
+// Exact bound means value has been proven with full window search. Can cutoff.
+// Upper bound means value has a proven upper bound, can cutoff if alpha is too
+// good to be true.
+// Lower bound means value has a proven lower bound, can cutoff if beta is too
+// good to be true;
+constexpr bool can_tt_cutoff(const TTEntry &entry, Eval alpha, Eval beta) {
+  switch (entry.bound) {
+  case TTBound::None: return false;
+  case TTBound::Exact: return true;
+  case TTBound::Upper: return entry.value <= alpha;
+  case TTBound::Lower: return entry.value >= beta;
+  }
+  return false;
+}
 
 } // namespace Lyra

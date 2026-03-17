@@ -19,7 +19,7 @@ class Worker {
   enum NodeType { PV, NonPV };
 
   template <Colour Us>
-  void aspwin();
+  void aspwin(StackEntry *se);
   template <Colour Us, NodeType NT>
   Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT>
@@ -31,6 +31,10 @@ class Worker {
   constexpr void do_move(StackEntry *se, Move move);
   template <Colour Us>
   constexpr void undo_move(StackEntry *se);
+  template <Colour Us>
+  constexpr void do_null_move(StackEntry *se);
+  template <Colour Us>
+  constexpr void undo_null_move(StackEntry *se);
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -73,12 +77,25 @@ public:
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
   ++nodes_;
+  se->move = move;
   board_.do_move<Us>(move);
 }
 
 template <Colour Us>
 constexpr void Worker::undo_move(StackEntry *se) {
   board_.undo_move<Us>();
+}
+
+template <Colour Us>
+constexpr void Worker::do_null_move(StackEntry *se) {
+  ++nodes_;
+  se->move = NullMove;
+  board_.do_null_move<Us>();
+}
+
+template <Colour Us>
+constexpr void Worker::undo_null_move(StackEntry *se) {
+  board_.undo_null_move<Us>();
 }
 
 } // namespace Lyra

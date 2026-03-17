@@ -39,7 +39,7 @@ TTEntry PackedTTEntry::read(Ply ply) const {
       TTBound((d & BoundMask) >> 14),
       Move((d & MoveMask) >> 16),
       I16((d & EvalMask) >> 32),
-      EvalUtils::from_TT(I16((d & ValueMask) >> 48), ply),
+      from_TT(I16((d & ValueMask) >> 48), ply),
   };
 }
 
@@ -62,7 +62,7 @@ void PackedTTEntry::write(Key pos_key, U8 age, Depth depth, Ply ply, TTBound bou
   if (!(age != old.age || pos_key != old.key || bound == Exact || depth > old.depth)) return;
 
   const Move new_move = move || pos_key != old.key ? move : old.move;
-  save({pos_key, age, depth, bound, new_move, eval, EvalUtils::to_TT(value, ply)});
+  save({pos_key, age, depth, bound, new_move, eval, to_TT(value, ply)});
 }
 
 /******************************************\

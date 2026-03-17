@@ -1,10 +1,10 @@
 #pragma once
 
-#include <sstream>
-
 #include "bitboard.hpp"
 #include "defs.hpp"
 #include "utils.hpp"
+
+#include <sstream>
 
 namespace Lyra {
 
@@ -43,21 +43,23 @@ struct CastleMask {
 \******************************************/
 
 inline void CastleMask::add_rights(Square ksq, Square rsq, Castle cr) {
-  int idx       = BBUtils::lsb(cr);
-  rook_sq[idx]  = rsq;
-  rights[ksq]  &= ~cr;
-  rights[rsq]  &= ~cr;
+  int idx      = BBUtils::lsb(cr);
+  rook_sq[idx] = rsq;
+  rights[ksq] &= ~cr;
+  rights[rsq] &= ~cr;
 }
 
 constexpr void CastleMask::reset() {
-  for (Square sq = A1; sq <= H8; ++sq)
-    rights[sq] = AnyCastle;
-  for (int i = 0; i < 4; i++)
-    rook_sq[i] = NoSquare;
+  for (Square sq = A1; sq <= H8; ++sq) rights[sq] = AnyCastle;
+  for (int i = 0; i < 4; i++) rook_sq[i] = NoSquare;
 }
 
-constexpr int    CastleMask::index(Colour c, bool queen_side) noexcept { return (c << 1) | queen_side; }
-constexpr Castle CastleMask::get_mask(Colour c, bool queen_side) noexcept { return Castle(1 << index(c, queen_side)); }
+constexpr int CastleMask::index(Colour c, bool queen_side) noexcept {
+  return (c << 1) | queen_side;
+}
+constexpr Castle CastleMask::get_mask(Colour c, bool queen_side) noexcept {
+  return Castle(1 << index(c, queen_side));
+}
 
 template <Colour C>
 constexpr Square CastleMask::rook_src(bool queen_side) const noexcept {
@@ -80,11 +82,11 @@ inline std::string CastleMask::to_str(Castle cr, bool chess960) const {
   std::ostringstream out;
 
   if (!cr) out << "-";
-  if (cr & WhiteOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[0])) : 'K');
-  if (cr & WhiteOOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[1])) : 'Q');
-  if (cr & BlackOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[2])) : 'k');
-  if (cr & BlackOOO) out << (chess960 ? IOUtils::format_file(file_of(rook_sq[3])) : 'q');
+  if (cr & WhiteOO) out << (chess960 ? format_file(file_of(rook_sq[0])) : 'K');
+  if (cr & WhiteOOO) out << (chess960 ? format_file(file_of(rook_sq[1])) : 'Q');
+  if (cr & BlackOO) out << (chess960 ? format_file(file_of(rook_sq[2])) : 'k');
+  if (cr & BlackOOO) out << (chess960 ? format_file(file_of(rook_sq[3])) : 'q');
   return out.str();
 }
 
-}  // namespace Lyra
+} // namespace Lyra

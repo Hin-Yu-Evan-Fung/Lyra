@@ -83,7 +83,7 @@ constexpr std::string format(Move move, bool chess960) {
   if (!chess960 && is_castle(move))
     dst_sq = make_square(flag(move) == QueenCastle ? FileC : FileG, rank_of(src_sq));
 
-  std::string move_str = IOUtils::format_sq(src_sq) + IOUtils::format_sq(dst_sq);
+  std::string move_str = format_sq(src_sq) + format_sq(dst_sq);
 
   if (is_promo(move)) move_str += "pnbrqk "[promoted_pt(move)];
 

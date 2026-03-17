@@ -18,7 +18,7 @@ void print(BB bb) {
   std::println("\n     +---+---+---+---+---+---+---+---+");
 
   for (Rank r = Rank8; r >= Rank1; --r) {
-    std::print("{}   |", IOUtils::format_rank(r));
+    std::print("{}   |", format_rank(r));
     for (File f = FileA; f <= FileH; ++f)
       std::print(" {} |", bb & from(make_square(f, r)) ? '1' : '.');
 

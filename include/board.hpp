@@ -117,6 +117,10 @@ public:
   void do_move(Move move);
   template <Colour Us>
   void undo_move();
+  template <Colour Us>
+  void do_null_move();
+  template <Colour Us>
+  void undo_null_move();
 
   // Bitboard getters
   constexpr BB bb() const;

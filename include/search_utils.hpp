@@ -21,6 +21,7 @@ struct StackEntry {
   Killer killer;
   PVLine pv;
   U16    ply;
+  Move   move;
 };
 
 /******************************************\

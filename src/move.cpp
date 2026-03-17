@@ -174,9 +174,43 @@ void Board::undo_move() {
   gameply_--;
 }
 
+template <Colour Us>
+void Board::do_null_move() {
+  constexpr Colour Them = ~Us;
+
+  // Initialise new state
+  Undo *prev = undo_++;
+  std::memcpy(undo_, prev, offsetof(Undo, ep));
+
+  // Update new state
+  if (prev->ep != NoSquare) undo_->key ^= Zobrist::EP_KEYS[file_of(prev->ep)];
+  undo_->ep   = NoSquare;
+  undo_->cap  = NoPiece;
+  undo_->move = NullMove;
+  undo_->reps = 0;
+
+  undo_->rule50 = 0;
+  undo_->ply    = 0;
+  // Update board state
+  undo_->key ^= Zobrist::SIDE_KEY;
+  stm_ = ~stm_;
+
+  update_masks<Them>();
+}
+
+template <Colour Us>
+void Board::undo_null_move() {
+  undo_--;
+  stm_ = ~stm_;
+}
+
 template void Board::do_move<White>(Move move);
 template void Board::do_move<Black>(Move move);
 template void Board::undo_move<White>();
 template void Board::undo_move<Black>();
+template void Board::do_null_move<White>();
+template void Board::do_null_move<Black>();
+template void Board::undo_null_move<White>();
+template void Board::undo_null_move<Black>();
 
 } // namespace Lyra

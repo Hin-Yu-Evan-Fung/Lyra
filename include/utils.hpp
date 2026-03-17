@@ -71,8 +71,6 @@ inline Time now() {
 |==========================================|
 \******************************************/
 
-namespace EvalUtils {
-
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
 constexpr Eval is_loss(Eval v) { return v <= -EvalMateBound; }
@@ -87,7 +85,7 @@ constexpr Eval to_TT(Eval v, U16 ply) { return is_win(v) ? v + ply : is_loss(v) 
 // can be reached in different lines
 constexpr Eval from_TT(Eval v, U16 ply) { return is_win(v) ? v - ply : is_loss(v) ? v + ply : v; }
 
-inline std::string format(Eval v) {
+inline std::string format_eval(Eval v) {
   if (v >= EvalMateBound)
     return std::format("mate {}", (EvalMate - v + 1) / 2);
   else if (v <= -EvalMateBound)
@@ -96,15 +94,11 @@ inline std::string format(Eval v) {
     return std::format("cp {}", v);
 }
 
-} // namespace EvalUtils
-
 /******************************************\
 |==========================================|
 |                 IO helpers               |
 |==========================================|
 \******************************************/
-
-namespace IOUtils {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
@@ -121,7 +115,5 @@ constexpr Square parse_sq(const std::string &str) {
   return make_square(parse_file(str[0]), parse_rank(str[1]));
 }
 constexpr Piece parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
-
-} // namespace IOUtils
 
 } // namespace Lyra

@@ -20,13 +20,21 @@ void Worker::start(TimeControl tc) {
     tt_.incr_age();
   }
 
+  StackEntry  stack[MaxDepth + StackOffset]{};
+  StackEntry *se = stack + StackOffset;
+
+  for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
+
   while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
     if (stm == White)
-      aspwin<White>();
+      aspwin<White>(se);
     else
-      aspwin<Black>();
+      aspwin<Black>(se);
 
     if (stop_.load(std::memory_order::relaxed)) break;
+
+    uci_report(se->pv);
+    best_move_ = se->pv.moves[0];
 
     depth_ += 1;
   }
@@ -36,21 +44,13 @@ void Worker::start(TimeControl tc) {
 
 // TODO: Aspiration windows
 template <Colour Us>
-void Worker::aspwin() {
+void Worker::aspwin(StackEntry *se) {
   Eval alpha = -EvalInf;
   Eval beta  = EvalInf;
 
-  StackEntry  stack[MaxDepth + StackOffset]{};
-  StackEntry *ss = stack + StackOffset;
-
-  for (int i = 0; i < MaxDepth; i++) (ss + i)->ply = i;
-
-  eval_ = negamax<Us, PV>(ss, alpha, beta, depth_ + 1);
+  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
 
   if (stop_.load(std::memory_order::relaxed)) return;
-
-  uci_report(ss->pv);
-  best_move_ = ss->pv.moves[0];
 }
 
 /******************************************\
@@ -82,9 +82,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
-    alpha = std::max(alpha, EvalUtils::mated_in(se->ply));
+    alpha = std::max(alpha, mated_in(se->ply));
     // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
-    beta = std::min(beta, EvalUtils::mate_in(se->ply + 1));
+    beta = std::min(beta, mate_in(se->ply + 1));
     // if our guaranteed score is better than the opponent's guaranteed score,
     // no need to continue to search this.
     if (alpha >= beta) return alpha;
@@ -106,6 +106,22 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     }
 
     tt_move = entry.move;
+  }
+
+  Eval eval = board_.eval();
+
+  if (!pv && !board_.in_check()) {
+    if (depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
+        && board_.has_non_pawn_material(board_.stm())) {
+
+      Depth r = 2;
+
+      do_null_move<Us>(se);
+      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);
+      undo_null_move<Us>(se);
+
+      if (val >= beta) return is_win(val) ? beta : val;
+    }
   }
 
   /********************************\
@@ -195,7 +211,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |        Draw / mate score       |
   \********************************/
 
-  if (move_count == 0) best = board_.in_check() ? EvalUtils::mated_in(se->ply) : EvalDraw;
+  if (move_count == 0) best = board_.in_check() ? mated_in(se->ply) : EvalDraw;
 
   /********************************\
   |   Transposition table write    |

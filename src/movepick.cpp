@@ -204,7 +204,8 @@ bool Board::is_legal(Move move) const {
   const Piece     cap       = on(dst);
   const bool      is_castle = MoveUtils::is_castle(move);
   const bool      is_cap    = MoveUtils::is_capture(move);
-  const bool      is_ep     = MoveUtils::is_ep(move);
+  const bool      is_promo  = MoveUtils::is_promo(move);
+  const bool      is_ep     = flag == EP;
   const bool      is_dp     = flag == DoublePush;
   const bool      is_quiet  = flag == Quiet;
 
@@ -218,15 +219,20 @@ bool Board::is_legal(Move move) const {
 
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
-  // Check if the captured piece is theirs or not (Except for castling where we can capture our own
-  // rook)
+  // Check if the captured piece is theirs or not (Except for castling
+  // where we can capture our own rook)
   const bool invalid_cap = !is_castle && cap != NoPiece && colour_of(cap) == Us;
-  // Check if the squares makes sense (Chess960 allows for src == dst for castling)
+  // Check if the squares makes sense (Chess960 allows for src == dst
+  // for castling)
   const bool invalid_sq = !is_castle && src == dst;
-  // Check if the capture flag is consistent with a piece being captured
+  // Check if the capture flag is consistent with a piece being
+  // captured
   const bool invalid_cap_flag = !is_castle && !is_ep && is_cap == (cap == NoPiece);
+  // Check if the promotion flag is consistent
+  const bool invalid_promo_flag = is_promo && pt_of(pc) != P;
 
-  if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag) return false;
+  if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag || invalid_promo_flag)
+    return false;
 
   if (is_castle) {
     if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
@@ -236,20 +242,23 @@ bool Board::is_legal(Move move) const {
 
   if (pt == K) return KING_ATK[src] & from(dst) && !(attacked & from(dst));
 
-  // Check if there is a pin and if so check if the movement is aligned to the king
+  // Check if there is a pin and if so check if the movement is aligned
+  // to the king
   const bool valid_pin =
       !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
 
   if (pt == P) {
-    // Enpassant is illegal if the destination is incorrect, the attack pattern is wrong, or the
-    // move results in check.
+    // Enpassant is illegal if the destination is incorrect, the attack
+    // pattern is wrong, or the move results in check.
     if (is_ep)
       return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
-    // Capture is illegal if the move does not correspond to the attack pattern
+    // Capture is illegal if the move does not correspond to the attack
+    // pattern
     if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
     // Double Push is illegal if there are pieces in the way
     if (is_dp && (BTWN_BB[src][dst] | from(dst)) & occ) return false;
-    // Single Push is illegal if its the wrong pattern and there are pieces in the way
+    // Single Push is illegal if its the wrong pattern and there are
+    // pieces in the way
     if (is_quiet && (dst != forward<Us>(src) || from(dst) & occ)) return false;
 
     return valid_pin && from(dst) & check_mask;
@@ -277,10 +286,9 @@ bool Board::see(Move move, Eval lower_bound) const {
   using namespace MoveUtils;
   using namespace BBUtils;
 
-  constexpr Eval PIECE_VALS[NPieceType] = {150, 340, 360, 480, 1000, 0};
-
   const Square    src       = MoveUtils::src(move);
   const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
   const PieceType promo     = MoveUtils::promoted_pt(move);
   const PieceType att       = pt_of(on(src));
   const PieceType vic       = pt_of(on(dst));
@@ -291,19 +299,19 @@ bool Board::see(Move move, Eval lower_bound) const {
   // Calculate move value
   Eval gain = -lower_bound;
   if (is_castle(move)) return 0 <= gain;
-  if (is_capture(move)) gain += is_ep(move) ? PIECE_VALS[P] : PIECE_VALS[vic];
-  if (is_promo(move)) gain += PIECE_VALS[promo] - PIECE_VALS[att];
+  if (is_capture(move)) gain += flag == EP ? SeePieceVals[P] : SeePieceVals[vic];
+  if (is_promo(move)) gain += SeePieceVals[promo] - SeePieceVals[att];
 
   // If we are still losing after the capture then, it is a bad move
   if (gain < EvalDraw) return false;
   // Simulate recapture
-  gain -= is_promo(move) ? PIECE_VALS[promo] : PIECE_VALS[att];
+  gain -= is_promo(move) ? SeePieceVals[promo] : SeePieceVals[att];
   // If we are still winning after recapture then, it is a good move
   if (gain >= EvalDraw) return true;
 
   // Simulate the capture
   BB occ = (bb() ^ from(src)) | from(dst);
-  if (is_ep(move)) occ ^= from(ep_target);
+  if (flag == EP) occ ^= from(ep_target);
 
   // Simulate the rest of the exchanges
   Colour    stm  = ~stm_;
@@ -334,11 +342,13 @@ bool Board::see(Move move, Eval lower_bound) const {
 
     // Switch sides
     stm = ~stm;
-    // Speculate the gains after recapture (discourage drawing captures)
-    gain = -PIECE_VALS[lva_pt] - gain - 1;
+    // Speculate the gains after recapture (discourage drawing
+    // captures)
+    gain = -SeePieceVals[lva_pt] - gain - 1;
 
     if (gain >= EvalDraw) {
-      // If we capture with the king but the opponent can recapture, then they win
+      // If we capture with the king but the opponent can recapture,
+      // then they win
       if (lva_pt == K && atks & bb(stm)) return stm == stm_;
       break;
     }

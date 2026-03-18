@@ -134,6 +134,8 @@ public:
   template <Colour C>
   constexpr Square      ksq() const;
   constexpr Piece       on(Square sq) const;
+  constexpr PieceType   moved(Move move) const;
+  constexpr PieceType   captured(Move move) const;
   constexpr Colour      stm() const;
   constexpr Undo *const undo() const;
   Eval                  eval() const;
@@ -188,7 +190,11 @@ constexpr BB Board::bb(Colour c, PieceType pt1, PieceType pt2) const {
 |==========================================|
 \******************************************/
 
-constexpr Piece Board::on(Square sq) const { return board_[sq]; }
+constexpr Piece     Board::on(Square sq) const { return board_[sq]; }
+constexpr PieceType Board::moved(Move move) const { return pt_of(on(MoveUtils::src(move))); }
+constexpr PieceType Board::captured(Move move) const {
+  return MoveUtils::is_ep(move) ? P : pt_of(on(MoveUtils::dst(move)));
+}
 template <Colour C>
 constexpr Square Board::ksq() const {
   return BBUtils::lsb(bb(C, K));

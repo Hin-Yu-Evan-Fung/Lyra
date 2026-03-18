@@ -4,8 +4,8 @@
 
 namespace Lyra {
 
-PieceFromTo piece_from_to(const Board &board, Move move) {
-  return {board.on(MoveUtils::src(move)), MoveUtils::src(move), MoveUtils::dst(move)};
+PieceTo piece_to(const Board &board, Move move) {
+  return {board.on(MoveUtils::src(move)), MoveUtils::dst(move)};
 }
 
 void update_killer(Killer &killer, Move best) {

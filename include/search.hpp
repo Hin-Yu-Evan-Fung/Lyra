@@ -27,6 +27,8 @@ class Worker {
 
   // Helpers
   MOStats mostats(StackEntry *se);
+
+  // Move wrappers
   template <Colour Us>
   constexpr void do_move(StackEntry *se, Move move);
   template <Colour Us>
@@ -49,6 +51,7 @@ class Worker {
   Move   best_move_;
 
   MainHist history_;
+  CapHist  cap_history_;
 
   TT &tt_;
 

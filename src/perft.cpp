@@ -18,8 +18,9 @@ constexpr unsigned NBenchPos  = 66;
 \******************************************/
 
 namespace {
-MainHist history;
 Killer   killer;
+MainHist history;
+CapHist  cap_history;
 } // namespace
 
 template <bool Div, Colour Us>
@@ -52,7 +53,7 @@ U64 perft(Board &board, Depth depth) {
 
 template <bool Div, Colour Us>
 U64 perftmp(Board &board, Depth depth) {
-  MOStats        mostats{&killer, &history};
+  MOStats        mostats{&killer, &history, &cap_history};
   MovePicker<Us> mp(MPType::Main, board, mostats, NoMove, 0);
 
   if (!Div && depth <= 1) {

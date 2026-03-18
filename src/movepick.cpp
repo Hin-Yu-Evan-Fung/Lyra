@@ -2,6 +2,7 @@
 
 #include "bitboard.hpp"
 #include "defs.hpp"
+#include "history.hpp"
 #include "move.hpp"
 #include "movegen.hpp"
 
@@ -17,7 +18,8 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats mostats, Mov
                            Depth depth)
     : board_(board)
     , killer_(*mostats.killer)
-    , history_(mostats.hist)
+    , history_(*mostats.hist)
+    , cap_history_(*mostats.cap_hist)
     , tt_move_(tt_move)
     , depth_(depth) {
 
@@ -76,17 +78,16 @@ Move MovePicker<Us>::pop_back() {
 template <Colour Us>
 Eval MovePicker<Us>::score_cap(Move move) {
   // MVV LVA
-  PieceType attacker = pt_of(board_.on(MoveUtils::src(move)));
-  PieceType victim   = is_ep(move) ? P : pt_of(board_.on(MoveUtils::dst(move)));
-
-  Eval mvv_lva = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
+  PieceType attacker = board_.moved(move);
+  PieceType victim   = board_.captured(move);
+  Eval      mvv_lva  = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
   return mvv_lva;
 }
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  const PieceFromTo &p = piece_from_to(board_, move);
-  return (*history_)[p.pc][p.to];
+  const PieceTo &p = piece_to(board_, move);
+  return history_[p.pc][p.to];
 }
 
 /******************************************\

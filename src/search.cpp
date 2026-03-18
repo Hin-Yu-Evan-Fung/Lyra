@@ -12,6 +12,8 @@
 
 namespace Lyra {
 
+using namespace MoveUtils;
+
 void Worker::start(TimeControl tc) {
   Colour stm = board_.stm();
 
@@ -138,22 +140,35 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   Move best_move   = NoMove;
   bool full_search = false;
 
+  std::vector<Move> captures, quiets;
+
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
     Depth new_depth = depth - 1;
 
+    if (!pv && !board_.in_check()) {
+
+      /********************************\
+      |          SEE Pruning           |
+      \********************************/
+
+      // Near leaf nodes, we can safely (hopefully!) prune moves that lose in terms of exchanges
+      if (mp.stage() > GOOD_CAP && !is_terminal(best) && depth <= 10
+          && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth))
+        continue;
+    }
+
     move_count++;
     do_move<Us>(se, move);
 
     /********************************\
-    |       Late Move Reduction      |
+    |       Late move reduction      |
     \********************************/
 
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
-    if (depth > 2 && move_count > 2 + pv && !MoveUtils::is_promo(move)
-        && !MoveUtils::is_capture(move)) {
+    if (depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move)) {
       Depth r = 1;
 
       Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
@@ -201,8 +216,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Update History         |
   \********************************/
 
-  if (best_move && !MoveUtils::is_capture(best_move)) {
-    const PieceFromTo &p = piece_from_to(board_, best_move);
+  if (best_move && !is_capture(best_move)) {
+    const PieceTo &p = piece_to(board_, best_move);
     update_killer(se->killer, best_move);
     update_hist(history_[p.pc][p.to], 300 * depth - 250);
   }
@@ -283,6 +298,16 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
 
   while ((move = mp.next())) {
+
+    if (!is_loss(best)) {
+
+      /********************************\
+      |           SEE Pruning          |
+      \********************************/
+
+      // Ignore moves that lose material. Usually not worth considering
+      if (!board_.see(move, -30)) continue;
+    }
 
     do_move<Us>(se, move);
     Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);

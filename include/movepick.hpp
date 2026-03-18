@@ -8,7 +8,7 @@ namespace Lyra {
 
 enum class MPType { Main, QSearch };
 
-enum MovePickStage {
+enum MPStage {
   MAIN_TT,
   INIT_CAP,
   GOOD_CAP,
@@ -26,6 +26,7 @@ enum MovePickStage {
 struct MOStats {
   const Killer   *killer;
   const MainHist *hist;
+  const CapHist  *cap_hist;
 };
 
 template <Colour Us>
@@ -34,10 +35,12 @@ public:
   MovePicker(MPType type, const Board &board, MOStats stats, Move tt_move, Depth depth);
 
   Move next();
+  int  stage() { return stage_; }
 
   const Board    &board_;
   Killer          killer_;
-  const MainHist *history_;
+  const MainHist &history_;
+  const CapHist  &cap_history_;
   Move            tt_move_;
   Depth           depth_;
 

@@ -38,6 +38,7 @@ void Worker::reset(const Board &board) {
   seldepth_  = 0;
 
   history_.fill({});
+  cap_history_.fill({});
 }
 
 void Worker::uci_report(const PVLine &pv) const {
@@ -54,6 +55,6 @@ void Worker::report_best_move() const {
   std::fflush(stdout);
 }
 
-MOStats Worker::mostats(StackEntry *se) { return {&se->killer, &history_}; }
+MOStats Worker::mostats(StackEntry *se) { return {&se->killer, &history_, &cap_history_}; }
 
 } // namespace Lyra

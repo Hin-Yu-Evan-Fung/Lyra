@@ -36,13 +36,16 @@ public:
 
   Move next();
   int  stage() { return stage_; }
+  void skip_quiet() { skip_quiet_ = true; }
 
   const Board    &board_;
+  Move            tt_move_;
   Killer          killer_;
   const MainHist &history_;
   const CapHist  &cap_history_;
-  Move            tt_move_;
-  Depth           depth_;
+
+  Depth depth_;
+  bool  skip_quiet_;
 
 private:
   void gen_score_cap();

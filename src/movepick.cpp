@@ -17,11 +17,12 @@ template <Colour Us>
 MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats mostats, Move tt_move,
                            Depth depth)
     : board_(board)
+    , tt_move_(tt_move)
     , killer_(*mostats.killer)
     , history_(*mostats.hist)
     , cap_history_(*mostats.cap_hist)
-    , tt_move_(tt_move)
-    , depth_(depth) {
+    , depth_(depth)
+    , skip_quiet_(false) {
 
   switch (type) {
   case MPType::Main: stage_ = MAIN_TT; break;
@@ -157,11 +158,11 @@ Move MovePicker<Us>::next() {
     if (killer_[1]) return killer_[1];
     return next();
   case INIT_QUIET:
-    gen_score_quiet();
+    if (!skip_quiet_) gen_score_quiet();
     ++stage_;
     return next();
   case QUIET:
-    if (peek_front()) return pop_front();
+    if (!skip_quiet_ && peek_front()) return pop_front();
     ++stage_;
     return next();
   case BAD_CAP:

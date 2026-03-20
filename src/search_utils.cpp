@@ -1,10 +1,14 @@
 #include "search_utils.hpp"
 
+#include "move.hpp"
 #include "search.hpp"
+#include "utils.hpp"
 
 #include <print>
 
 namespace Lyra {
+
+using namespace MoveUtils;
 
 /******************************************\
 |==========================================|
@@ -26,7 +30,27 @@ std::string PVLine::format(bool chess960) const {
 
 /******************************************\
 |==========================================|
-|              Search Helpers              |
+|            Pruning conditions            |
+|==========================================|
+\******************************************/
+
+bool Worker::can_lmr(Depth depth, Move move, bool pv, int move_count) {
+  return depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move);
+}
+
+bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) {
+  return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
+         && board_.has_non_pawn_material(board_.stm());
+}
+
+bool Worker::can_see_prune(Depth depth, Eval best, Move move) {
+  return !is_terminal(best) && depth <= 10
+         && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth);
+}
+
+/******************************************\
+|==========================================|
+|              Search helpers              |
 |==========================================|
 \******************************************/
 

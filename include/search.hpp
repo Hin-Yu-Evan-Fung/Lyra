@@ -38,6 +38,10 @@ class Worker {
   template <Colour Us>
   constexpr void undo_null_move(StackEntry *se);
 
+  bool can_lmr(Depth depth, Move move, bool pv, int move_count);
+  bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
+  bool can_see_prune(Depth depth, Eval best, Move move);
+
   Clock             clock_;
   std::atomic_bool &stop_;
 

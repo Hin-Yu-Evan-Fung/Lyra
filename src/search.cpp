@@ -150,6 +150,13 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (!pv && !board_.in_check()) {
 
       /********************************\
+      |        Late Move Pruning       |
+      \********************************/
+      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move
+      // ordering
+      if (move_count >= 3 + depth * depth) mp.skip_quiet();
+
+      /********************************\
       |          SEE Pruning           |
       \********************************/
 

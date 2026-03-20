@@ -27,6 +27,8 @@ class Worker {
 
   // Helpers
   MOStats mostats(StackEntry *se);
+  void    update_cont_hist(StackEntry *se, Move move, Eval bonus);
+  void    update_all_stats(StackEntry *se, Depth depth, Move best);
 
   // Move wrappers
   template <Colour Us>
@@ -54,8 +56,9 @@ class Worker {
   Eval   eval_;
   Move   best_move_;
 
-  MainHist history_;
-  CapHist  cap_history_;
+  MainHist  history_;
+  CapHist   cap_history_;
+  ContTable cont_table_;
 
   TT &tt_;
 
@@ -84,7 +87,9 @@ public:
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
   ++nodes_;
-  se->move = move;
+  PieceTo p = piece_to(board_, move);
+  se->cont  = &cont_table_[p.pc][p.to];
+  se->move  = move;
   board_.do_move<Us>(move);
 }
 
@@ -96,6 +101,7 @@ constexpr void Worker::undo_move(StackEntry *se) {
 template <Colour Us>
 constexpr void Worker::do_null_move(StackEntry *se) {
   ++nodes_;
+  se->cont = &cont_table_[wP][A1]; // Dummy table
   se->move = NullMove;
   board_.do_null_move<Us>();
 }

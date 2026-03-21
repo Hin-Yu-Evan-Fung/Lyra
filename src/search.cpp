@@ -151,6 +151,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   }
 
   /********************************\
+  |  Internal Iterative Reduction  |
+  \********************************/
+
+  // If a pv node has no tt move or has a very shallow tt entry,
+  // then it usually means that this position is not that good,
+  // so we can reduce the depth search to avoid wasting time.
+  if (depth >= 4 && tt_move == NoMove) depth--;
+
+  /********************************\
   |        Main Search Loop        |
   \********************************/
 

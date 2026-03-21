@@ -115,7 +115,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |           Static Eval          |
   \********************************/
 
-  Eval eval = board_.eval();
+  Eval eval = se->static_eval = board_.eval();
+
+  const bool improving = se->static_eval > (se - 2)->static_eval;
 
   /********************************\
   |             Pruning            |
@@ -178,7 +180,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    Depth new_depth = depth - 1;
+    Depth     new_depth = depth - 1;
+    PieceType moved     = board_.moved(move);
+    PieceType cap       = board_.captured(move);
 
     if (!pv && !board_.in_check()) {
 
@@ -207,7 +211,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
     if (can_lmr(depth, move, pv, move_count)) {
-      Depth r = 1;
+      Depth r = lmr_reductions(depth, move_count);
+      r += !improving + !pv;
+      r -= mp.stage() < INIT_QUIET;
 
       Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
       val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

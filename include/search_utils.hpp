@@ -23,6 +23,7 @@ struct StackEntry {
   U16       ply;
   Move      move;
   ContHist *cont;
+  Eval      static_eval;
 };
 
 /******************************************\

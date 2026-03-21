@@ -6,6 +6,7 @@
 #include "search.hpp"
 #include "utils.hpp"
 
+#include <cmath>
 #include <print>
 
 namespace Lyra {
@@ -50,6 +51,15 @@ bool Worker::can_see_prune(Depth depth, Eval best, Move move) {
          && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth);
 }
 
+/******************************************\
+|==========================================|
+|                Reductions                |
+|==========================================|
+\******************************************/
+
+Depth Worker::lmr_reductions(Depth depth, int move_count) {
+  return 0.75 + std::log(depth) * std::log(move_count) / 3;
+}
 /******************************************\
 |==========================================|
 |              Search helpers              |

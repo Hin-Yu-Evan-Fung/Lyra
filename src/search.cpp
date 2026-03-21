@@ -48,12 +48,35 @@ void Worker::start(TimeControl tc) {
 // TODO: Aspiration windows
 template <Colour Us>
 void Worker::aspwin(StackEntry *se) {
-  Eval alpha = -EvalInf;
-  Eval beta  = EvalInf;
+  Eval  alpha  = -EvalInf;
+  Eval  beta   = EvalInf;
+  Eval  window = 25;
+  Depth r      = 0;
 
-  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
+  if (depth_ >= 5) {
+    alpha = std::max(eval_ - window, -EvalInf);
+    beta  = std::min(eval_ + window, EvalInf);
+  }
 
-  if (stop_.load(std::memory_order::relaxed)) return;
+  while (true) {
+    Depth r_depth = depth_ + 1 - r;
+    Eval  val     = negamax<Us, PV>(se, alpha, beta, r_depth);
+
+    if (stop_.load(std::memory_order::relaxed)) return;
+
+    if (val <= alpha) {
+      beta  = (alpha + beta) / 2;
+      alpha = std::max(val - window, -EvalInf);
+    } else if (val >= beta) {
+      beta = std::min(val + window, EvalInf);
+      if (r_depth > 1 && !is_terminal(val)) r += 1;
+    } else {
+      eval_ = val;
+      break;
+    }
+
+    window += window / 2;
+  }
 }
 
 /******************************************\

@@ -57,9 +57,12 @@ bool Worker::can_see_prune(Depth depth, Eval best, Move move) {
 |==========================================|
 \******************************************/
 
-Depth Worker::lmr_reductions(Depth depth, int move_count) {
+Depth Worker::lmr_reduction(Depth depth, int move_count) {
   return 0.75 + std::log(depth) * std::log(move_count) / 3;
 }
+
+Depth Worker::nmp_reduction(Depth depth) { return 3 + depth / 5; }
+
 /******************************************\
 |==========================================|
 |              Search helpers              |

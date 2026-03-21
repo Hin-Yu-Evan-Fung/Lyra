@@ -142,7 +142,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // 3. We prove that it will fail high even if we do nothing(null move) using a reduced search.
 
     if (can_nmp(se, depth, eval, beta)) {
-      Depth r = 2;
+      Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
       Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);
@@ -211,7 +211,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
     if (can_lmr(depth, move, pv, move_count)) {
-      Depth r = lmr_reductions(depth, move_count);
+      Depth r = lmr_reduction(depth, move_count);
       r += !improving + !pv;
       r -= mp.stage() < INIT_QUIET;
 

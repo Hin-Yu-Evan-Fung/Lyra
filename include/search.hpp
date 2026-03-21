@@ -46,7 +46,8 @@ class Worker {
   bool can_see_prune(Depth depth, Eval best, Move move);
 
   // Reductions
-  Depth lmr_reductions(Depth depth, int move_count);
+  Depth lmr_reduction(Depth depth, int move_count);
+  Depth nmp_reduction(Depth depth);
 
   Clock             clock_;
   std::atomic_bool &stop_;

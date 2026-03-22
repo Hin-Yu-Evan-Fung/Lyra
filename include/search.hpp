@@ -44,6 +44,7 @@ class Worker {
   bool can_lmr(Depth depth, Move move, bool pv, int move_count);
   bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta);
   bool can_see_prune(Depth depth, Eval best, Move move);
+  bool can_lmp(Depth depth, int move_count, Eval best, bool improving);
 
   // Reductions
   Depth lmr_reduction(Depth depth, int move_count);

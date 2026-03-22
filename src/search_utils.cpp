@@ -51,6 +51,10 @@ bool Worker::can_see_prune(Depth depth, Eval best, Move move) {
          && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth);
 }
 
+bool Worker::can_lmp(Depth depth, int move_count, Eval best, bool improving) {
+  return !is_loss(best) && depth <= 8 && move_count >= (5 + depth * depth) / (2 - improving);
+}
+
 /******************************************\
 |==========================================|
 |                Reductions                |

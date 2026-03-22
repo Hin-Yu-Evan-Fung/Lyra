@@ -309,7 +309,6 @@ void run_bench(int argc, char **argv) {
     total_time += worker.clock().elapsed();
     total_nps += worker.nodes() * 1000 / std::max(worker.clock().elapsed(), 1UL);
   }
-
   std::println("{} nodes {} nps {} time", total_nodes, total_nps / NBenchPos, total_time);
 }
 

@@ -196,9 +196,10 @@ bool Board::is_legal(Move move) const {
   using namespace BBUtils;
   using enum Direction;
 
-  constexpr Direction Up  = Us == White ? N : S;
-  constexpr Castle    OO  = Us == White ? WhiteOO : BlackOO;
-  constexpr Castle    OOO = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Direction Up        = Us == White ? N : S;
+  constexpr Castle    OO        = Us == White ? WhiteOO : BlackOO;
+  constexpr Castle    OOO       = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Rank      PromoRank = Us == White ? Rank7 : Rank2;
 
   if (!move) return false;
 
@@ -225,21 +226,15 @@ bool Board::is_legal(Move move) const {
   const BB     attacked   = undo_->attacked;
 
   // Check if the moving piece is ours or not
-  const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
-  // Check if the captured piece is theirs or not (Except for castling
-  // where we can capture our own rook)
-  const bool invalid_cap = !is_castle && cap != NoPiece && colour_of(cap) == Us;
-  // Check if the squares makes sense (Chess960 allows for src == dst
-  // for castling)
-  const bool invalid_sq = !is_castle && src == dst;
-  // Check if the capture flag is consistent with a piece being
-  // captured
-  const bool invalid_cap_flag = !is_castle && !is_ep && is_cap == (cap == NoPiece);
+  if (pc == NoPiece || colour_of(pc) != Us) return false;
+  // Check if the squares makes sense
+  if (!is_castle && src == dst) return false;
+  // Check if the captured piece is theirs or not
+  if (!is_castle && cap != NoPiece && colour_of(cap) == Us) return false;
+  // Check if the capture flag is consistent with a piece being captured
+  if (!is_castle && !is_ep && is_cap == (cap == NoPiece)) return false;
   // Check if the promotion flag is consistent
-  const bool invalid_promo_flag = is_promo && pt_of(pc) != P;
-
-  if (invalid_pc || invalid_cap || invalid_sq || invalid_cap_flag || invalid_promo_flag)
-    return false;
+  if (is_promo && (pt_of(pc) != P || rank_of(src) != PromoRank)) return false;
 
   if (is_castle) {
     if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();

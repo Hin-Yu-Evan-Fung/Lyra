@@ -12,8 +12,6 @@ enum MPStage {
   MAIN_TT,
   INIT_CAP,
   GOOD_CAP,
-  KILLER_1,
-  KILLER_2,
   INIT_QUIET,
   QUIET,
   BAD_CAP,
@@ -41,16 +39,6 @@ public:
   int  stage() { return stage_; }
   void skip_quiet() { skip_quiet_ = true; }
 
-  const Board    &board_;
-  Move            tt_move_;
-  Killer          killer_;
-  const MainHist &history_;
-  const CapHist  &cap_history_;
-  ContHistBuf     cont_hist_buf;
-
-  Depth depth_;
-  bool  skip_quiet_;
-
 private:
   void gen_score_cap();
   void gen_score_quiet();
@@ -65,6 +53,16 @@ private:
   bool peek_back() { return end_ptr_ != MaxMoves - 1; }
   Move pop_front();
   Move pop_back();
+
+  const Board    &board_;
+  Move            tt_move_;
+  Killer          killer_;
+  const MainHist &history_;
+  const CapHist  &cap_history_;
+  ContHistBuf     cont_hist_buf;
+
+  Depth depth_;
+  bool  skip_quiet_;
 
   Move moves_[MaxMoves];
   Eval scores_[MaxMoves];

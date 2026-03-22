@@ -235,7 +235,7 @@ Key Board::compute_pawn_key() const {
 |==========================================|
 \******************************************/
 
-Eval Board::compute_raw_eval() const {
+std::pair<Score, int> Board::compute_psq() const {
   Score score{};
   int   game_phase = 0;
 
@@ -247,7 +247,12 @@ Eval Board::compute_raw_eval() const {
     game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
   }
 
-  Eval raw = score.to_eval(game_phase);
+  return {score, game_phase};
+}
+
+Eval Board::compute_raw_eval() const {
+  auto [score, game_phase] = compute_psq();
+  Eval raw                 = score.to_eval(game_phase);
   return stm_ == White ? raw : -raw;
 }
 

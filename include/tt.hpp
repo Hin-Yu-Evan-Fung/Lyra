@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <utility>
+#include <vector>
 
 namespace Lyra {
 
@@ -29,12 +30,9 @@ enum TTBound {
   Upper  // Fail low nodes, upper bound for position eval
 };
 
-struct PackedTTEntry;
-class TT;
-
 struct TTEntry {
   Key     key;
-  U8      age;
+  Age     age;
   Depth   depth;
   TTBound bound;
   Move    move;
@@ -43,43 +41,51 @@ struct TTEntry {
 };
 
 struct PackedTTEntry {
-  std::atomic_uint64_t key;
-  std::atomic_uint64_t data;
+  std::atomic<U64> key;
+  std::atomic<U64> data;
 
-  constexpr bool is_valid(Key pos_key) const { return (pos_key ^ key) == data; }
-  constexpr void clear();
+  PackedTTEntry()
+      : key(0)
+      , data(0) {}
+  PackedTTEntry(const PackedTTEntry &pe)
+      : key(pe.key.load(std::memory_order_relaxed))
+      , data(pe.data.load(std::memory_order_relaxed)) {}
 
-  TTEntry read(Ply ply) const;
-  void    write(Key pos_key, U8 age, Depth depth, Ply ply, TTBound bound, Move move, Eval eval,
-                Eval value);
-
-private:
-  constexpr void save(TTEntry tt);
-
-  friend TT;
+  void clear() {
+    key.store(0, std::memory_order_relaxed);
+    data.store(0, std::memory_order_relaxed);
+  }
+  void    pack(const TTEntry &e, Ply ply);
+  TTEntry unpack(Ply ply) const;
 };
 
 class TT {
-  PackedTTEntry *table_ = nullptr;
-  U64            n_entries_;
-  U8             age_;
+  std::vector<PackedTTEntry> entries_;
+  Age                        age_;
 
-  size_t index(Key key) const { return (U128(key) * U128(n_entries_)) >> 64; }
+  constexpr size_t calc_no_of_entries(size_t mb) const {
+    return (mb << 20) / sizeof(PackedTTEntry);
+  }
+  constexpr size_t index(Key key) const { return (U128(key) * U128(size())) >> 64; }
 
 public:
-  TT(size_t mb);
-  ~TT();
+  TT(size_t mb)
+      : age_(0) {
+    resize(mb);
+    clear();
+  }
 
-  U8   age() const { return age_; }
+  constexpr Age    age() const { return age_; }
+  constexpr size_t size() const { return entries_.size(); }
+  size_t           hashfull() const;
+
   void reset_age() { age_ = 0; }
-  void incr_age();
+  void incr_age() { age_ = (age_ + 1) & 0x7FUL; }
+  void resize(size_t mb);
+  void clear();
 
-  void   resize(size_t mb);
-  void   clear();
-  size_t size() const { return n_entries_; }
-  size_t hashfull() const;
-
-  std::pair<bool, PackedTTEntry &> probe(Key key);
+  std::pair<bool, TTEntry> read(Key key, Ply ply);
+  void write(Key key, Depth depth, Ply ply, TTBound bound, Move move, Eval eval, Eval value);
 };
 
 } // namespace Lyra

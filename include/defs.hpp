@@ -10,19 +10,20 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-using I8   = int8_t;
-using I16  = int16_t;
-using I32  = int32_t;
 using U8   = uint8_t;
 using U16  = uint16_t;
 using U64  = uint64_t;
 using U128 = __uint128_t;
+using I8   = int8_t;
+using I16  = int16_t;
+using I32  = int32_t;
 
-using Key   = U64;
+using Age   = U8;
+using Move  = U16;
 using Ply   = U16;
+using Key   = U64;
 using Depth = I16;
 using Eval  = I32;
-using Move  = U16;
 
 /******************************************\
 |==========================================|

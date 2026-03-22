@@ -5,6 +5,7 @@
 #include "perft.hpp"
 
 #include <atomic>
+#include <print>
 
 namespace Lyra {
 
@@ -36,6 +37,13 @@ void Engine::go(const TimeControl &tc) {
 
 void Engine::perft(PerftMode perft_mode, Depth d) {
   if (!is_busy()) Lyra::perft(perft_mode, board_, d);
+}
+
+void Engine::print_eval() {
+  auto [score, game_phase] = board_.compute_psq();
+  std::println("Eval: {}, MG: {}, EG: {}, Game Phase: {}", score.to_eval(game_phase), score.mg,
+               score.eg, game_phase);
+  std::println("Incremental Eval: {}", board_.eval());
 }
 
 /******************************************\

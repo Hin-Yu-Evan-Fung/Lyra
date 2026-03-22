@@ -88,10 +88,9 @@ class Board {
   void           update_reps() const;
 
   // Functions that compute from scratch
-  Eval                  compute_raw_eval() const;
-  Key                   compute_key() const;
-  Key                   compute_pawn_key() const;
-  std::pair<Score, int> compute_psq() const; // (PSQT score, Game Phase)
+  Eval compute_raw_eval() const;
+  Key  compute_key() const;
+  Key  compute_pawn_key() const;
 
 public:
   Board();
@@ -139,6 +138,7 @@ public:
   constexpr Colour      stm() const;
   constexpr Undo *const undo() const;
   Eval                  eval() const;
+  std::pair<Score, int> compute_psq() const; // (PSQT score, Game Phase)
   constexpr CastleMask  castle_mask() const;
   constexpr Key         key() const;
 

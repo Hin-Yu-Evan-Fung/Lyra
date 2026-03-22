@@ -93,7 +93,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv   = NT == PV;
   const bool     root = se->ply == 0;
 
-  if (depth == 0) return qsearch<Us, NT>(se, alpha, beta);
+  if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
   seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
@@ -120,18 +120,16 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.probe(board_.key());
+  auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
 
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    TTEntry entry = tt_entry.read(se->ply);
-
-    if (!pv && entry.depth >= depth && can_tt_cutoff(entry, alpha, beta)) {
-      return entry.value;
+    if (!pv && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
+      return tt_entry.value;
     }
 
-    tt_move = entry.move;
+    tt_move = tt_entry.move;
   }
 
   /********************************\
@@ -203,9 +201,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    Depth     new_depth = depth - 1;
-    PieceType moved     = board_.moved(move);
-    PieceType cap       = board_.captured(move);
+    Depth new_depth = depth - 1;
 
     if (!pv && !board_.in_check()) {
 
@@ -297,11 +293,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   // If we fail high, we have a lower bound for how good this pos is.
   // If we are in PV and we have a best move, then we have an exact bound.
-  tt_entry.write(board_.key(), tt_.age(), depth, se->ply,
-                 best >= beta        ? TTBound::Lower
-                 : (pv && best_move) ? TTBound::Exact
-                                     : TTBound::Upper,
-                 best_move, 0, best);
+  tt_.write(board_.key(), depth, se->ply,
+            best >= beta        ? TTBound::Lower
+            : (pv && best_move) ? TTBound::Exact
+                                : TTBound::Upper,
+            best_move, 0, best);
+
   return best;
 }
 
@@ -323,18 +320,16 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.probe(board_.key());
+  auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
 
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    TTEntry entry = tt_entry.read(se->ply);
-
-    if (!pv && can_tt_cutoff(entry, alpha, beta)) {
-      return entry.value;
+    if (!pv && can_tt_cutoff(tt_entry, alpha, beta)) {
+      return tt_entry.value;
     }
 
-    tt_move = entry.move;
+    tt_move = tt_entry.move;
   }
 
   /********************************\
@@ -402,8 +397,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   \********************************/
 
   // If we fail high, we have a lower bound for how good this pos is.
-  tt_entry.write(board_.key(), tt_.age(), DepthQS, se->ply,
-                 best >= beta ? TTBound::Lower : TTBound::Upper, best_move, 0, best);
+  tt_.write(board_.key(), DepthQS, se->ply, best >= beta ? TTBound::Lower : TTBound::Upper,
+            best_move, 0, best);
 
   return best;
 }

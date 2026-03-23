@@ -147,9 +147,7 @@ public:
   constexpr bool can_castle() const;
 
   // Movepick Helpers
-  BB attackers_to(Square to, BB occ) const;
-  template <Colour Us>
-  bool is_legal(Move move) const;
+  BB   attackers_to(Square to, BB occ) const;
   bool see(Move move, Eval threshold) const;
 
   // Game State functions

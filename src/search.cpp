@@ -9,6 +9,7 @@
 #include "utils.hpp"
 
 #include <atomic>
+#include <stdexcept>
 
 namespace Lyra {
 
@@ -202,7 +203,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    Depth new_depth = depth - 1;
+    const Depth new_depth    = depth - 1;
+    const bool  is_killer_tt = move == tt_move || move == se->killer[0] || move == se->killer[1];
+
     move_count++;
 
     if (!pv && !in_check && board_.has_non_pawn_material(board_.stm())) {
@@ -233,8 +236,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // 2. Use a null window with reduced search to prove that later moves are worse.
     if (can_lmr(depth, move, pv, move_count)) {
       Depth r = lmr_reduction(depth, move_count);
-      r += !improving + !pv;
-      r -= mp.stage() < INIT_QUIET;
+      if (!pv) r++;
+      if (!improving) r++;
+      if (is_killer_tt) r--;
 
       Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
       val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

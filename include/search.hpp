@@ -28,7 +28,8 @@ class Worker {
   // Helpers
   MOStats mostats(StackEntry *se);
   void    update_cont_hist(StackEntry *se, Move move, Eval bonus);
-  void    update_all_stats(StackEntry *se, Depth depth, Move best);
+  void update_all_stats(StackEntry *se, Depth depth, Move best, const std::vector<Move> &captures,
+                        const std::vector<Move> &quiets);
 
   // Move wrappers
   template <Colour Us>

@@ -204,7 +204,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   while ((move = mp.next())) {
     const Depth new_depth    = depth - 1;
+    const bool  is_cap       = is_capture(move);
     const bool  is_killer_tt = move == tt_move || move == se->killer[0] || move == se->killer[1];
+
+    (is_cap ? captures : quiets).push_back(move);
 
     move_count++;
 
@@ -285,7 +288,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Update History         |
   \********************************/
 
-  if (best_move) update_all_stats(se, depth, best_move);
+  if (best_move) update_all_stats(se, depth, best_move, captures, quiets);
 
   /********************************\
   |        Draw / mate score       |

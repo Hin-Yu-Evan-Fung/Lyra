@@ -9,7 +9,6 @@
 #include "utils.hpp"
 
 #include <atomic>
-#include <stdexcept>
 
 namespace Lyra {
 
@@ -203,7 +202,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    const Depth new_depth    = depth - 1;
+    const Depth new_depth    = depth - 1 + in_check;
     const bool  is_cap       = is_capture(move);
     const bool  is_killer_tt = move == tt_move || move == se->killer[0] || move == se->killer[1];
 

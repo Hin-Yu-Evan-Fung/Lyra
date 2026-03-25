@@ -74,13 +74,21 @@ void Worker::update_cont_hist(StackEntry *se, Move move, Eval bonus) {
   }
 }
 
-void Worker::update_all_stats(StackEntry *se, Depth depth, Move best) {
+void Worker::update_all_stats(StackEntry *se, Depth depth, Move best,
+                              const std::vector<Move> &captures, const std::vector<Move> &quiets) {
   if (!is_capture(best)) {
-    const Eval     bonus = 300 * depth - 250;
-    const PieceTo &p     = piece_to(board_, best);
+    const Eval    bonus = std::min(300 * depth - 250, 1500);
+    const PieceTo p     = piece_to(board_, best);
     update_killer(se->killer, best);
     update_hist(history_[p.pc][p.to], bonus);
     update_cont_hist(se, best, bonus);
+
+    for (Move m : quiets) {
+      if (m == best) continue;
+      const PieceTo p = piece_to(board_, m);
+      update_hist(history_[p.pc][p.to], -bonus);
+      update_cont_hist(se, m, -bonus);
+    }
   }
 }
 

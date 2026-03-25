@@ -67,8 +67,9 @@ void Worker::aspwin(StackEntry *se) {
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
-  constexpr bool pv   = NT == PV;
-  const bool     root = se->ply == 0;
+  constexpr bool pv       = NT == PV;
+  const bool     root     = se->ply == 0;
+  const bool     in_check = board_.in_check();
 
   if (depth == 0) return qsearch<Us, NT>(se, alpha, beta);
 
@@ -82,7 +83,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
     if (board_.is_draw(se->ply)) return EvalDraw;
-    if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
+    if (se->ply >= MaxDepth - 1) return in_check ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
     alpha = std::max(alpha, mated_in(se->ply));
@@ -113,7 +114,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   Eval eval = board_.eval();
 
-  if (!pv && !board_.in_check()) {
+  if (!pv && !in_check) {
     if (depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
         && board_.has_non_pawn_material(board_.stm())) {
 
@@ -146,9 +147,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    Depth new_depth = depth - 1;
+    const Depth new_depth = depth - 1;
+    const bool  is_cap    = is_capture(move);
 
-    if (!pv && !board_.in_check()) {
+    (is_cap ? captures : quiets).push_back(move);
+
+    move_count++;
+
+    if (!pv && !in_check && board_.has_non_pawn_material(board_.stm())) {
 
       /********************************\
       |        Late Move Pruning       |
@@ -167,7 +173,6 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
         continue;
     }
 
-    move_count++;
     do_move<Us>(se, move);
 
     /********************************\
@@ -224,7 +229,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Update History         |
   \********************************/
 
-  if (best_move) update_all_stats(se, depth, best_move);
+  if (best_move) update_all_stats(se, depth, best_move, captures, quiets);
 
   /********************************\
   |        Draw / mate score       |

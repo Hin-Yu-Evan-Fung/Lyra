@@ -28,7 +28,10 @@ void Worker::start(TimeControl tc) {
   for (int i = 0; i <= StackOffset; i++) (se - i)->cont = &cont_table_[wP][A1];
   for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
-  while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
+  while (
+      depth_ < MaxDepth
+      && !clock_.stop_iter(depth_, last_best_move_depth_, avg_eval_, eval_, nodes_, best_move_)) {
+
     if (stm == White)
       aspwin<White>(se);
     else
@@ -37,7 +40,11 @@ void Worker::start(TimeControl tc) {
     if (stop_.load(std::memory_order::relaxed)) break;
 
     uci_report(se->pv);
-    best_move_ = se->pv.moves[0];
+
+    if (best_move_ != se->pv.moves[0]) {
+      best_move_            = se->pv.moves[0];
+      last_best_move_depth_ = depth_;
+    }
 
     depth_ += 1;
   }
@@ -51,9 +58,8 @@ void Worker::aspwin(StackEntry *se) {
   Eval alpha = -EvalInf;
   Eval beta  = EvalInf;
 
-  eval_ = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
-
-  if (stop_.load(std::memory_order::relaxed)) return;
+  eval_     = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
+  avg_eval_ = depth_ > 1 ? (avg_eval_ * 8 + eval_ * 2) / 10 : eval_;
 }
 
 /******************************************\
@@ -177,6 +183,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     |       Late move reduction      |
     \********************************/
 
+    U64 cached_nodes = nodes_;
+
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
     if (depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move)) {
@@ -204,6 +212,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
+
+    if (root) {
+      clock_.update_effort(nodes_ - cached_nodes, move);
+    }
 
     /********************************\
     |       Alpha Beta Pruning       |

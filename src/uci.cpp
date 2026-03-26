@@ -96,6 +96,8 @@ void UCI::parse_go(std::istringstream &is) {
       is >> tc.move_time;
     else if (token == "infinite")
       tc.is_infinite = true;
+    else if (token == "nodes")
+      is >> tc.nodes;
     else {
       std::println("Wrong command format!");
       return;

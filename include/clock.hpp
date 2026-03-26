@@ -23,19 +23,25 @@ public:
   void set(Colour stm, const TimeControl &tc);
   Time elapsed() const { return now() - start_; }
 
-  bool stop_iter(Depth depth);
+  bool stop_iter(Depth depth, Depth last_best_move_depth, Eval avg_eval, Eval eval, U64 nodes,
+                 Move best_move);
   bool stop(U64 nodes);
+  void update_effort(U64 nodes, Move move);
 
 private:
   void calc_time();
 
   std::atomic_bool &stop_;
 
+  NDArray<U64, NSquare, NSquare> effort_;
+
   Time start_;
   Time opt_;
   Time max_;
 
   Depth max_depth_;
+
+  int pv_stability_;
 
   std::atomic_uint64_t total_nodes;
 };

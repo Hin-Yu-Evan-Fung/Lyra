@@ -75,10 +75,11 @@ Depth Worker::nmp_reduction(Depth depth) { return 3 + depth / 5; }
 
 void Worker::reset(const Board &board) {
   board_.copy(board);
-  best_move_ = NoMove;
-  nodes_     = 0;
-  depth_     = 0;
-  seldepth_  = 0;
+  best_move_            = NoMove;
+  nodes_                = 0;
+  depth_                = 0;
+  seldepth_             = 0;
+  last_best_move_depth_ = 0;
 
   history_     = {};
   cap_history_ = {};

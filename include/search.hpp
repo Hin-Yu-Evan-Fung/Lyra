@@ -50,7 +50,9 @@ class Worker {
   size_t nodes_;
   Depth  depth_;
   Depth  seldepth_;
+  Depth  last_best_move_depth_;
   Eval   eval_;
+  Eval   avg_eval_;
   Move   best_move_;
 
   MainHist  history_;

@@ -4,7 +4,6 @@
 #include "immintrin.h"
 
 #include <immintrin.h>
-#include <stdexcept>
 
 namespace Lyra {
 
@@ -33,10 +32,12 @@ void init();
 |==========================================|
 \******************************************/
 
-constexpr BB EmptyBB = 0ULL;
-constexpr BB FullBB  = ~EmptyBB;
-constexpr BB Rank1BB = 0xFFULL;
-constexpr BB FileABB = 0x0101010101010101ULL;
+constexpr BB EmptyBB   = 0ULL;
+constexpr BB FullBB    = ~EmptyBB;
+constexpr BB Rank1BB   = 0xFFULL;
+constexpr BB FileABB   = 0x0101010101010101ULL;
+constexpr BB WhiteSqBB = 0xAA55AA55AA55AA55;
+constexpr BB BlackSqBB = 0x55AA55AA55AA55AA;
 
 constexpr BB from(Square sq) { return 1ULL << sq; }
 constexpr BB from(Rank r) { return Rank1BB << (r * 8); }

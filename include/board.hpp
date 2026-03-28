@@ -154,6 +154,7 @@ public:
   bool is_draw(Ply ply) const;
   bool in_check() const;
   bool has_non_pawn_material(Colour us) const;
+  bool insufficient_material() const;
 };
 
 /******************************************\

@@ -20,8 +20,7 @@ Thread::Thread(std::atomic_bool &stop, size_t id, TT &tt)
 
 Thread::~Thread() {
   exit_ = true;
-  cv_.notify_one(); // Notify the idle loop that the loop must exit as soon as
-                    // possible
+  cv_.notify_one(); // Notify the idle loop that the loop must exit as soon as possible
   if (thread_.joinable()) thread_.join();
 }
 
@@ -89,12 +88,6 @@ void ThreadPool::exec(std::function<void(Thread &)> func) {
 
 void ThreadPool::wait() {
   for (auto &thread : threads_) thread->wait();
-}
-
-bool ThreadPool::is_busy() {
-  for (auto &thread : threads_)
-    if (thread->is_busy()) return true;
-  return false;
 }
 
 void ThreadPool::stop() {

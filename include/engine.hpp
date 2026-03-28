@@ -23,7 +23,6 @@ public:
   Engine();
 
   void wait() { pool_.wait(); }
-  bool is_busy() { return pool_.is_busy(); }
   void set_pos(const std::string fen, const std::vector<std::string> &moves);
   void print_pos() { board_.print(); }
   void print_eval();

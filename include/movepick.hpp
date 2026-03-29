@@ -16,9 +16,13 @@ enum MPStage {
   QUIET,
   BAD_CAP,
 
-  QSEARCH_TT,
-  QSEARCH_INIT,
-  QSEARCH,
+  QCAP_TT,
+  QCAP_INIT,
+  QCAP,
+
+  QEVASIONS_TT,
+  QEVASIONS_INIT,
+  QEVASIONS,
 };
 
 using ContHistBuf = std::array<ContHist *, 2>;

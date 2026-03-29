@@ -28,7 +28,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
 
   switch (type) {
   case MPType::Main: stage_ = MAIN_TT; break;
-  case MPType::QSearch: stage_ = QSEARCH_TT; break;
+  case MPType::QSearch: stage_ = board_.in_check() ? QEVASIONS_TT : QCAP_TT; break;
   }
 
   if (type == MPType::QSearch && !is_capture(tt_move_)) {
@@ -137,6 +137,24 @@ void MovePicker<Us>::gen_score_quiet() {
   });
 }
 
+template <Colour Us>
+void MovePicker<Us>::gen_score_evasion() {
+  constexpr Eval CAP_BASE = 1000000;
+  start_ptr_              = 0;
+
+  enum_moves<Us, GenAll>(board_, [&](Move move) {
+    if (move == tt_move_) return;
+
+    if (is_capture(move)) {
+      moves_[start_ptr_]    = move;
+      scores_[start_ptr_++] = CAP_BASE + score_cap(move);
+    } else {
+      moves_[start_ptr_]    = move;
+      scores_[start_ptr_++] = score_quiet(move);
+    }
+  });
+}
+
 /******************************************\
 |==========================================|
 |            Next Move Function            |
@@ -147,12 +165,13 @@ template <Colour Us>
 Move MovePicker<Us>::next() {
   switch (stage_) {
   case MAIN_TT:
-  case QSEARCH_TT:
+  case QCAP_TT:
+  case QEVASIONS_TT:
     ++stage_;
     if (tt_move_) return tt_move_;
     return next();
   case INIT_CAP:
-  case QSEARCH_INIT:
+  case QCAP_INIT:
     gen_score_cap();
     ++stage_;
     return next();
@@ -171,7 +190,14 @@ Move MovePicker<Us>::next() {
   case BAD_CAP:
     if (peek_back()) return pop_back();
     return NoMove;
-  case QSEARCH:
+  case QCAP:
+    if (peek_front()) return pop_front();
+    return NoMove;
+  case QEVASIONS_INIT:
+    gen_score_evasion();
+    stage_++;
+    return next();
+  case QEVASIONS:
     if (peek_front()) return pop_front();
     return NoMove;
   };

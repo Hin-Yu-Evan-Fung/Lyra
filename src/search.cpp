@@ -9,6 +9,8 @@
 #include "utils.hpp"
 
 #include <atomic>
+#include <print>
+#include <stdexcept>
 
 namespace Lyra {
 
@@ -329,14 +331,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
-  constexpr bool pv = NT == PV;
+  constexpr bool pv       = NT == PV;
+  const bool     in_check = board_.in_check();
 
   se->pv.clear();
   seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
 
   if (clock_.stop(nodes_)) return EvalStop;
   if (board_.is_draw(se->ply)) return EvalDraw;
-  if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
+  if (se->ply >= MaxDepth - 1) return in_check ? EvalDraw : board_.eval();
 
   /********************************\
   |   Transposition Table Lookup   |
@@ -354,30 +357,38 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     tt_move = tt_entry.move;
   }
 
-  /********************************\
-  |            Stand pat           |
-  \********************************/
+  Eval best = -EvalInf;
 
-  // The current eval is the lower bound because we can just not capture
-  // anything (assume its not a zugzwang) If lower bound >= beta, then we fail
-  // high (opponent has better options) If lower bound > alpha, then we update
-  // alpha (the best we can do)
-  Eval best = board_.eval();
-  if (best >= beta) return best;
-  alpha = std::max(alpha, best);
+  if (!in_check) {
+
+    /********************************\
+    |            Stand pat           |
+    \********************************/
+
+    // The current eval is the lower bound because we can just not capture
+    // anything (assume its not a zugzwang) If lower bound >= beta, then we fail
+    // high (opponent has better options) If lower bound > alpha, then we update
+    // alpha (the best we can do)
+    best = board_.eval();
+    if (best >= beta) return best;
+    alpha = std::max(alpha, best);
+  }
 
   /********************************\
   |        Main Qsearch Loop       |
   \********************************/
 
-  Move move      = NoMove;
-  Move best_move = NoMove;
+  Move move       = NoMove;
+  Move best_move  = NoMove;
+  int  move_count = 0;
 
   // Clear killer moves
   (se + 1)->killer.fill(NoMove);
   MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
 
   while ((move = mp.next())) {
+
+    move_count++;
 
     if (!is_loss(best)) {
 
@@ -413,6 +424,12 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       }
     }
   }
+
+  /********************************\
+  |        Draw / mate score       |
+  \********************************/
+
+  if (in_check && move_count == 0) best = mated_in(se->ply);
 
   /********************************\
   |   Transposition table write    |

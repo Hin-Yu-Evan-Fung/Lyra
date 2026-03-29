@@ -14,13 +14,14 @@ namespace Lyra {
 constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 
 template <Colour Us>
-MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats mostats, Move tt_move,
+MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, Move tt_move,
                            Depth depth)
     : board_(board)
     , tt_move_(tt_move)
     , killer_(*mostats.killer)
     , history_(*mostats.hist)
     , cap_history_(*mostats.cap_hist)
+    , cont_hist_buf(std::move(mostats.cont_hist_buf))
     , depth_(depth)
     , skip_quiet_(false) {
 
@@ -87,8 +88,12 @@ Eval MovePicker<Us>::score_cap(Move move) {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  const PieceTo &p = piece_to(board_, move);
-  return history_[p.pc][p.to];
+  const PieceTo &p     = piece_to(board_, move);
+  Eval           score = history_[p.pc][p.to];
+
+  for (ContHist *cont : cont_hist_buf) score += (*cont)[p.pc][p.to];
+
+  return score;
 }
 
 /******************************************\

@@ -54,6 +54,7 @@ private:
   Move pop_front();
   Move pop_back();
 
+  MPType          type_;
   const Board    &board_;
   Move            tt_move_;
   Killer          killer_;

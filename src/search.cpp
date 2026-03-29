@@ -160,7 +160,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     \********************************/
 
     // If a move near the leaf nodes is far too good to be true, prune it.
-    if (!is_win(eval) && !is_loss(beta) && depth <= 8 && eval - 100 * depth >= beta) return beta;
+    if (!is_win(eval) && !is_loss(beta) && depth <= 8 && eval - 150 * depth - 70 >= beta && !tt_hit)
+      return beta;
 
     /********************************\
     |        Null Move Pruning       |

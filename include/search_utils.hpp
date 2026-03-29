@@ -18,10 +18,11 @@ struct PVLine {
 };
 
 struct StackEntry {
-  Killer killer;
-  PVLine pv;
-  U16    ply;
-  Move   move;
+  Killer    killer;
+  PVLine    pv;
+  U16       ply;
+  Move      move;
+  ContHist *cont;
 };
 
 /******************************************\

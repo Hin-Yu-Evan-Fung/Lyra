@@ -23,16 +23,19 @@ enum MPStage {
   QSEARCH,
 };
 
+using ContHistBuf = std::array<ContHist *, 2>;
+
 struct MOStats {
   const Killer   *killer;
   const MainHist *hist;
   const CapHist  *cap_hist;
+  ContHistBuf     cont_hist_buf;
 };
 
 template <Colour Us>
 class MovePicker {
 public:
-  MovePicker(MPType type, const Board &board, MOStats stats, Move tt_move, Depth depth);
+  MovePicker(MPType type, const Board &board, MOStats &&stats, Move tt_move, Depth depth);
 
   Move next();
   int  stage() { return stage_; }
@@ -43,6 +46,7 @@ public:
   Killer          killer_;
   const MainHist &history_;
   const CapHist  &cap_history_;
+  ContHistBuf     cont_hist_buf;
 
   Depth depth_;
   bool  skip_quiet_;

@@ -1,10 +1,15 @@
 #include "search_utils.hpp"
 
+#include "history.hpp"
+#include "move.hpp"
+#include "params.hpp"
 #include "search.hpp"
 
 #include <print>
 
 namespace Lyra {
+
+using namespace MoveUtils;
 
 /******************************************\
 |==========================================|
@@ -37,8 +42,9 @@ void Worker::reset(const Board &board) {
   depth_     = 0;
   seldepth_  = 0;
 
-  history_.fill({});
-  cap_history_.fill({});
+  history_     = {};
+  cap_history_ = {};
+  cont_table_  = {};
 }
 
 void Worker::uci_report(const PVLine &pv) const {
@@ -55,6 +61,27 @@ void Worker::report_best_move() const {
   std::fflush(stdout);
 }
 
-MOStats Worker::mostats(StackEntry *se) { return {&se->killer, &history_, &cap_history_}; }
+MOStats Worker::mostats(StackEntry *se) {
+  return {&se->killer, &history_, &cap_history_, {(se - 1)->cont, (se - 2)->cont}};
+}
+
+void Worker::update_cont_hist(StackEntry *se, Move move, Eval bonus) {
+  for (unsigned i = 1; i <= ContSize; ++i) {
+    if ((se - i)->move == NoMove) continue;
+    PieceTo   p    = piece_to(board_, move);
+    ContHist &cont = *(se - i)->cont;
+    update_hist(cont[p.pc][p.to], bonus);
+  }
+}
+
+void Worker::update_all_stats(StackEntry *se, Depth depth, Move best) {
+  if (!is_capture(best)) {
+    const Eval     bonus = 300 * depth - 250;
+    const PieceTo &p     = piece_to(board_, best);
+    update_killer(se->killer, best);
+    update_hist(history_[p.pc][p.to], bonus);
+    update_cont_hist(se, best, bonus);
+  }
+}
 
 } // namespace Lyra

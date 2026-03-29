@@ -25,6 +25,7 @@ void Worker::start(TimeControl tc) {
   StackEntry  stack[MaxDepth + StackOffset]{};
   StackEntry *se = stack + StackOffset;
 
+  for (int i = 0; i <= StackOffset; i++) (se - i)->cont = &cont_table_[wP][A1];
   for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
   while (depth_ < MaxDepth && !clock_.stop_iter(depth_)) {
@@ -223,11 +224,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Update History         |
   \********************************/
 
-  if (best_move && !is_capture(best_move)) {
-    const PieceTo &p = piece_to(board_, best_move);
-    update_killer(se->killer, best_move);
-    update_hist(history_[p.pc][p.to], 300 * depth - 250);
-  }
+  if (best_move) update_all_stats(se, depth, best_move);
 
   /********************************\
   |        Draw / mate score       |

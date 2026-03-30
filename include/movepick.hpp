@@ -41,6 +41,7 @@ public:
   int  stage() { return stage_; }
   void skip_quiet() { skip_quiet_ = true; }
 
+  MPType          type_;
   const Board    &board_;
   Move            tt_move_;
   Killer          killer_;

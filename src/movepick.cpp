@@ -16,7 +16,8 @@ constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
 template <Colour Us>
 MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, Move tt_move,
                            Depth depth)
-    : board_(board)
+    : type_(type)
+    , board_(board)
     , tt_move_(tt_move)
     , killer_(*mostats.killer)
     , history_(*mostats.hist)
@@ -106,10 +107,14 @@ template <Colour Us>
 void MovePicker<Us>::gen_score_cap() {
   start_ptr_ = 0;
   end_ptr_   = MaxMoves - 1;
+
+  Eval threshold = EvalDraw;
+  if (type_ == MPType::QSearch) threshold = -30;
+
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
-    if (board_.see(move, EvalDraw)) {
+    if (board_.see(move, threshold)) {
       moves_[start_ptr_]    = move;
       scores_[start_ptr_++] = score_cap(move);
     } else {

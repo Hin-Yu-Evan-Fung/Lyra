@@ -317,16 +317,6 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   while ((move = mp.next())) {
 
-    if (!is_loss(best)) {
-
-      /********************************\
-      |           SEE Pruning          |
-      \********************************/
-
-      // Ignore moves that lose material. Usually not worth considering
-      if (!board_.see(move, -30)) continue;
-    }
-
     do_move<Us>(se, move);
     Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
     undo_move<Us>(se);

@@ -145,7 +145,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   if (!pv && !in_check) {
 
     if (can_nmp(se, depth, eval, beta)) {
-      Depth r = 2;
+      Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
       Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);

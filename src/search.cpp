@@ -52,14 +52,38 @@ void Worker::start(TimeControl tc) {
   report_best_move();
 }
 
-// TODO: Aspiration windows
 template <Colour Us>
 void Worker::aspwin(StackEntry *se) {
-  Eval alpha = -EvalInf;
-  Eval beta  = EvalInf;
+  Eval  alpha  = -EvalInf;
+  Eval  beta   = EvalInf;
+  Eval  window = 25;
+  Depth r      = 0;
 
-  eval_     = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
-  avg_eval_ = depth_ > 1 ? (avg_eval_ * 8 + eval_ * 2) / 10 : eval_;
+  if (depth_ >= 5) {
+    alpha = std::max(eval_ - window, -EvalInf);
+    beta  = std::min(eval_ + window, EvalInf);
+  }
+
+  while (true) {
+    Depth r_depth = depth_ + 1 - r;
+    Eval  val     = negamax<Us, PV>(se, alpha, beta, r_depth);
+
+    if (stop_.load(std::memory_order_relaxed)) return;
+
+    if (val <= alpha) {
+      beta  = (alpha + beta) / 2;
+      alpha = std::max(val - window, -EvalInf);
+    } else if (val >= beta) {
+      beta = std::min(val + window, EvalInf);
+      if (r_depth > 1 && !is_terminal(val)) r += 1;
+    } else {
+      eval_     = val;
+      avg_eval_ = depth_ > 1 ? (avg_eval_ * 8 + eval_ * 2) / 10 : eval_;
+      break;
+    }
+
+    window += window / 2;
+  }
 }
 
 /******************************************\

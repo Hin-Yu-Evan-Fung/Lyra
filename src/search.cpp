@@ -143,9 +143,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   Eval eval = board_.eval();
 
   if (!pv && !in_check) {
-    if (depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
-        && board_.has_non_pawn_material(board_.stm())) {
 
+    if (can_nmp(se, depth, eval, beta)) {
       Depth r = 2;
 
       do_null_move<Us>(se);
@@ -189,16 +188,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       \********************************/
       // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move
       // ordering
-      if (move_count >= 3 + depth * depth) mp.skip_quiet();
+      if (can_lmp(depth, move_count)) mp.skip_quiet();
 
       /********************************\
       |          SEE Pruning           |
       \********************************/
 
       // Near leaf nodes, we can safely (hopefully!) prune moves that lose in terms of exchanges
-      if (mp.stage() > GOOD_CAP && !is_terminal(best) && depth <= 10
-          && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth))
-        continue;
+      if (mp.stage() > GOOD_CAP && can_see_prune(depth, move, best)) continue;
     }
 
     do_move<Us>(se, move);
@@ -211,8 +208,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
-    if (depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move)) {
-      Depth r = 1;
+    if (can_lmr(depth, move_count, pv, move)) {
+      Depth r = lmr_reduction(depth, move_count);
 
       Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
       val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

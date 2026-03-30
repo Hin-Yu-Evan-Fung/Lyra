@@ -9,6 +9,7 @@
 #include "tt.hpp"
 
 #include <atomic>
+#include <cmath>
 
 namespace Lyra {
 
@@ -40,6 +41,15 @@ class Worker {
   constexpr void do_null_move(StackEntry *se);
   template <Colour Us>
   constexpr void undo_null_move(StackEntry *se);
+
+  // Pruning conditions
+  constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
+  constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
+  constexpr bool can_see_prune(Depth depth, Move move, Eval best) const;
+  constexpr bool can_lmp(Depth depth, int move_count) const;
+
+  // Reductions
+  constexpr Depth lmr_reduction(Depth depth, int move_count);
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -108,6 +118,42 @@ constexpr void Worker::do_null_move(StackEntry *se) {
 template <Colour Us>
 constexpr void Worker::undo_null_move(StackEntry *se) {
   board_.undo_null_move<Us>();
+}
+
+/******************************************\
+|==========================================|
+|            Pruning Conditions            |
+|==========================================|
+\******************************************/
+
+constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
+  return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
+         && board_.has_non_pawn_material(board_.stm());
+}
+
+constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) const {
+  using namespace MoveUtils;
+  return depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move);
+}
+
+constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) const {
+  using namespace MoveUtils;
+  return !is_terminal(best) && depth <= 10
+         && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth);
+}
+
+constexpr bool Worker::can_lmp(Depth depth, int move_count) const {
+  return move_count >= 3 + depth * depth;
+}
+
+/******************************************\
+|==========================================|
+|                Reductions                |
+|==========================================|
+\******************************************/
+
+constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
+  return 0.75 + std::log(depth) * std::log(move_count) / 3;
 }
 
 } // namespace Lyra

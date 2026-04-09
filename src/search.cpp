@@ -4,6 +4,7 @@
 #include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
+#include "params.hpp"
 #include "search_utils.hpp"
 #include "tt.hpp"
 #include "utils.hpp"
@@ -130,17 +131,38 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
 
-  Move tt_move = NoMove;
+  Eval tt_eval  = EvalInvalid;
+  Move tt_move  = NoMove;
+  Eval tt_value = EvalInvalid;
 
   if (tt_hit) {
     if (!pv && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
       return tt_entry.value;
     }
 
-    tt_move = tt_entry.move;
+    tt_eval  = tt_entry.eval;
+    tt_move  = tt_entry.move;
+    tt_value = tt_entry.value;
   }
 
-  Eval eval = board_.eval();
+  /********************************\
+  |          Static Eval           |
+  \********************************/
+
+  Eval eval     = -EvalInf;
+  Eval raw_eval = -EvalInf;
+
+  if (in_check) {
+    eval = se->eval = -EvalInf;
+  } else {
+    eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+    if (is_valid(tt_value) && can_use_tt_value(tt_entry, eval)) eval = tt_value;
+  }
+
+  /********************************\
+  |         Forward Pruning        |
+  \********************************/
 
   if (!pv && !in_check) {
 
@@ -148,7 +170,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     |    Reverse Futility Pruning    |
     \********************************/
 
-    if (depth <= 8 && eval >= beta && eval - 100 * depth >= beta) return eval;
+    if (can_rfp(depth, eval, beta)) return eval;
 
     /********************************\
     |        Null Move Pruning       |
@@ -288,7 +310,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
             best >= beta        ? TTBound::Lower
             : (pv && best_move) ? TTBound::Exact
                                 : TTBound::Upper,
-            best_move, 0, best);
+            best_move, eval, best);
 
   return best;
 }
@@ -313,15 +335,26 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
 
-  Move tt_move = NoMove;
+  Eval tt_eval  = EvalInvalid;
+  Move tt_move  = NoMove;
+  Eval tt_value = EvalInvalid;
 
   if (tt_hit) {
     if (!pv && can_tt_cutoff(tt_entry, alpha, beta)) {
       return tt_entry.value;
     }
 
-    tt_move = tt_entry.move;
+    tt_eval  = tt_entry.eval;
+    tt_move  = tt_entry.move;
+    tt_value = tt_entry.value;
   }
+
+  Eval raw_eval = -EvalInf;
+  Eval best     = -EvalInf;
+
+  best = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+  if (is_valid(tt_value) && can_use_tt_value(tt_entry, best)) best = tt_value;
 
   /********************************\
   |            Stand pat           |
@@ -331,7 +364,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   // anything (assume its not a zugzwang) If lower bound >= beta, then we fail
   // high (opponent has better options) If lower bound > alpha, then we update
   // alpha (the best we can do)
-  Eval best = board_.eval();
+
+  best = raw_eval;
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
@@ -379,7 +413,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   // If we fail high, we have a lower bound for how good this pos is.
   tt_.write(board_.key(), DepthQS, se->ply, best >= beta ? TTBound::Lower : TTBound::Upper,
-            best_move, 0, best);
+            best_move, raw_eval, best);
 
   return best;
 }

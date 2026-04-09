@@ -4,6 +4,7 @@
 #include "clock.hpp"
 #include "defs.hpp"
 #include "history.hpp"
+#include "move.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
 #include "tt.hpp"
@@ -45,12 +46,12 @@ class Worker {
   // Pruning conditions
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
-  constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
+  constexpr bool can_lmr(Depth depth, int move_count, bool pv) const;
   constexpr bool can_see_prune(Depth depth, Move move, Eval best) const;
   constexpr bool can_lmp(Depth depth, int move_count) const;
 
   // Reductions
-  constexpr Depth lmr_reduction(Depth depth, int move_count);
+  constexpr Depth lmr_reduction(Depth depth, int move_count, bool is_cap);
   constexpr Depth nmp_reduction(Depth depth);
 
   Clock             clock_;
@@ -137,9 +138,8 @@ constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta
          && board_.has_non_pawn_material(board_.stm());
 }
 
-constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) const {
-  using namespace MoveUtils;
-  return depth > 2 && move_count > 2 + pv && !is_promo(move) && !is_capture(move);
+constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv) const {
+  return depth > 2 && move_count > 2 + pv;
 }
 
 constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) const {
@@ -158,8 +158,11 @@ constexpr bool Worker::can_lmp(Depth depth, int move_count) const {
 |==========================================|
 \******************************************/
 
-constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
-  return 0.75 + std::log(depth) * std::log(move_count) / 3;
+constexpr Depth Worker::lmr_reduction(Depth depth, int move_count, bool is_cap) {
+  if (is_cap)
+    return 0.35 + std::log(depth) * std::log(move_count) / 3;
+  else
+    return 0.75 + std::log(depth) * std::log(move_count) / 2.5;
 }
 
 constexpr Depth Worker::nmp_reduction(Depth depth) { return 3 + depth / 5; }

@@ -188,6 +188,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   }
 
   /********************************\
+  |  Internal Iterative Reduction  |
+  \********************************/
+
+  if (pv && depth >= 6 && !tt_move) depth--;
+
+  /********************************\
   |        Main Search Loop        |
   \********************************/
 
@@ -243,8 +249,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (can_lmr(depth, move_count, pv)) {
       Depth r = lmr_reduction(depth, move_count, is_cap);
 
-      Depth d     = std::clamp(new_depth - r, 1, (int)new_depth);
-      val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
+      Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
+      val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
+
       full_search = val > alpha && new_depth > d;
     } else {
       full_search = !pv || move_count > 1;

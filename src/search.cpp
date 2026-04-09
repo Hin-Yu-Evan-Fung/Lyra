@@ -144,6 +144,16 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (!pv && !in_check) {
 
+    /********************************\
+    |    Reverse Futility Pruning    |
+    \********************************/
+
+    if (depth <= 8 && eval >= beta && eval - 100 * depth >= beta) return eval;
+
+    /********************************\
+    |        Null Move Pruning       |
+    \********************************/
+
     if (can_nmp(se, depth, eval, beta)) {
       Depth r = nmp_reduction(depth);
 

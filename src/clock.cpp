@@ -57,8 +57,8 @@ bool Clock::stop_iter(Depth depth, Depth last_best_move_depth, Eval avg_eval, Ev
   switch (type_) {
   case TCType::Infinite: return false;
   case TCType::Depth: stop = depth >= tc_.depth; break;
-  case TCType::Fixed: stop = elapsed() >= tc_.move_time; break;
-  case TCType::Nodes: stop = nodes >= tc_.nodes;
+  case TCType::Fixed: stop = elapsed() > tc_.move_time; break;
+  case TCType::Nodes: stop = nodes >= tc_.nodes; break;
   case TCType::Variable: {
     pv_stability_ = last_best_move_depth + 3 <= depth ? std::min(10, pv_stability_ + 1) : 0;
 
@@ -86,9 +86,17 @@ bool Clock::stop(U64 nodes) {
     if (stop_.load(std::memory_order::relaxed)) return true;
   }
 
-  if (max_ == 0) return false;
+  bool stop = false;
+  if (searched >= CLOCK_FREQ) {
+    switch (type_) {
+    case TCType::Infinite: return false;
+    case TCType::Fixed: stop = elapsed() > tc_.move_time; break;
+    case TCType::Nodes: stop = nodes >= tc_.nodes; break;
+    case TCType::Variable: stop = elapsed() > max_; break;
+    default: stop = false;
+    }
+  }
 
-  bool stop = searched >= CLOCK_FREQ && elapsed() >= max_;
   if (stop) stop_.store(true, std::memory_order::relaxed);
   return stop;
 }

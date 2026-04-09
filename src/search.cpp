@@ -240,10 +240,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     // 1. Assume the first move is the best move.
     // 2. Use a null window with reduced search to prove that later moves are worse.
-    if (can_lmr(depth, move_count, pv, move)) {
-      Depth r = lmr_reduction(depth, move_count);
+    if (can_lmr(depth, move_count, pv)) {
+      Depth r = lmr_reduction(depth, move_count, is_cap);
 
-      Depth d     = std::clamp(new_depth - r, 1, new_depth + 1);
+      Depth d     = std::clamp(new_depth - r, 1, (int)new_depth);
       val         = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
       full_search = val > alpha && new_depth > d;
     } else {

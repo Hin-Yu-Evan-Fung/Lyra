@@ -43,6 +43,7 @@ class Worker {
   constexpr void undo_null_move(StackEntry *se);
 
   // Pruning conditions
+  constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
   constexpr bool can_see_prune(Depth depth, Move move, Eval best) const;
@@ -126,6 +127,10 @@ constexpr void Worker::undo_null_move(StackEntry *se) {
 |            Pruning Conditions            |
 |==========================================|
 \******************************************/
+
+constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
+  return depth <= 8 && eval >= beta && eval - 100 * depth >= beta;
+}
 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
   return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)

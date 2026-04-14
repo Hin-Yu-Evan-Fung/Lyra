@@ -29,7 +29,7 @@ class Worker {
 
   // Helpers
   MOStats mostats(StackEntry *se);
-  void    update_cont_hist(StackEntry *se, Move move, Eval bonus);
+  void    update_cont_table(StackEntry *se, Move move, Eval bonus);
   void update_all_stats(StackEntry *se, Depth depth, Move best, const std::vector<Move> &captures,
                         const std::vector<Move> &quiets);
 
@@ -68,8 +68,8 @@ class Worker {
   Eval   avg_eval_;
   Move   best_move_;
 
-  MainHist  history_;
-  CapHist   cap_history_;
+  MainHist  hist_quiet_;
+  CapHist   hist_cap_;
   ContTable cont_table_;
 
   TT &tt_;

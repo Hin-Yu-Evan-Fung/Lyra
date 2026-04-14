@@ -21,7 +21,6 @@ set(
     src/movepick.cpp
     src/clock.cpp
     src/eval.cpp
-    src/history.cpp
     src/perft.cpp
     src/tt.cpp
     src/search.cpp

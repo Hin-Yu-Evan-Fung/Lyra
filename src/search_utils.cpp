@@ -46,9 +46,9 @@ void Worker::reset(const Board &board) {
   eval_     = 0;
   avg_eval_ = 0;
 
-  history_     = {};
-  cap_history_ = {};
-  cont_table_  = {};
+  hist_quiet_ = {};
+  hist_cap_   = {};
+  cont_table_ = {};
 }
 
 void Worker::uci_report(const PVLine &pv) const {
@@ -66,33 +66,37 @@ void Worker::report_best_move() const {
 }
 
 MOStats Worker::mostats(StackEntry *se) {
-  return {&se->killer, &history_, &cap_history_, {(se - 1)->cont, (se - 2)->cont}};
+  return {&se->killer, &hist_quiet_, &hist_cap_, {(se - 1)->cont, (se - 2)->cont}};
 }
 
-void Worker::update_cont_hist(StackEntry *se, Move move, Eval bonus) {
+void Worker::update_cont_table(StackEntry *se, Move move, Eval bonus) {
   for (unsigned i = 1; i <= ContSize; ++i) {
     if ((se - i)->move == NoMove) continue;
-    PieceTo   p    = piece_to(board_, move);
-    ContHist &cont = *(se - i)->cont;
-    update_hist(cont[p.pc][p.to], bonus);
+    update_hist_cont(*(se - i)->cont, board_, move, bonus);
   }
 }
 
 void Worker::update_all_stats(StackEntry *se, Depth depth, Move best,
                               const std::vector<Move> &captures, const std::vector<Move> &quiets) {
-  if (!is_capture(best)) {
-    const Eval    bonus = std::min(300 * depth - 250, 1500);
-    const PieceTo p     = piece_to(board_, best);
+  const Eval bonus = std::min(300 * depth - 250, 1500);
+
+  if (is_capture(best)) {
+    update_hist_cap(hist_cap_, board_, best, bonus);
+  } else {
     update_killer(se->killer, best);
-    update_hist(history_[p.pc][p.to], bonus);
-    update_cont_hist(se, best, bonus);
+    update_hist_quiet(hist_quiet_, board_, best, bonus);
+    update_cont_table(se, best, bonus);
 
     for (Move m : quiets) {
       if (m == best) continue;
-      const PieceTo p = piece_to(board_, m);
-      update_hist(history_[p.pc][p.to], -bonus);
-      update_cont_hist(se, m, -bonus);
+      update_hist_quiet(hist_quiet_, board_, m, -bonus);
+      update_cont_table(se, m, -bonus);
     }
+  }
+
+  for (Move m : captures) {
+    if (m == best) continue;
+    update_hist_cap(hist_cap_, board_, m, -bonus);
   }
 }
 

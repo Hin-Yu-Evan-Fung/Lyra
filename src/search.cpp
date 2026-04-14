@@ -10,6 +10,7 @@
 #include "utils.hpp"
 
 #include <atomic>
+#include <print>
 
 namespace Lyra {
 

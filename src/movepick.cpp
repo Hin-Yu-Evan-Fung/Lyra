@@ -11,8 +11,6 @@
 
 namespace Lyra {
 
-constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
-
 template <Colour Us>
 MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, Move tt_move,
                            Depth depth)
@@ -80,11 +78,10 @@ Move MovePicker<Us>::pop_back() {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_cap(Move move) {
-  // MVV LVA
-  PieceType attacker = board_.moved(move);
-  PieceType victim   = board_.captured(move);
-  Eval      mvv_lva  = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
-  return mvv_lva;
+  const Eval      MVV[NPieceType] = {0, 2400, 2400, 4800, 9600, 0};
+  const PieceTo   p               = piece_to(board_, move);
+  const PieceType vic             = board_.captured(move);
+  return MVV[vic] + cap_history_[p.pc][p.to][vic];
 }
 
 template <Colour Us>
@@ -108,11 +105,16 @@ void MovePicker<Us>::gen_score_cap() {
   start_ptr_ = 0;
   end_ptr_   = MaxMoves - 1;
 
-  Eval threshold = EvalDraw;
-  if (type_ == MPType::QSearch) threshold = -30;
-
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
+
+    Eval score     = score_cap(move);
+    Eval threshold = EvalDraw;
+
+    switch (type_) {
+    case MPType::Main: threshold = -score / 32;
+    case MPType::QSearch: threshold = -30;
+    }
 
     if (board_.see(move, threshold)) {
       moves_[start_ptr_]    = move;

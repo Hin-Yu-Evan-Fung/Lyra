@@ -20,8 +20,9 @@ struct PVLine {
 struct StackEntry {
   Killer    killer;
   PVLine    pv;
-  U16       ply;
+  Ply       ply_from_null;
   Move      move;
+  Move      excl;
   ContHist *cont;
   Eval      eval;
 };

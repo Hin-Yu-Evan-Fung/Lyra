@@ -42,6 +42,8 @@ void Worker::reset(const Board &board) {
   depth_                = 0;
   seldepth_             = 0;
   last_best_move_depth_ = 0;
+  ply_                  = 0;
+  ply_from_null_        = 0;
 
   eval_     = 0;
   avg_eval_ = 0;

@@ -48,6 +48,7 @@ class Worker {
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmr(Depth depth, int move_count, bool pv) const;
   constexpr bool can_see_prune(Depth depth, Move move, Eval best) const;
+  constexpr bool can_singular(const TTEntry &e, Depth depth, Move move) const;
   constexpr bool can_lmp(Depth depth, int move_count) const;
 
   // Reductions
@@ -67,6 +68,8 @@ class Worker {
   Eval   eval_;
   Eval   avg_eval_;
   Move   best_move_;
+  Ply    ply_;
+  Ply    ply_from_null_;
 
   MainHist  hist_quiet_;
   CapHist   hist_cap_;
@@ -99,27 +102,38 @@ public:
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
   ++nodes_;
-  PieceTo p = piece_to(board_, move);
-  se->cont  = &cont_table_[p.pc][p.to];
-  se->move  = move;
+  ++ply_;
+
+  se->ply_from_null = ply_from_null_++;
+  PieceTo p         = piece_to(board_, move);
+  se->cont          = &cont_table_[p.pc][p.to];
+  se->move          = move;
   board_.do_move<Us>(move);
 }
 
 template <Colour Us>
 constexpr void Worker::undo_move(StackEntry *se) {
+  --ply_;
+  ply_from_null_ = se->ply_from_null;
   board_.undo_move<Us>();
 }
 
 template <Colour Us>
 constexpr void Worker::do_null_move(StackEntry *se) {
   ++nodes_;
-  se->cont = &cont_table_[wP][A1]; // Dummy table
-  se->move = NullMove;
+  ++ply_;
+
+  se->ply_from_null = ply_from_null_;
+  ply_from_null_    = 0;
+  se->cont          = &cont_table_[wP][A1]; // Dummy table
+  se->move          = NullMove;
   board_.do_null_move<Us>();
 }
 
 template <Colour Us>
 constexpr void Worker::undo_null_move(StackEntry *se) {
+  --ply_;
+  ply_from_null_ = se->ply_from_null;
   board_.undo_null_move<Us>();
 }
 
@@ -150,6 +164,11 @@ constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) const {
 
 constexpr bool Worker::can_lmp(Depth depth, int move_count) const {
   return move_count >= 3 + depth * depth;
+}
+
+constexpr bool Worker::can_singular(const TTEntry &e, Depth depth, Move move) const {
+  return move == e.move && depth >= 5 && is_valid(e.value) && (e.bound & TTBound::Lower)
+         && e.depth >= depth - 3;
 }
 
 /******************************************\

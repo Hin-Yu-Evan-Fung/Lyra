@@ -28,7 +28,6 @@ void Worker::start(TimeControl tc) {
   StackEntry *se = stack + StackOffset;
 
   for (int i = 0; i <= StackOffset; i++) (se - i)->cont = &cont_table_[wP][A1];
-  for (int i = 0; i < MaxDepth; i++) (se + i)->ply = i;
 
   while (
       depth_ < MaxDepth
@@ -100,13 +99,14 @@ void Worker::aspwin(StackEntry *se) {
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv       = NT == PV;
-  const bool     root     = se->ply == 0;
+  const bool     root     = ply_ == 0;
   const bool     in_check = board_.in_check();
+  const bool     singular = se->excl != NoMove;
 
   if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
-  seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
+  seldepth_ = std::max(seldepth_, Depth(ply_ + 1));
 
   /********************************\
   |      Mate Distance Pruning     |
@@ -114,13 +114,13 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
-    if (board_.is_draw(se->ply)) return EvalDraw;
-    if (se->ply >= MaxDepth - 1) return in_check ? EvalDraw : board_.eval();
+    if (board_.is_draw(ply_from_null_)) return EvalDraw;
+    if (ply_ >= MaxDepth - 1) return in_check ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
-    alpha = std::max(alpha, mated_in(se->ply));
+    alpha = std::max(alpha, mated_in(ply_));
     // Opponent's worst case scenario will not be worse than mate in ply_ + 1.
-    beta = std::min(beta, mate_in(se->ply + 1));
+    beta = std::min(beta, mate_in(ply_ + 1));
     // if our guaranteed score is better than the opponent's guaranteed score,
     // no need to continue to search this.
     if (alpha >= beta) return alpha;
@@ -130,17 +130,21 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
+  auto [tt_hit, tt_entry] = tt_.read(board_.key(), ply_);
 
-  Eval tt_eval  = EvalInvalid;
-  Move tt_move  = NoMove;
-  Eval tt_value = EvalInvalid;
+  TTBound tt_bound = TTBound::None;
+  Depth   tt_depth = 0;
+  Eval    tt_eval  = EvalInvalid;
+  Move    tt_move  = NoMove;
+  Eval    tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
+    if (!pv && !singular && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
       return tt_entry.value;
     }
 
+    tt_bound = tt_entry.bound;
+    tt_depth = tt_entry.depth;
     tt_eval  = tt_entry.eval;
     tt_move  = tt_entry.move;
     tt_value = tt_entry.value;
@@ -155,6 +159,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (in_check) {
     eval = se->eval = -EvalInf;
+  } else if (singular) {
+    eval = se->eval;
   } else {
     eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
 
@@ -165,7 +171,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Forward Pruning        |
   \********************************/
 
-  if (!pv && !in_check) {
+  if (!pv && !in_check && !singular) {
 
     /********************************\
     |    Reverse Futility Pruning    |
@@ -213,8 +219,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
 
   while ((move = mp.next())) {
-    const Depth new_depth = depth - 1 + in_check;
-    const bool  is_cap    = is_capture(move);
+    const bool is_cap    = is_capture(move);
+    Depth      new_depth = depth - 1;
+
+    if (move == se->excl) continue;
 
     (is_cap ? captures : quiets).push_back(move);
 
@@ -236,6 +244,19 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       // Near leaf nodes, we can safely (hopefully!) prune moves that lose in terms of exchanges
       if (mp.stage() > GOOD_CAP && can_see_prune(depth, move, best)) continue;
     }
+
+    Depth ext = 0;
+    if (!root && !singular && can_singular(tt_entry, depth, move)) {
+      Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
+
+      se->excl = move;
+      Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2);
+      se->excl = NoMove;
+
+      if (val < s_beta) ext = 1;
+    }
+
+    new_depth += ext ? ext : in_check;
 
     do_move<Us>(se, move);
 
@@ -306,7 +327,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |        Draw / mate score       |
   \********************************/
 
-  if (move_count == 0) best = board_.in_check() ? mated_in(se->ply) : EvalDraw;
+  if (move_count == 0) best = board_.in_check() ? mated_in(ply_) : EvalDraw;
 
   /********************************\
   |   Transposition table write    |
@@ -314,11 +335,12 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   // If we fail high, we have a lower bound for how good this pos is.
   // If we are in PV and we have a best move, then we have an exact bound.
-  tt_.write(board_.key(), depth, se->ply,
-            best >= beta        ? TTBound::Lower
-            : (pv && best_move) ? TTBound::Exact
-                                : TTBound::Upper,
-            best_move, eval, best);
+  if (!singular)
+    tt_.write(board_.key(), depth, ply_,
+              best >= beta        ? TTBound::Lower
+              : (pv && best_move) ? TTBound::Exact
+                                  : TTBound::Upper,
+              best_move, eval, best);
 
   return best;
 }
@@ -331,17 +353,17 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   constexpr bool pv = NT == PV;
 
   se->pv.clear();
-  seldepth_ = std::max(seldepth_, Depth(se->ply + 1));
+  seldepth_ = std::max(seldepth_, Depth(ply_ + 1));
 
   if (clock_.stop(nodes_)) return EvalStop;
-  if (board_.is_draw(se->ply)) return EvalDraw;
-  if (se->ply >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
+  if (board_.is_draw(ply_from_null_)) return EvalDraw;
+  if (ply_ >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
 
   /********************************\
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.read(board_.key(), se->ply);
+  auto [tt_hit, tt_entry] = tt_.read(board_.key(), ply_);
 
   Eval tt_eval  = EvalInvalid;
   Move tt_move  = NoMove;
@@ -420,8 +442,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   \********************************/
 
   // If we fail high, we have a lower bound for how good this pos is.
-  tt_.write(board_.key(), DepthQS, se->ply, best >= beta ? TTBound::Lower : TTBound::Upper,
-            best_move, raw_eval, best);
+  tt_.write(board_.key(), DepthQS, ply_, best >= beta ? TTBound::Lower : TTBound::Upper, best_move,
+            raw_eval, best);
 
   return best;
 }

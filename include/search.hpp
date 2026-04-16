@@ -8,6 +8,7 @@
 #include "movepick.hpp"
 #include "search_utils.hpp"
 #include "tt.hpp"
+#include "utils.hpp"
 
 #include <atomic>
 #include <cmath>
@@ -167,7 +168,7 @@ constexpr bool Worker::can_lmp(Depth depth, int move_count) const {
 }
 
 constexpr bool Worker::can_singular(const TTEntry &e, Depth depth, Move move) const {
-  return move == e.move && depth >= 5 && is_valid(e.value) && (e.bound & TTBound::Lower)
+  return move == e.move && depth >= 5 && !is_terminal(e.value) && (e.bound & TTBound::Lower)
          && e.depth >= depth - 3;
 }
 

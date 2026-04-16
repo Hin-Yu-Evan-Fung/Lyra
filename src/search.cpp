@@ -10,7 +10,6 @@
 #include "utils.hpp"
 
 #include <atomic>
-#include <print>
 
 namespace Lyra {
 
@@ -132,19 +131,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   auto [tt_hit, tt_entry] = tt_.read(board_.key(), ply_);
 
-  TTBound tt_bound = TTBound::None;
-  Depth   tt_depth = 0;
-  Eval    tt_eval  = EvalInvalid;
-  Move    tt_move  = NoMove;
-  Eval    tt_value = EvalInvalid;
+  Eval tt_eval  = EvalInvalid;
+  Move tt_move  = NoMove;
+  Eval tt_value = EvalInvalid;
 
   if (tt_hit) {
     if (!pv && !singular && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
       return tt_entry.value;
     }
 
-    tt_bound = tt_entry.bound;
-    tt_depth = tt_entry.depth;
     tt_eval  = tt_entry.eval;
     tt_move  = tt_entry.move;
     tt_value = tt_entry.value;
@@ -247,7 +242,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     Depth ext = 0;
     if (!root && !singular && can_singular(tt_entry, depth, move)) {
-      Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
+      Eval s_beta = std::max(tt_value - 2 * (depth - pv), -EvalMate);
 
       se->excl = move;
       Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2);
@@ -327,7 +322,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |        Draw / mate score       |
   \********************************/
 
-  if (move_count == 0) best = board_.in_check() ? mated_in(ply_) : EvalDraw;
+  if (move_count == 0) best = singular ? alpha : board_.in_check() ? mated_in(ply_) : EvalDraw;
 
   /********************************\
   |   Transposition table write    |

@@ -50,10 +50,14 @@ class Worker {
   constexpr bool can_see_prune(Depth depth, Move move, Eval best) const;
   constexpr bool can_singular(const TTEntry &e, Depth depth, Move move) const;
   constexpr bool can_lmp(Depth depth, int move_count) const;
+  constexpr bool can_hp(Depth depth, Eval hist) const;
 
   // Reductions
-  constexpr Depth lmr_reduction(Depth depth, int move_count, bool is_cap);
-  constexpr Depth nmp_reduction(Depth depth);
+  constexpr Depth lmr_reduction(Depth depth, int move_count, bool is_cap) const;
+  constexpr Depth nmp_reduction(Depth depth) const;
+
+  // History
+  constexpr Eval hist_score(Move move) const;
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -161,6 +165,7 @@ constexpr bool Worker::can_see_prune(Depth depth, Move move, Eval best) const {
   return !is_terminal(best) && depth <= 10
          && !board_.see(move, is_capture(move) ? -70 * depth : -20 * depth * depth);
 }
+constexpr bool Worker::can_hp(Depth depth, Eval hist) const { return depth <= 2 && hist < -5000; }
 
 constexpr bool Worker::can_lmp(Depth depth, int move_count) const {
   return move_count >= 3 + depth * depth;
@@ -177,13 +182,30 @@ constexpr bool Worker::can_singular(const TTEntry &e, Depth depth, Move move) co
 |==========================================|
 \******************************************/
 
-constexpr Depth Worker::lmr_reduction(Depth depth, int move_count, bool is_cap) {
+constexpr Depth Worker::lmr_reduction(Depth depth, int move_count, bool is_cap) const {
   if (is_cap)
     return 0.35 + std::log(depth) * std::log(move_count) / 3;
   else
     return 0.75 + std::log(depth) * std::log(move_count) / 2.5;
 }
 
-constexpr Depth Worker::nmp_reduction(Depth depth) { return 3 + depth / 5; }
+constexpr Depth Worker::nmp_reduction(Depth depth) const { return 3 + depth / 5; }
+
+/******************************************\
+|==========================================|
+|                Reductions                |
+|==========================================|
+\******************************************/
+
+constexpr Eval Worker::hist_score(Move move) const {
+  const bool    is_cap = MoveUtils::is_capture(move);
+  const PieceTo p      = piece_to(board_, move);
+  if (is_cap) {
+    const PieceType vic = board_.captured(move);
+    return hist_cap_[p.pc][p.to][vic];
+  } else {
+    return hist_quiet_[p.pc][p.to];
+  }
+}
 
 } // namespace Lyra

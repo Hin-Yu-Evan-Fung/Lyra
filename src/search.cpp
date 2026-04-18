@@ -216,6 +216,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   while ((move = mp.next())) {
     const bool is_cap    = is_capture(move);
+    const Eval hist      = hist_score(move);
     Depth      new_depth = depth - 1;
 
     if (move == se->excl) continue;
@@ -227,10 +228,17 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (!pv && !in_check && board_.has_non_pawn_material(board_.stm())) {
 
       /********************************\
+      |         History Pruning        |
+      \********************************/
+
+      if (!is_cap && can_hp(depth, hist)) mp.skip_quiet();
+
+      /********************************\
       |        Late Move Pruning       |
       \********************************/
-      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in move
-      // ordering
+
+      // Near leaf nodes, we can safely (hopefully!) prune quiet moves that are ranked low in
+      // move ordering
       if (can_lmp(depth, move_count)) mp.skip_quiet();
 
       /********************************\
@@ -266,6 +274,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // 2. Use a null window with reduced search to prove that later moves are worse.
     if (can_lmr(depth, move_count, pv)) {
       Depth r = lmr_reduction(depth, move_count, is_cap);
+
+      r -= hist / 9000;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

@@ -228,12 +228,6 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (!pv && !in_check && board_.has_non_pawn_material(board_.stm())) {
 
       /********************************\
-      |         History Pruning        |
-      \********************************/
-
-      if (!is_cap && can_hp(depth, hist)) mp.skip_quiet();
-
-      /********************************\
       |        Late Move Pruning       |
       \********************************/
 

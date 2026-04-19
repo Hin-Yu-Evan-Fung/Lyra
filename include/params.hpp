@@ -79,8 +79,10 @@ constexpr size_t MaxMoves  = 256;
 constexpr Ply    Rule50Ply = 100;
 
 // History Constant
-constexpr Eval HistMax  = 16384;
-constexpr Eval ContSize = 2;
+constexpr Eval   HistMax      = 16384;
+constexpr Eval   ContSize     = 2;
+constexpr size_t CorrHistSize = 32768;
+constexpr Eval   CorrHistMax  = 1024;
 
 // General search constants
 constexpr Depth DepthQS     = 0;

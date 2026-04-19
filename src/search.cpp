@@ -155,9 +155,11 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   if (in_check) {
     eval = se->eval = -EvalInf;
   } else if (singular) {
-    eval = se->eval;
+    raw_eval = eval = se->eval;
   } else {
-    eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+    raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+    eval = se->eval = adjust_eval(raw_eval);
 
     if (is_valid(tt_value) && can_use_val(tte.bound, tte.value, eval)) eval = tt_value;
   }
@@ -338,14 +340,13 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |   Transposition table write    |
   \********************************/
 
-  // If we fail high, we have a lower bound for how good this pos is.
-  // If we are in PV and we have a best move, then we have an exact bound.
-  if (!singular)
-    tt_.write(board_.key(), depth, ply_,
-              best >= beta        ? Bound::Lower
-              : (pv && best_move) ? Bound::Exact
-                                  : Bound::Upper,
-              best_move, eval, best);
+  const Bound bound = best >= beta ? Bound::Lower : (pv && best_move) ? Bound::Exact : Bound::Upper;
+
+  if (!in_check && !is_capture(best_move) && can_use_val(bound, best, se->eval)) {
+    update_hist_corr(hist_corr_, board_, depth, best, se->eval);
+  }
+
+  if (!singular) tt_.write(board_.key(), depth, ply_, bound, best_move, raw_eval, best);
 
   return best;
 }
@@ -387,7 +388,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   Eval raw_eval = -EvalInf;
   Eval best     = -EvalInf;
 
-  best = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+  raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+  best = se->eval = adjust_eval(raw_eval);
 
   if (is_valid(tt_value) && can_use_val(tte.bound, tte.value, best)) best = tt_value;
 

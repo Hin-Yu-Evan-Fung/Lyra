@@ -33,6 +33,7 @@ class Worker {
   void    update_cont_table(StackEntry *se, Move move, Eval bonus);
   void update_all_stats(StackEntry *se, Depth depth, Move best, const std::vector<Move> &captures,
                         const std::vector<Move> &quiets);
+  Eval adjust_eval(Eval eval) const;
 
   // Move wrappers
   template <Colour Us>
@@ -79,6 +80,7 @@ class Worker {
   MainHist  hist_quiet_;
   CapHist   hist_cap_;
   ContTable cont_table_;
+  CorrHist  hist_corr_;
 
   TT &tt_;
 

@@ -120,9 +120,10 @@ void Board::set(const std::string &fen) {
   ss >> std::skipws >> fifty_mv;
   ss >> std::skipws >> full_mv;
 
-  undo_->rule50 = I8(fifty_mv);
-  gameply_      = I8(full_mv - 1) * 2 + I8(stm_);
-  undo_->key    = compute_key();
+  undo_->rule50   = I8(fifty_mv);
+  gameply_        = I8(full_mv - 1) * 2 + I8(stm_);
+  undo_->key      = compute_key();
+  undo_->pawn_key = compute_pawn_key();
 
   // Basic board legality checks
   if (ksq<White>() == NoSquare)

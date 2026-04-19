@@ -257,7 +257,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2);
       se->excl = NoMove;
 
-      if (val < s_beta) ext = 1;
+      if (!pv && val < s_beta - 25)
+        ext = 2;
+      else if (val < s_beta)
+        ext = 1;
+      else if (val >= beta && !is_terminal(val))
+        return beta;
+      else if (tt_value >= beta)
+        ext = -1;
     }
 
     new_depth += ext ? ext : in_check;

@@ -6,6 +6,7 @@
 #include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
+#include "params.hpp"
 #include "search_utils.hpp"
 #include "tt.hpp"
 
@@ -148,7 +149,7 @@ constexpr void Worker::undo_null_move(StackEntry *se) {
 \******************************************/
 
 constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
-  return depth <= 8 && eval >= beta && eval - 100 * depth >= beta;
+  return depth <= 8 && eval - RFPMargin * depth >= beta;
 }
 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
@@ -183,10 +184,16 @@ constexpr bool Worker::can_singular(const TTEntry &e, Depth depth, Move move) co
 \******************************************/
 
 constexpr Depth Worker::lmr_reduction(Depth depth, int move_count, bool is_cap) const {
+
+  const float lmr_base_quiet = LmrBaseQuiet / 1024.0;
+  const float lmr_mult_quiet = LmrMultQuiet / 1024.0;
+  const float lmr_base_cap   = LmrBaseCap / 1024.0;
+  const float lmr_mult_cap   = LmrMultCap / 1024.0;
+
   if (is_cap)
-    return 0.35 + std::log(depth) * std::log(move_count) / 3;
+    return lmr_base_cap + std::log(depth) * std::log(move_count) / lmr_mult_cap;
   else
-    return 0.75 + std::log(depth) * std::log(move_count) / 2.5;
+    return lmr_base_quiet + std::log(depth) * std::log(move_count) / lmr_mult_quiet;
 }
 
 constexpr Depth Worker::nmp_reduction(Depth depth) const { return 3 + depth / 5; }

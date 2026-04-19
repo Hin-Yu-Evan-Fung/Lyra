@@ -2,7 +2,7 @@ EXE := Lyra
 CXX := g++
 CXXSTD := -std=c++23
 
-COMMON_FLAGS := -DUSE_PEXT -Wall -flto -fno-rtti \
+COMMON_FLAGS := -DTUNE -DUSE_PEXT -Wall -flto -fno-rtti \
 	-msse2 -msse3 -msse4 -msse4.1 -mpopcnt -mavx2 \
 	-mbmi -mbmi2 -mmmx -funroll-loops -finline -fomit-frame-pointer
 

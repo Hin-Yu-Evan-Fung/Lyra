@@ -23,7 +23,7 @@ namespace Lyra {
 // | eval  | 16   | 32
 // | value | 16   | 48
 
-enum TTBound {
+enum Bound {
   None,  // Writing static eval to TT
   Lower, // Fail high nodes, lower bound for position eval
   Upper, // Fail low nodes, upper bound for position eval
@@ -31,13 +31,13 @@ enum TTBound {
 };
 
 struct TTEntry {
-  Key     key;
-  Age     age;
-  Depth   depth;
-  TTBound bound;
-  Move    move;
-  Eval    eval;
-  Eval    value;
+  Key   key;
+  Age   age;
+  Depth depth;
+  Bound bound;
+  Move  move;
+  Eval  eval;
+  Eval  value;
 };
 
 struct PackedTTEntry {
@@ -85,7 +85,7 @@ public:
   void clear();
 
   std::pair<bool, TTEntry> read(Key key, Ply ply);
-  void write(Key key, Depth depth, Ply ply, TTBound bound, Move move, Eval eval, Eval value);
+  void write(Key key, Depth depth, Ply ply, Bound bound, Move move, Eval eval, Eval value);
 };
 
 } // namespace Lyra

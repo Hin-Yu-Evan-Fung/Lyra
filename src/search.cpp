@@ -10,7 +10,6 @@
 #include "utils.hpp"
 
 #include <atomic>
-#include <print>
 
 namespace Lyra {
 
@@ -130,20 +129,20 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.read(board_.key(), ply_);
+  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
 
   Eval tt_eval  = EvalInvalid;
   Move tt_move  = NoMove;
   Eval tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && !singular && tt_entry.depth >= depth && can_tt_cutoff(tt_entry, alpha, beta)) {
-      return tt_entry.value;
+    if (!pv && !singular && tte.depth >= depth && can_use_val(tte.bound, tte.value, beta)) {
+      return tte.value;
     }
 
-    tt_eval  = tt_entry.eval;
-    tt_move  = tt_entry.move;
-    tt_value = tt_entry.value;
+    tt_eval  = tte.eval;
+    tt_move  = tte.move;
+    tt_value = tte.value;
   }
 
   /********************************\
@@ -160,7 +159,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   } else {
     eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
 
-    if (is_valid(tt_value) && can_use_tt_value(tt_entry, eval)) eval = tt_value;
+    if (is_valid(tt_value) && can_use_val(tte.bound, tte.value, eval)) eval = tt_value;
   }
 
   /********************************\
@@ -250,7 +249,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     }
 
     Depth ext = 0;
-    if (!root && !singular && can_singular(tt_entry, depth, move)) {
+    if (!root && !singular && can_singular(tte, depth, move)) {
       Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
 
       se->excl = move;
@@ -343,9 +342,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   // If we are in PV and we have a best move, then we have an exact bound.
   if (!singular)
     tt_.write(board_.key(), depth, ply_,
-              best >= beta        ? TTBound::Lower
-              : (pv && best_move) ? TTBound::Exact
-                                  : TTBound::Upper,
+              best >= beta        ? Bound::Lower
+              : (pv && best_move) ? Bound::Exact
+                                  : Bound::Upper,
               best_move, eval, best);
 
   return best;
@@ -369,20 +368,20 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tt_entry] = tt_.read(board_.key(), ply_);
+  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
 
   Eval tt_eval  = EvalInvalid;
   Move tt_move  = NoMove;
   Eval tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && can_tt_cutoff(tt_entry, alpha, beta)) {
-      return tt_entry.value;
+    if (!pv && can_use_val(tte.bound, tte.value, beta)) {
+      return tte.value;
     }
 
-    tt_eval  = tt_entry.eval;
-    tt_move  = tt_entry.move;
-    tt_value = tt_entry.value;
+    tt_eval  = tte.eval;
+    tt_move  = tte.move;
+    tt_value = tte.value;
   }
 
   Eval raw_eval = -EvalInf;
@@ -390,7 +389,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   best = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
 
-  if (is_valid(tt_value) && can_use_tt_value(tt_entry, best)) best = tt_value;
+  if (is_valid(tt_value) && can_use_val(tte.bound, tte.value, best)) best = tt_value;
 
   /********************************\
   |            Stand pat           |
@@ -448,7 +447,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   \********************************/
 
   // If we fail high, we have a lower bound for how good this pos is.
-  tt_.write(board_.key(), DepthQS, ply_, best >= beta ? TTBound::Lower : TTBound::Upper, best_move,
+  tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
             raw_eval, best);
 
   return best;

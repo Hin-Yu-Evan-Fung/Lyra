@@ -3,7 +3,6 @@
 #include "tt.hpp"
 #include "utils.hpp"
 
-#include <cstdlib>
 #include <gtest/gtest.h>
 
 namespace Lyra {
@@ -24,7 +23,7 @@ void check_entry(const TTEntry &a, const TTEntry &b) {
 }
 
 TEST(tt, basic_pack_unpack) {
-  TTEntry e{0x1234, 127, 127, TTBound::Exact, NullMove, EvalInvalid, mated_in(5)};
+  TTEntry e{0x1234, 127, 127, Bound::Exact, NullMove, EvalInvalid, mated_in(5)};
   check_entry(e, pack_unpack(e, 5));
 }
 
@@ -35,7 +34,7 @@ TEST(tt, depth_replacement) {
   for (unsigned i = 0; i < 1000; ++i) {
     Depth depth = random() % 128;
     max_depth   = std::max(depth, max_depth);
-    tt.write(0x123, 127, depth, TTBound::Lower, NullMove, EvalInvalid, mate_in(5));
+    tt.write(0x123, 127, depth, Bound::Lower, NullMove, EvalInvalid, mate_in(5));
   }
 
   auto [tt_hit, tt_entry] = tt.read(0x123, 127);
@@ -45,26 +44,26 @@ TEST(tt, depth_replacement) {
 TEST(tt, bound_replacement) {
   TT tt(1);
 
-  tt.write(0x123, 127, 127, TTBound::Lower, NullMove, EvalInvalid, mate_in(5));
-  tt.write(0x123, 127, 127, TTBound::Exact, NullMove, EvalInvalid, mate_in(5));
-  tt.write(0x123, 127, 127, TTBound::Lower, NullMove, EvalInvalid, mated_in(5));
+  tt.write(0x123, 127, 127, Bound::Lower, NullMove, EvalInvalid, mate_in(5));
+  tt.write(0x123, 127, 127, Bound::Exact, NullMove, EvalInvalid, mate_in(5));
+  tt.write(0x123, 127, 127, Bound::Lower, NullMove, EvalInvalid, mated_in(5));
 
   auto [tt_hit, tt_entry] = tt.read(0x123, 5);
-  ASSERT_EQ(tt_entry.bound, TTBound::Exact);
+  ASSERT_EQ(tt_entry.bound, Bound::Exact);
 }
 
 TEST(tt, age_replacement) {
   TT tt(1);
 
-  tt.write(0x123, 5, 5, TTBound::Lower, NullMove, EvalMateBound, mate_in(5));
+  tt.write(0x123, 5, 5, Bound::Lower, NullMove, EvalMateBound, mate_in(5));
   tt.incr_age();
-  tt.write(0x123, 4, 5, TTBound::Lower, NullMove, EvalMateBound, mated_in(5));
-  tt.write(0x123, 4, 5, TTBound::Lower, NullMove, EvalMateBound, mate_in(5));
+  tt.write(0x123, 4, 5, Bound::Lower, NullMove, EvalMateBound, mated_in(5));
+  tt.write(0x123, 4, 5, Bound::Lower, NullMove, EvalMateBound, mate_in(5));
 
   auto [tt_hit, tt_entry] = tt.read(0x123, 5);
   ASSERT_EQ(tt_entry.age, 0x1);
   ASSERT_EQ(tt_entry.depth, 4);
-  ASSERT_EQ(tt_entry.bound, TTBound::Lower);
+  ASSERT_EQ(tt_entry.bound, Bound::Lower);
   ASSERT_EQ(tt_entry.move, NullMove);
   ASSERT_EQ(tt_entry.eval, EvalMateBound);
   ASSERT_EQ(tt_entry.value, mated_in(5));

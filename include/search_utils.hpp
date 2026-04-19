@@ -33,29 +33,34 @@ struct StackEntry {
 |==========================================|
 \******************************************/
 
-// Exact bound means value has been proven with full window search. Can cutoff.
-// Upper bound means value has a proven upper bound, can cutoff if alpha is too
-// good to be true.
-// Lower bound means value has a proven lower bound, can cutoff if beta is too
-// good to be true;
-constexpr bool can_tt_cutoff(const TTEntry &entry, Eval alpha, Eval beta) {
-  switch (entry.bound) {
-  case TTBound::None: return false;
-  case TTBound::Exact: return true;
-  case TTBound::Upper: return entry.value <= alpha;
-  case TTBound::Lower: return entry.value >= beta;
-  }
-  return false;
+// Whether to use a value given a bound
+constexpr bool can_use_val(Bound bound, Eval bounded_val, Eval ref) {
+  return bound & (bounded_val >= ref ? Bound::Lower : Bound::Upper);
 }
 
-constexpr bool can_use_tt_value(const TTEntry &entry, Eval value) {
-  switch (entry.bound) {
-  case TTBound::None: return false;
-  case TTBound::Exact: return true;
-  case TTBound::Upper: return entry.value <= value;
-  case TTBound::Lower: return entry.value >= value;
-  }
-  return false;
-}
+// // Exact bound means value has been proven with full window search. Can cutoff.
+// // Upper bound means value has a proven upper bound, can cutoff if alpha is too
+// // good to be true.
+// // Lower bound means value has a proven lower bound, can cutoff if beta is too
+// // good to be true;
+// constexpr bool can_tt_cutoff(const TTEntry &entry, Eval alpha, Eval beta) {
+//   switch (entry.bound) {
+//   case Bound::None: return false;
+//   case Bound::Exact: return true;
+//   case Bound::Upper: return entry.value <= alpha;
+//   case Bound::Lower: return entry.value >= beta;
+//   }
+//   return false;
+// }
+//
+// constexpr bool can_use_tt_value(const TTEntry &entry, Eval value) {
+//   switch (entry.bound) {
+//   case Bound::None: return false;
+//   case Bound::Exact: return true;
+//   case Bound::Upper: return entry.value <= value;
+//   case Bound::Lower: return entry.value >= value;
+//   }
+//   return false;
+// }
 
 } // namespace Lyra

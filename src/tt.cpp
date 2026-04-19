@@ -69,7 +69,7 @@ TTEntry PackedTTEntry::unpack(Ply ply) const {
       pos_key,
       U8(d & AgeMask),
       Depth((d & DepthMask) >> 7),
-      TTBound((d & BoundMask) >> 14),
+      Bound((d & BoundMask) >> 14),
       Move((d & MoveMask) >> 16),
       I16((d & EvalMask) >> 32),
       from_TT(I16((d & ValueMask) >> 48), ply),
@@ -96,12 +96,12 @@ std::pair<bool, TTEntry> TT::read(Key key, Ply ply) {
   }
 }
 
-void TT::write(Key key, Depth depth, Ply ply, TTBound bound, Move move, Eval eval, Eval value) {
+void TT::write(Key key, Depth depth, Ply ply, Bound bound, Move move, Eval eval, Eval value) {
   const size_t   index = this->index(key);
   PackedTTEntry &pe    = entries_[index];
   const TTEntry &old   = pe.unpack(ply);
 
-  if (old.age != age_ || old.key != key || bound == TTBound::Exact || old.depth < depth) {
+  if (old.age != age_ || old.key != key || bound == Bound::Exact || old.depth < depth) {
     Move    tt_move = (key == old.key && move == NoMove) ? old.move : move;
     TTEntry e{
         key, age_, depth, bound, tt_move, eval, value,

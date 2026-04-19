@@ -275,7 +275,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (can_lmr(depth, move_count, pv)) {
       Depth r = lmr_reduction(depth, move_count, is_cap);
 
-      r -= hist / 9000;
+      r -= hist / LmrMultHist;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

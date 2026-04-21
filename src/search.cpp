@@ -114,7 +114,8 @@ void Worker::aspwin(StackEntry *se) {
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
-  constexpr bool pv = NT == PV;
+  constexpr bool pv       = NT == PV;
+  const bool     in_check = board_.in_check();
 
   se->pv.clear();
 
@@ -122,8 +123,8 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (ply_) {
     if (clock_.stop(nodes_)) return EvalStop;
-    if (board_.is_draw(ply_)) return EvalDraw;
-    if (ply_ >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
+    if (board_.is_draw(ply_from_null_)) return EvalDraw;
+    if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
     alpha = std::max(alpha, mated_in(ply_));
@@ -134,7 +135,9 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (alpha >= beta) return alpha;
   }
 
-  // ** Main Search Loop ** //
+  /********************************\
+  |        Main Search Loop        |
+  \********************************/
 
   MovePicker<Us> mp{MPType::Main, board_, {}, NoMove, depth};
 
@@ -145,15 +148,9 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   while ((move = mp.next())) {
     move_count++;
 
-    // ** Recursive Search **
-    board_.do_move<Us>(move);
-    ply_++;
-    nodes_++;
-
+    do_move<Us>(se, move);
     Eval val = -search<~Us, PV>(se + 1, -beta, -alpha, depth - 1);
-
-    ply_--;
-    board_.undo_move<Us>();
+    undo_move<Us>(se);
 
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
@@ -175,7 +172,7 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     }
   }
 
-  if (move_count == 0) best = board_.in_check() ? mated_in(ply_) : EvalDraw;
+  if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
 
   return best;
 }
@@ -185,17 +182,21 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
 Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
-  constexpr bool pv = NT == PV;
+  constexpr bool pv       = NT == PV;
+  const bool     in_check = board_.in_check();
 
   if (clock_.stop(nodes_)) return EvalStop;
-  if (board_.is_draw(ply_)) return EvalDraw;
-  if (ply_ >= MaxDepth - 1) return board_.in_check() ? EvalDraw : board_.eval();
+  if (board_.is_draw(ply_from_null_)) return EvalDraw;
+  if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
   se->pv.clear();
 
   MovePicker<Us> mp{MPType::QSearch, board_, {}, NoMove, DepthQS};
 
-  // ** Stand Pat ** //
+  /********************************\
+  |            Stand Pat           |
+  \********************************/
+
   // The current eval is the lower bound because we can just not capture anything (assume its not a
   // zugzwang) If lower bound >= beta, then we fail high (opponent has better options) If lower
   // bound > alpha, then we update alpha (the best we can do)
@@ -203,20 +204,17 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
-  // ** Main QSearch Loop ** //
+  /********************************\
+  |        Main Search Loop        |
+  \********************************/
 
   Move move = NoMove;
 
   while ((move = mp.next())) {
-    // ** Recursive Search **
-    board_.do_move<Us>(move);
-    ply_++;
-    nodes_++;
 
+    do_move<Us>(se, move);
     Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
-
-    ply_--;
-    board_.undo_move<Us>();
+    undo_move<Us>(se);
 
     /********************************\
     |       Alpha Beta Pruning       |

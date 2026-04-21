@@ -23,6 +23,8 @@ struct PVLine {
 struct StackEntry {
   PVLine pv;
   Eval   eval;
+  Ply    ply_from_null;
+  Move   move;
 };
 
 class Worker {
@@ -40,6 +42,16 @@ class Worker {
   template <Colour Us, NodeType NT>
   Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 
+  // Move wrappers
+  template <Colour Us>
+  constexpr void do_move(StackEntry *se, Move move);
+  template <Colour Us>
+  constexpr void undo_move(StackEntry *se);
+  template <Colour Us>
+  constexpr void do_null_move(StackEntry *se);
+  template <Colour Us>
+  constexpr void undo_null_move(StackEntry *se);
+
   Clock             clock_;
   std::atomic_bool &stop_;
 
@@ -51,7 +63,8 @@ class Worker {
   Depth  depth_;
   Depth  last_best_move_depth_;
   Depth  seldepth_;
-  U16    ply_;
+  Ply    ply_;
+  Ply    ply_from_null_;
   Eval   eval_;
   Eval   avg_eval_;
 
@@ -68,5 +81,46 @@ public:
   const Clock &clock() const { return clock_; }
   const U64    nodes() const { return nodes_; }
 };
+
+/******************************************\
+|==========================================|
+|            Do Move / Undo Move           |
+|==========================================|
+\******************************************/
+
+template <Colour Us>
+constexpr void Worker::do_move(StackEntry *se, Move move) {
+  ++nodes_;
+  ++ply_;
+
+  se->ply_from_null = ply_from_null_++;
+  se->move          = move;
+  board_.do_move<Us>(move);
+}
+
+template <Colour Us>
+constexpr void Worker::undo_move(StackEntry *se) {
+  --ply_;
+  ply_from_null_ = se->ply_from_null;
+  board_.undo_move<Us>();
+}
+
+template <Colour Us>
+constexpr void Worker::do_null_move(StackEntry *se) {
+  ++nodes_;
+  ++ply_;
+
+  se->ply_from_null = ply_from_null_;
+  ply_from_null_    = 0;
+  se->move          = NullMove;
+  board_.do_null_move<Us>();
+}
+
+template <Colour Us>
+constexpr void Worker::undo_null_move(StackEntry *se) {
+  --ply_;
+  ply_from_null_ = se->ply_from_null;
+  board_.undo_null_move<Us>();
+}
 
 } // namespace Lyra

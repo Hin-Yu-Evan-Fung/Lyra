@@ -1,12 +1,12 @@
 #include "move.hpp"
 
-#include <cstring>
-
 #include "bitboard.hpp"
 #include "board.hpp"
 #include "defs.hpp"
 #include "mask.hpp"
 #include "zobrist.hpp"
+
+#include <cstring>
 
 namespace Lyra {
 
@@ -16,7 +16,9 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-void Board::do_move(Move move) { return stm_ == White ? do_move<White>(move) : do_move<Black>(move); }
+void Board::do_move(Move move) {
+  return stm_ == White ? do_move<White>(move) : do_move<Black>(move);
+}
 
 template <Colour Us>
 void Board::do_move(Move move) {
@@ -24,25 +26,25 @@ void Board::do_move(Move move) {
   constexpr Piece  King = make_piece(Us, K);
   constexpr Piece  Pawn = make_piece(Us, P);
 
-  const Square   src    = MoveUtils::src(move);
-  const Square   dst    = MoveUtils::dst(move);
-  const Piece    pc     = on(src);
-  const MoveFlag flag   = MoveUtils::flag(move);
-  Piece          cap    = on(dst);
+  const Square   src  = MoveUtils::src(move);
+  const Square   dst  = MoveUtils::dst(move);
+  const Piece    pc   = on(src);
+  const MoveFlag flag = MoveUtils::flag(move);
+  Piece          cap  = on(dst);
 
   Piece  promo;
   Square rook_dst, king_dst, ep;
   bool   queen_side;
 
   // Initialise new state
-  Undo* prev = undo_++;
+  Undo *prev = undo_++;
   std::memcpy(undo_, prev, offsetof(Undo, ep));
 
   // Update new state
-  undo_->key  ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
-  undo_->ep    = NoSquare;
-  undo_->cap   = cap;
-  undo_->move  = move;
+  undo_->key ^= (prev->ep != NoSquare) * Zobrist::EP_KEYS[file_of(prev->ep)];
+  undo_->ep   = NoSquare;
+  undo_->cap  = cap;
+  undo_->move = move;
 
   // Increment move counters
   undo_->rule50++;
@@ -64,7 +66,7 @@ void Board::do_move(Move move) {
     ep            = forward<Us>(src);
     undo_->rule50 = 0;
     if (!can_ep<Them>(ep)) break;
-    undo_->ep   = ep;
+    undo_->ep = ep;
     undo_->key ^= Zobrist::EP_KEYS[file_of(ep)];
     break;
   case KingCastle:
@@ -79,7 +81,7 @@ void Board::do_move(Move move) {
   case PromoCap_Q:
   case PromoCap_R:
   case PromoCap_B:
-  case PromoCap_N:  //
+  case PromoCap_N: //
     pop_piece<true, Them>(dst);
     [[fallthrough]];
   case Promo_Q:
@@ -102,13 +104,13 @@ void Board::do_move(Move move) {
   }
 
   // Update castling rights and keys
-  undo_->key      ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
+  undo_->key ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
   undo_->c_rights &= castling_mask_.rights[src] & castling_mask_.rights[dst];
-  undo_->key      ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
+  undo_->key ^= Zobrist::CASTLE_KEYS[undo_->c_rights];
 
   // Update board state
   undo_->key ^= Zobrist::SIDE_KEY;
-  stm_        = ~stm_;
+  stm_ = ~stm_;
 
   update_masks<Them>();
 }
@@ -119,18 +121,18 @@ void Board::undo_move() {
   constexpr Piece  King = make_piece(Us, K);
   constexpr Piece  Pawn = make_piece(Us, P);
 
-  const Move     move   = undo_->move;
-  const Piece    cap    = undo_->cap;
-  const Square   src    = MoveUtils::src(move);
-  const Square   dst    = MoveUtils::dst(move);
-  const MoveFlag flag   = MoveUtils::flag(move);
+  const Move     move = undo_->move;
+  const Piece    cap  = undo_->cap;
+  const Square   src  = MoveUtils::src(move);
+  const Square   dst  = MoveUtils::dst(move);
+  const MoveFlag flag = MoveUtils::flag(move);
 
   Square rook_dst, king_dst;
   bool   queen_side;
 
   switch (flag) {
   case Quiet:
-  case DoublePush:  // Move the piece back
+  case DoublePush: // Move the piece back
     move_piece<false, Us>(dst, src);
     break;
   case Cap:
@@ -208,7 +210,8 @@ bool Board::is_legal(Move move) const {
 
   // Check if the moving piece is ours or not
   const bool invalid_pc = pc == NoPiece || colour_of(pc) != Us;
-  // Check if the captured piece is theirs or not (Except for castling where we can capture our own rook)
+  // Check if the captured piece is theirs or not (Except for castling where we can capture our own
+  // rook)
   const bool invalid_cap = !is_castle_ && cap != NoPiece && colour_of(cap) == Us;
   // Check if the squares makes sense (Chess960 allows for src == dst for castling)
   const bool invalid_sq = !is_castle_ && src_ == dst_;
@@ -224,9 +227,12 @@ bool Board::is_legal(Move move) const {
   }
 
   // Check if there is a pin and if so check if the movement is aligned to the king
-  const bool valid_pin = !(diag_pin & from(src_) || hv_pin & from(src_)) || is_aligned(src_, dst_, ksq_);
+  const bool valid_pin =
+      !(diag_pin & from(src_) || hv_pin & from(src_)) || is_aligned(src_, dst_, ksq_);
 
-  if (is_ep_) return undo_->ep == dst_ && valid_pin && PAWN_ATK[Us][src_] & from(dst_) && from(ep_target_) & check_mask;
+  if (is_ep_)
+    return undo_->ep == dst_ && valid_pin && PAWN_ATK[Us][src_] & from(dst_)
+           && from(ep_target_) & check_mask;
 
   switch (pt) {
   case P:
@@ -241,7 +247,8 @@ bool Board::is_legal(Move move) const {
   case N: return valid_pin && from(dst_) & check_mask & KNIGHT_ATK[src_];
   case B: return valid_pin && from(dst_) & check_mask & BISHOP_ATK[src_][occ];
   case R: return valid_pin && from(dst_) & check_mask & ROOK_ATK[src_][occ];
-  case Q: return valid_pin && from(dst_) & check_mask & (BISHOP_ATK[src_][occ] | ROOK_ATK[src_][occ]);
+  case Q:
+    return valid_pin && from(dst_) & check_mask & (BISHOP_ATK[src_][occ] | ROOK_ATK[src_][occ]);
   case K: return KING_ATK[src_] & from(dst_) && !(attacked & from(dst_));
   case NoPieceType: return false;
   }
@@ -256,4 +263,4 @@ template void Board::undo_move<Black>();
 template bool Board::is_legal<White>(Move move) const;
 template bool Board::is_legal<Black>(Move move) const;
 
-}  // namespace Lyra
+} // namespace Lyra

@@ -5,14 +5,21 @@
 
 namespace Lyra {
 
-enum PerftMode {
-  Perft,
-  Perft_MP,
+enum class PerftMode {
+  Normal,
+  MovePick,
 };
 
-template <PerftMode MP>
-void perft(Board& board, Depth d);
+struct BenchTestCase {
+  std::string fen;
+  Depth       depth;
+  U64         nodes;
+};
 
-void perft_bench();
+void perft(PerftMode perft_mode, Board &board, Depth depth);
+bool perft_bench(PerftMode perft_mode, BenchTestCase test_cases[], int n_cases);
+bool perft_bench();
 
-}  // namespace Lyra
+void run_bench(int argc, char **argv);
+
+} // namespace Lyra

@@ -5,8 +5,10 @@
 
 namespace Lyra {
 
-enum MovePickStage {
-  TT,
+enum class MPType { Main, QSearch };
+
+enum MPStage {
+  MAIN_TT,
   INIT_CAP,
   GOOD_CAP,
   INIT_QUIET,
@@ -14,25 +16,21 @@ enum MovePickStage {
   BAD_CAP,
 
   Q_TT,
-  Q_INIT_CAP,
+  Q_INIT,
   Q_CAP
 };
 
 // Contains all info required for MovePicker
-struct MovePickState {
-  const Board& board;
-  Move         tt_move;
-  Depth        depth;
-};
+struct MOStats {};
 
 template <Colour Us>
 class MovePicker {
- public:
-  MovePicker(bool quiescence, const MovePickState& state);
+public:
+  MovePicker(MPType type, const Board &board, MOStats &&stats, Move tt_move, Depth depth);
 
   Move next();
 
- private:
+private:
   void gen_score_cap();
   void gen_score_quiet();
   Eval score_quiet(Move move);
@@ -52,8 +50,13 @@ class MovePicker {
   size_t start_ptr = 0;
   size_t end_ptr   = MaxMoves - 1;
 
-  const MovePickState& state_;
-  MovePickStage        stage_ = TT;
+  const Board &board_;
+  Move         tt_move_;
+  Depth        depth_;
+
+  bool     skip_quiet_;
+  MPType   type_;
+  unsigned stage_ = MAIN_TT;
 };
 
-}  // namespace Lyra
+} // namespace Lyra

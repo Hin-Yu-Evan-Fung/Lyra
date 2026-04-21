@@ -1,10 +1,22 @@
 #pragma once
 
+#include "defs.hpp"
+#include "params.hpp"
+
 #include <chrono>
 
-#include "defs.hpp"
-
 namespace Lyra {
+/******************************************\
+|==========================================|
+|                 ND Array                 |
+|==========================================|
+\******************************************/
+
+template <typename T, size_t A, size_t... B>
+struct NDArray : public std::array<NDArray<T, B...>, A> {};
+
+template <typename T, size_t A>
+struct NDArray<T, A> : public std::array<T, A> {};
 
 /******************************************\
 |==========================================|
@@ -13,8 +25,9 @@ namespace Lyra {
 \******************************************/
 
 struct PRNG {
- public:
-  PRNG() : PRNG(0x6B51FF299F6A3AEE) {}
+public:
+  PRNG()
+      : PRNG(0x6B51FF299F6A3AEE) {}
   PRNG(U64 seed) {
     s0 = seed;
     s1 = seed * 2;
@@ -23,18 +36,18 @@ struct PRNG {
   }
 
   U64 random() {
-    U64 tmp  = s1 << 17;
-    s2      ^= s0;
-    s3      ^= s1;
-    s1      ^= s2;
-    s0      ^= s3;
-    s2      ^= tmp;
-    s3       = std::rotl(s3, 45);
+    U64 tmp = s1 << 17;
+    s2 ^= s0;
+    s3 ^= s1;
+    s1 ^= s2;
+    s0 ^= s3;
+    s2 ^= tmp;
+    s3 = std::rotl(s3, 45);
 
     return s0;
   }
 
- private:
+private:
   U64 s0, s1, s2, s3;
 };
 
@@ -48,9 +61,8 @@ using Time = uint64_t;
 
 inline Time now() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::high_resolution_clock::now().time_since_epoch()
-  )
-    .count();
+             std::chrono::high_resolution_clock::now().time_since_epoch())
+      .count();
 }
 
 /******************************************\
@@ -59,12 +71,21 @@ inline Time now() {
 |==========================================|
 \******************************************/
 
-namespace EvalUtils {
-
 constexpr Eval mate_in(U16 ply) { return EvalMate - ply; }
 constexpr Eval mated_in(U16 ply) { return -EvalMate + ply; }
+constexpr Eval is_loss(Eval v) { return v <= -EvalMateBound; }
+constexpr Eval is_win(Eval v) { return v >= EvalMateBound; }
+constexpr bool is_terminal(Eval v) { return is_win(v) || is_loss(v); }
+constexpr bool is_valid(Eval v) { return std::abs(v) < EvalInf; }
 
-inline std::string format(Eval v) {
+// Remove the mate score's dependency on ply from root, as the same position can
+// be reached in different lines
+constexpr Eval to_TT(Eval v, U16 ply) { return is_win(v) ? v + ply : is_loss(v) ? v - ply : v; }
+// Restore the mate score's dependency on ply from root, as the same position
+// can be reached in different lines
+constexpr Eval from_TT(Eval v, U16 ply) { return is_win(v) ? v - ply : is_loss(v) ? v + ply : v; }
+
+inline std::string format_eval(Eval v) {
   if (v >= EvalMateBound)
     return std::format("mate {}", (EvalMate - v + 1) / 2);
   else if (v <= -EvalMateBound)
@@ -73,15 +94,11 @@ inline std::string format(Eval v) {
     return std::format("cp {}", v);
 }
 
-}  // namespace EvalUtils
-
 /******************************************\
 |==========================================|
 |                 IO helpers               |
 |==========================================|
 \******************************************/
-
-namespace IOUtils {
 
 constexpr std::string_view PIECE_STR = "PpNnBbRrQqKk ";
 
@@ -94,9 +111,9 @@ constexpr std::string format_sq(Square sq) {
 
 constexpr File   parse_file(const char c) { return static_cast<File>(std::tolower(c) - 'a'); }
 constexpr Rank   parse_rank(const char c) { return static_cast<Rank>(std::tolower(c) - '1'); }
-constexpr Square parse_sq(const std::string& str) { return make_square(parse_file(str[0]), parse_rank(str[1])); }
-constexpr Piece  parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
+constexpr Square parse_sq(const std::string &str) {
+  return make_square(parse_file(str[0]), parse_rank(str[1]));
+}
+constexpr Piece parse_piece(const char c) { return static_cast<Piece>(PIECE_STR.find(c)); }
 
-}  // namespace IOUtils
-
-}  // namespace Lyra
+} // namespace Lyra

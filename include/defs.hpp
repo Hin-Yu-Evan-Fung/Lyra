@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <format>
-#include <string>
 
 namespace Lyra {
 
@@ -12,33 +10,20 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-using I8    = int8_t;
-using I16   = int16_t;
-using I32   = int32_t;
-using U8    = uint8_t;
-using U16   = uint16_t;
-using U64   = uint64_t;
+using U8   = uint8_t;
+using U16  = uint16_t;
+using U64  = uint64_t;
+using U128 = __uint128_t;
+using I8   = int8_t;
+using I16  = int16_t;
+using I32  = int32_t;
 
+using Age   = U8;
+using Move  = U16;
+using Ply   = U16;
+using Key   = U64;
 using Depth = I16;
 using Eval  = I32;
-
-/******************************************\
-|==========================================|
-|                Constants                 |
-|==========================================|
-\******************************************/
-
-enum {
-  MaxDepth      = 256,
-  MaxPly        = 2048,
-  MaxMoves      = 256,
-  Rule50Ply     = 100,
-  EvalInf       = 30000,
-  EvalMate      = 29000,
-  EvalMateBound = EvalMate - MaxDepth,
-  EvalDraw      = 0,
-  EvalStop      = 0,
-};
 
 /******************************************\
 |==========================================|
@@ -113,23 +98,29 @@ enum GamePhase : I8 {
 |==========================================|
 \******************************************/
 
-constexpr Square    operator++(Square& sq) noexcept { return sq = static_cast<Square>(sq + 1); }
-constexpr Square    operator--(Square& sq) noexcept { return sq = static_cast<Square>(sq - 1); }
-constexpr Rank      operator++(Rank& r) noexcept { return r = static_cast<Rank>(r + 1); }
-constexpr Rank      operator--(Rank& r) noexcept { return r = static_cast<Rank>(r - 1); }
-constexpr File      operator++(File& f) noexcept { return f = static_cast<File>(f + 1); }
-constexpr File      operator--(File& f) noexcept { return f = static_cast<File>(f - 1); }
-constexpr PieceType operator++(PieceType& pt) noexcept { return pt = static_cast<PieceType>(pt + 1); }
-constexpr Piece     operator++(Piece& pc) noexcept { return pc = static_cast<Piece>(pc + 1); }
-constexpr Castle    operator++(Castle& cr) noexcept { return cr = static_cast<Castle>(cr + 1); }
+constexpr Square    operator++(Square &sq) noexcept { return sq = static_cast<Square>(sq + 1); }
+constexpr Square    operator--(Square &sq) noexcept { return sq = static_cast<Square>(sq - 1); }
+constexpr Rank      operator++(Rank &r) noexcept { return r = static_cast<Rank>(r + 1); }
+constexpr Rank      operator--(Rank &r) noexcept { return r = static_cast<Rank>(r - 1); }
+constexpr File      operator++(File &f) noexcept { return f = static_cast<File>(f + 1); }
+constexpr File      operator--(File &f) noexcept { return f = static_cast<File>(f - 1); }
+constexpr PieceType operator++(PieceType &pt) noexcept {
+  return pt = static_cast<PieceType>(pt + 1);
+}
+constexpr Piece  operator++(Piece &pc) noexcept { return pc = static_cast<Piece>(pc + 1); }
+constexpr Castle operator++(Castle &cr) noexcept { return cr = static_cast<Castle>(cr + 1); }
 
 constexpr Direction operator~(Direction dir) noexcept { return static_cast<Direction>(-I8(dir)); }
 constexpr Colour    operator~(Colour c) noexcept { return static_cast<Colour>(c ^ Black); }
 constexpr Castle    operator~(Castle cr) noexcept { return static_cast<Castle>(cr ^ AnyCastle); }
-constexpr Castle    operator&(Castle cr1, Castle cr2) noexcept { return static_cast<Castle>(I8(cr1) & I8(cr2)); }
-constexpr Castle&   operator&=(Castle& cr1, Castle cr2) noexcept { return cr1 = cr1 & cr2; }
-constexpr Castle    operator|(Castle cr1, Castle cr2) noexcept { return static_cast<Castle>(I8(cr1) | I8(cr2)); }
-constexpr Castle    operator|=(Castle& cr1, Castle cr2) noexcept { return cr1 = cr1 | cr2; }
+constexpr Castle    operator&(Castle cr1, Castle cr2) noexcept {
+  return static_cast<Castle>(I8(cr1) & I8(cr2));
+}
+constexpr Castle &operator&=(Castle &cr1, Castle cr2) noexcept { return cr1 = cr1 & cr2; }
+constexpr Castle  operator|(Castle cr1, Castle cr2) noexcept {
+  return static_cast<Castle>(I8(cr1) | I8(cr2));
+}
+constexpr Castle operator|=(Castle &cr1, Castle cr2) noexcept { return cr1 = cr1 | cr2; }
 
 constexpr Rank   rank_of(Square sq) noexcept { return static_cast<Rank>(sq >> 3); }
 constexpr File   file_of(Square sq) noexcept { return static_cast<File>(sq & 7); }
@@ -137,7 +128,9 @@ constexpr Square make_square(File f, Rank r) noexcept { return static_cast<Squar
 
 constexpr PieceType pt_of(Piece pc) noexcept { return static_cast<PieceType>(pc >> 1); }
 constexpr Colour    colour_of(Piece pc) noexcept { return static_cast<Colour>(pc & 1); }
-constexpr Piece     make_piece(Colour c, PieceType pt) noexcept { return static_cast<Piece>(pt << 1 | c); }
+constexpr Piece     make_piece(Colour c, PieceType pt) noexcept {
+  return static_cast<Piece>(pt << 1 | c);
+}
 
 /******************************************\
 |==========================================|
@@ -159,8 +152,8 @@ struct Score {
 constexpr Score  operator-(Score s) { return {-s.mg, -s.eg}; }
 constexpr Score  operator+(Score s1, Score s2) { return {s1.mg + s2.mg, s1.eg + s2.eg}; }
 constexpr Score  operator-(Score s1, Score s2) { return {s1.mg - s2.mg, s1.eg - s2.eg}; }
-constexpr Score& operator+=(Score& s1, Score s2) { return s1 = s1 + s2; }
-constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
+constexpr Score &operator+=(Score &s1, Score s2) { return s1 = s1 + s2; }
+constexpr Score &operator-=(Score &s1, Score s2) { return s1 = s1 - s2; }
 
 /******************************************\
 |==========================================|
@@ -169,12 +162,21 @@ constexpr Score& operator-=(Score& s1, Score s2) { return s1 = s1 - s2; }
 \******************************************/
 
 constexpr Square flip_rank(Square sq) noexcept { return static_cast<Square>(sq ^ A8); }
-constexpr Square relative_sq(Colour c, Square sq) noexcept { return c == White ? sq : flip_rank(sq); }
-constexpr Castle relative_castle(Colour c, Castle cr) noexcept { return c == White ? cr : Castle(cr << 2); }
+constexpr Square relative_sq(Colour c, Square sq) noexcept {
+  return c == White ? sq : flip_rank(sq);
+}
+constexpr Castle relative_castle(Colour c, Castle cr) noexcept {
+  return c == White ? cr : Castle(cr << 2);
+}
 
 template <Colour C>
 constexpr Square forward(Square sq) noexcept {
   return static_cast<Square>(C == White ? sq + I8(Direction::N) : sq + I8(Direction::S));
 }
 
-}  // namespace Lyra
+template <Direction dir>
+constexpr Square shift(Square sq) {
+  return static_cast<Square>(sq + I8(dir));
+}
+
+} // namespace Lyra

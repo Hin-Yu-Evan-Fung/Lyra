@@ -1,12 +1,12 @@
 #include "uci.hpp"
 
+#include "perft.hpp"
+
 #include <ios>
 #include <iostream>
 #include <print>
 #include <sstream>
 #include <string>
-
-#include "perft.hpp"
 
 namespace Lyra {
 
@@ -51,13 +51,13 @@ void UCI::loop() {
   } while (token != "quit");
 }
 
-void UCI::parse_perft(std::istringstream& is) {
+void UCI::parse_perft(std::istringstream &is) {
   std::string    token;
   Depth          depth = 0;
   std::streampos pos   = is.tellg();
 
   if (is >> depth) {
-    engine_.perft<Perft>(depth);
+    engine_.perft(PerftMode::Normal, depth);
     return;
   }
 
@@ -67,14 +67,14 @@ void UCI::parse_perft(std::istringstream& is) {
 
   if (token == "mp") {
     is >> depth;
-    engine_.perft<Perft_MP>(depth);
+    engine_.perft(PerftMode::MovePick, depth);
   } else if (token == "bench")
     engine_.perft_bench();
   else
     std::println("Wrong command format! Must be perft [depth], perft mp [depth] or perft bench!");
 }
 
-void UCI::parse_go(std::istringstream& is) {
+void UCI::parse_go(std::istringstream &is) {
   std::string token;
 
   TimeControl tc{};
@@ -105,7 +105,7 @@ void UCI::parse_go(std::istringstream& is) {
   engine_.go(tc);
 }
 
-void UCI::parse_pos(std::istringstream& is) {
+void UCI::parse_pos(std::istringstream &is) {
   std::string token, fen;
   is >> token;
 
@@ -113,27 +113,26 @@ void UCI::parse_pos(std::istringstream& is) {
     fen = start_pos.data();
     is >> token;
   } else if (token == "fen") {
-    while (is >> token && token != "moves")
-      fen += token + " ";
+    while (is >> token && token != "moves") fen += token + " ";
   } else {
-    std::println(
-      "Wrong command format! Must be 'position startpos [moves] <move-1> <move-2> ...' or 'position fen <fen> "
-      "[moves] <move-1> <move-2>'"
-    );
+    std::println("Wrong command format! Must be 'position startpos [moves] <move-1> <move-2> ...' "
+                 "or 'position fen <fen> "
+                 "[moves] <move-1> <move-2>'");
     return;
   }
 
   std::vector<std::string> moves;
 
-  while (is >> token)
-    moves.push_back(token);
+  while (is >> token) moves.push_back(token);
 
   try {
     engine_.set_pos(fen, moves);
-  } catch (const std::invalid_argument& e) { std::println("Error: {}", e.what()); }
+  } catch (const std::invalid_argument &e) {
+    std::println("Error: {}", e.what());
+  }
 }
 
-void UCI::parse_option(std::istringstream& is) {
+void UCI::parse_option(std::istringstream &is) {
   std::string token, name;
   is >> token;
 
@@ -150,4 +149,4 @@ void UCI::parse_option(std::istringstream& is) {
   }
 }
 
-}  // namespace Lyra
+} // namespace Lyra

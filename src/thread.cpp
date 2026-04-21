@@ -11,12 +11,16 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-Thread::Thread(std::atomic_bool& stop, size_t id)
-  : id_(id), worker_(stop, id), exit_(false), busy_(false), thread_(&Thread::loop, this) {}
+Thread::Thread(std::atomic_bool &stop, size_t id)
+    : id_(id)
+    , worker_(stop, id)
+    , exit_(false)
+    , busy_(false)
+    , thread_(&Thread::loop, this) {}
 
 Thread::~Thread() {
   exit_ = true;
-  cv_.notify_one();  // Notify the idle loop that the loop must exit as soon as possible
+  cv_.notify_one(); // Notify the idle loop that the loop must exit as soon as possible
   if (thread_.joinable()) thread_.join();
 }
 
@@ -25,7 +29,7 @@ void Thread::wait() {
   cv_.wait(lock, [&] { return !busy_; });
 }
 
-void Thread::exec(std::function<void(Thread&)> func) {
+void Thread::exec(std::function<void(Thread &)> func) {
   {
     std::unique_lock<std::mutex> lock(mtx_);
     func_ = std::move(func);
@@ -35,14 +39,15 @@ void Thread::exec(std::function<void(Thread&)> func) {
 
 void Thread::loop() {
   while (!exit_) {
-    std::function<void(Thread&)> func;
+    std::function<void(Thread &)> func;
     {
       std::unique_lock<std::mutex> lock(mtx_);
-      cv_.notify_one();  // Notify any wait calls that the function is finished
-      cv_.wait(lock, [this] { return func_ != nullptr || exit_; });  // Wait for new job or exit command
+      cv_.notify_one(); // Notify any wait calls that the function is finished
+      cv_.wait(lock,
+               [this] { return func_ != nullptr || exit_; }); // Wait for new job or exit command
       if (exit_) return;
       func  = std::move(func_);
-      func_ = nullptr;  // Reset the loop
+      func_ = nullptr; // Reset the loop
     }
 
     if (func) {
@@ -59,7 +64,10 @@ void Thread::loop() {
 |==========================================|
 \******************************************/
 
-ThreadPool::ThreadPool(size_t num) : stop_(false) { resize(num); }
+ThreadPool::ThreadPool(size_t num)
+    : stop_(false) {
+  resize(num);
+}
 
 void ThreadPool::resize(size_t num) {
   wait();
@@ -74,18 +82,16 @@ void ThreadPool::resize(size_t num) {
   wait();
 }
 
-void ThreadPool::exec(std::function<void(Thread&)> func) {
-  for (auto& thread : threads_)
-    thread->exec(func);
+void ThreadPool::exec(std::function<void(Thread &)> func) {
+  for (auto &thread : threads_) thread->exec(func);
 }
 
 void ThreadPool::wait() {
-  for (auto& thread : threads_)
-    thread->wait();
+  for (auto &thread : threads_) thread->wait();
 }
 
 bool ThreadPool::is_busy() {
-  for (auto& thread : threads_)
+  for (auto &thread : threads_)
     if (thread->is_busy()) return true;
   return false;
 }
@@ -96,4 +102,4 @@ void ThreadPool::stop() {
   stop_ = false;
 }
 
-}  // namespace Lyra
+} // namespace Lyra

@@ -1,13 +1,5 @@
 #include "board.hpp"
 
-#include <algorithm>
-#include <cassert>
-#include <cstring>
-#include <ios>
-#include <iostream>
-#include <print>
-#include <sstream>
-
 #include "bitboard.hpp"
 #include "castle.hpp"
 #include "defs.hpp"
@@ -17,6 +9,14 @@
 #include "utils.hpp"
 #include "zobrist.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <cstring>
+#include <ios>
+#include <iostream>
+#include <print>
+#include <sstream>
+
 namespace Lyra {
 
 /******************************************\
@@ -25,17 +25,15 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-Board::Board() {
-  history_ = new Undo[MaxPly];
+Board::Board()
+    : history_(MaxPly) {
   reset();
 }
-
-Board::~Board() { delete[] history_; }
 
 void Board::reset() {
   chess960          = false;
   gameply_          = 0;
-  undo_             = history_;
+  undo_             = history_.data();
   undo_->ply        = 0;
   undo_->c_rights   = NoCastle;
   undo_->ep         = NoSquare;
@@ -50,7 +48,7 @@ void Board::reset() {
   castling_mask_.reset();
 }
 
-void Board::set(const std::string& fen) {
+void Board::set(const std::string &fen) {
   std::istringstream ss(fen);
   std::string        part;
 
@@ -66,7 +64,7 @@ void Board::set(const std::string& fen) {
     sq = make_square(File(file), Rank(rank));
 
     if (std::isalpha(c)) {
-      Piece pc = IOUtils::parse_piece(c);
+      Piece pc = parse_piece(c);
       colour_of(pc) == White ? set_piece<true, White>(pc, sq) : set_piece<true, Black>(pc, sq);
       file++;
     } else if (std::isdigit(c)) {
@@ -88,24 +86,22 @@ void Board::set(const std::string& fen) {
     Colour s     = std::isupper(c) ? White : Black;
     char   upper = std::toupper(c);
 
-    Piece  rook  = make_piece(s, R);
-    Square ksq   = s == White ? Board::ksq<White>() : Board::ksq<Black>();
+    Piece  rook = make_piece(s, R);
+    Square ksq  = s == White ? Board::ksq<White>() : Board::ksq<Black>();
     Square rsq;
 
     if (upper == 'K') {
       rsq = relative_sq(s, H1);
-      while (on(rsq) != rook)
-        --rsq;
+      while (on(rsq) != rook) --rsq;
       castling = CastleMask::get_mask(s, false);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper == 'Q') {
       rsq = relative_sq(s, A1);
-      while (on(rsq) != rook)
-        ++rsq;
+      while (on(rsq) != rook) ++rsq;
       castling = CastleMask::get_mask(s, true);
       castling_mask_.add_rights(ksq, rsq, castling);
     } else if (upper >= 'A' && upper <= 'H') {
-      rsq      = relative_sq(s, make_square(IOUtils::parse_file(upper), Rank1));
+      rsq      = relative_sq(s, make_square(parse_file(upper), Rank1));
       castling = CastleMask::get_mask(s, ksq > rsq);
       castling_mask_.add_rights(ksq, rsq, castling);
     }
@@ -116,7 +112,9 @@ void Board::set(const std::string& fen) {
   // 4. Parse enpassant
   ss >> std::skipws >> part;
   undo_->ep = NoSquare;
-  if (part.length() == 2) { undo_->ep = IOUtils::parse_sq(part); }
+  if (part.length() == 2) {
+    undo_->ep = parse_sq(part);
+  }
 
   int fifty_mv = 0, full_mv = 1;
   ss >> std::skipws >> fifty_mv;
@@ -127,13 +125,15 @@ void Board::set(const std::string& fen) {
   undo_->key    = compute_key();
 
   // Basic board legality checks
-  if (ksq<White>() == NoSquare) throw std::invalid_argument("Invalid fen! White king is not on the board!");
-  if (ksq<Black>() == NoSquare) throw std::invalid_argument("Invalid fen! Black king is not on the board!");
+  if (ksq<White>() == NoSquare)
+    throw std::invalid_argument("Invalid fen! White king is not on the board!");
+  if (ksq<Black>() == NoSquare)
+    throw std::invalid_argument("Invalid fen! Black king is not on the board!");
 
   stm_ == White ? update_masks<White>() : update_masks<Black>();
 }
 
-void Board::copy(const Board& board) {
+void Board::copy(const Board &board) {
   chess960       = board.chess960;
   gameply_       = board.gameply_;
   castling_mask_ = board.castling_mask_;
@@ -141,17 +141,16 @@ void Board::copy(const Board& board) {
   std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
   std::copy_n(board.colourBB_, NColour, colourBB_);
   std::copy_n(board.board_, NSquare, board_);
-  std::copy_n(board.history_, board.undo_->ply + 1, history_);
-  undo_ = history_ + board.undo_->ply;
+  std::copy_n(board.history_.begin(), board.undo_->ply + 1, history_.begin());
+  undo_ = history_.data() + board.undo_->ply;
 }
 
 void Board::print() const {
   std::println("\n     +---+---+---+---+---+---+---+---+");
 
   for (Rank r = Rank8; r >= Rank1; --r) {
-    std::print(" {}   |", IOUtils::format_rank(r));
-    for (File f = FileA; f <= FileH; ++f)
-      std::print(" {} |", IOUtils::format_piece(on(make_square(f, r))));
+    std::print(" {}   |", format_rank(r));
+    for (File f = FileA; f <= FileH; ++f) std::print(" {} |", format_piece(on(make_square(f, r))));
 
     std::println("\n     +---+---+---+---+---+---+---+---+");
   }
@@ -159,7 +158,7 @@ void Board::print() const {
   std::println("Fen: {}", fen());
   std::println("Side to move: {}", stm_ == White ? "White" : "Black");
   std::println("Castling Rights: {}", castling_mask_.to_str(undo_->c_rights));
-  std::println("Enpassant Square: {}", IOUtils::format_sq(undo_->ep));
+  std::println("Enpassant Square: {}", format_sq(undo_->ep));
   std::println("Hash Key: {:#X}", undo_->key);
   std::println("Chess960: {}", chess960 ? "true" : "false");
 }
@@ -176,7 +175,7 @@ std::string Board::fen() const {
       pc = on(sq);
       if (pc != NoPiece) {
         if (empty_count != 0) out << empty_count;
-        out << IOUtils::format_piece(pc);
+        out << format_piece(pc);
         empty_count = 0;
       } else {
         empty_count += 1;
@@ -184,13 +183,13 @@ std::string Board::fen() const {
     }
 
     if (empty_count != 0) out << empty_count;
-    if (r != Rank1)  // Move the piece back
+    if (r != Rank1) // Move the piece back
       out << '/';
   }
 
   out << " " << (stm_ == Colour::White ? "w" : "b");
   out << " " << castling_mask_.to_str(undo_->c_rights);
-  out << " " << (undo_->ep != NoSquare ? IOUtils::format_sq(undo_->ep) : "-");
+  out << " " << (undo_->ep != NoSquare ? format_sq(undo_->ep) : "-");
   out << " " << int(undo_->rule50);
   out << " " << gameply_ / 2 + 1;
 
@@ -203,8 +202,8 @@ std::string Board::fen() const {
 |==========================================|
 \******************************************/
 
-Zobrist::Key Board::compute_key() const {
-  Zobrist::Key key = 0;
+Key Board::compute_key() const {
+  Key key = 0;
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
@@ -219,8 +218,8 @@ Zobrist::Key Board::compute_key() const {
   return key;
 }
 
-Zobrist::Key Board::compute_pawn_key() const {
-  Zobrist::Key key = 0;
+Key Board::compute_pawn_key() const {
+  Key key = 0;
 
   for (Square sq = A1; sq <= H8; ++sq) {
     Piece pc = on(sq);
@@ -244,7 +243,7 @@ Eval Board::compute_raw_eval() const {
     Piece pc = on(sq);
     if (pc == NoPiece) continue;
 
-    score      += EvalUtils::PSQT[pc][sq];
+    score += EvalUtils::PSQT[pc][sq];
     game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
   }
 
@@ -263,20 +262,27 @@ Eval Board::eval() const {
 |==========================================|
 \******************************************/
 
-bool Board::is_draw() const {
-  bool not_checkmate = (undo_->check_mask == FullBB || list_moves(*this).size());
-  if (undo_->rule50 >= Rule50Ply && not_checkmate) return true;
-  return is_reps();
+bool Board::is_draw(Ply ply) const {
+  if (undo_->rule50 >= Rule50Ply)
+    if (undo_->check_mask == FullBB || list_moves(*this).size()) return true;
+  return undo_->reps && undo_->reps < ply;
 }
 
-bool Board::is_reps() const {
-  int end = std::min((U16)undo_->rule50, undo_->ply);
+void Board::update_reps() const {
+  undo_->reps = 0;
+  int end     = std::min((U16)undo_->rule50, undo_->ply);
   if (end >= 4)
-    for (int i = 2, reps = 0; i <= end; i += 2)
-      if (undo_->key == (undo_ - i)->key && ++reps >= 2) return true;
-  return false;
+    for (int i = 2; i <= end; i += 2) {
+      Undo *prev = undo_ - i;
+      if (undo_->key == prev->key) {
+        undo_->reps = prev->reps ? -i : i;
+        break;
+      }
+    }
 }
 
 bool Board::in_check() const { return undo_->check_mask != FullBB; }
 
-}  // namespace Lyra
+bool Board::has_non_pawn_material(Colour us) const { return bb(us) ^ bb(us, K) ^ bb(us, P); }
+
+} // namespace Lyra

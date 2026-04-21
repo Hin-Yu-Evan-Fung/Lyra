@@ -9,4 +9,4 @@ extern int   GamePhaseInc[NPieceType];
 
 void init();
 
-}  // namespace Lyra::EvalUtils
+} // namespace Lyra::EvalUtils

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <atomic>
-
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
+
+#include <atomic>
 
 namespace Lyra {
 
@@ -15,49 +15,58 @@ struct PVLine {
   Move   moves[MaxDepth];
   size_t length;
 
-  void        update(const PVLine& other, Move best);
+  void        update(const PVLine &other, Move best);
   void        clear() { length = 0; }
-  std::string format(bool chess960);
+  std::string format(bool chess960) const;
 };
 
 struct StackEntry {
-  Move  killers[2];
-  Move  curr_move;
-  Move  excl_move;
-  Piece moved;
-  Eval  eval;
-  bool  in_check;
-  U16   ply_since_null;
+  PVLine pv;
+  Eval   eval;
 };
 
 class Worker {
-  enum NodeType { Root, PV, NonPV };
+  enum NodeType { PV, NonPV };
+
+  bool should_search_deeper();
+  void uci_report(const PVLine &pv);
+  void report_best_move();
+
+  template <Colour Us>
+  void aspwin(StackEntry *se);
 
   template <Colour Us, NodeType NT>
-  Eval search(Board& board, PVLine& pv, Eval alpha, Eval beta, Depth depth);
+  Eval search(StackEntry *se, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT>
-  Eval qsearch(Board& board, PVLine& pv, Eval alpha, Eval beta);
+  Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 
   Clock             clock_;
-  std::atomic_bool& stop_;
+  std::atomic_bool &stop_;
 
   Board  board_;
   size_t id_;
 
-  PVLine pv_;
   size_t nodes_;
+  Move   best_move_;
   Depth  depth_;
+  Depth  last_best_move_depth_;
   Depth  seldepth_;
   U16    ply_;
   Eval   eval_;
+  Eval   avg_eval_;
 
- public:
-  Worker(std::atomic_bool& stop, size_t id) : clock_(stop), stop_(stop), id_(id) {}
+public:
+  Worker(std::atomic_bool &stop, size_t id)
+      : clock_(stop)
+      , stop_(stop)
+      , id_(id) {}
   bool is_main() { return id_ == 0; }
 
-  void reset(const Board& board);
-  void start(const TimeControl& tc);
-  void uci_report();
+  void reset(const Board &board);
+  void start(const TimeControl &tc);
+
+  const Clock &clock() const { return clock_; }
+  const U64    nodes() const { return nodes_; }
 };
 
-}  // namespace Lyra
+} // namespace Lyra

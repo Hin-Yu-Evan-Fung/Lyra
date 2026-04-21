@@ -1,8 +1,8 @@
 #pragma once
-#include <string>
-
 #include "defs.hpp"
 #include "utils.hpp"
+
+#include <string>
 
 namespace Lyra {
 
@@ -16,8 +16,6 @@ namespace Lyra {
 \******************************************/
 
 class Board;
-
-using Move = U16;
 
 // Move flag enum
 enum MoveFlag : U16 {
@@ -65,11 +63,16 @@ constexpr Square   src(Move move) { return static_cast<Square>(move & SrcMask); 
 constexpr Square   dst(Move move) { return static_cast<Square>((move & DstMask) >> 6); }
 constexpr MoveFlag flag(Move move) { return static_cast<MoveFlag>(move & FlagMask); }
 
+constexpr bool is_ep(Move move) { return flag(move) == EP; }
 constexpr bool is_capture(Move move) { return flag(move) & CapMask; }
 constexpr bool is_promo(Move move) { return flag(move) & PromoMask; }
-constexpr bool is_castle(Move move) { return flag(move) == KingCastle || flag(move) == QueenCastle; }
+constexpr bool is_castle(Move move) {
+  return flag(move) == KingCastle || flag(move) == QueenCastle;
+}
 
-constexpr PieceType promoted_pt(Move move) { return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N); }
+constexpr PieceType promoted_pt(Move move) {
+  return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N);
+}
 
 constexpr std::string format(Move move, bool chess960) {
   if (!move) return "none";
@@ -77,15 +80,16 @@ constexpr std::string format(Move move, bool chess960) {
   Square src_sq = src(move);
   Square dst_sq = dst(move);
 
-  if (!chess960 && is_castle(move)) dst_sq = make_square(flag(move) == QueenCastle ? FileC : FileG, rank_of(src_sq));
+  if (!chess960 && is_castle(move))
+    dst_sq = make_square(flag(move) == QueenCastle ? FileC : FileG, rank_of(src_sq));
 
-  std::string move_str = IOUtils::format_sq(src_sq) + IOUtils::format_sq(dst_sq);
+  std::string move_str = format_sq(src_sq) + format_sq(dst_sq);
 
-  if (is_promo(move)) move_str += " pnbrqk"[promoted_pt(move)];
+  if (is_promo(move)) move_str += "pnbrqk "[promoted_pt(move)];
 
   return move_str;
 }
 
-}  // namespace MoveUtils
+} // namespace MoveUtils
 
-}  // namespace Lyra
+} // namespace Lyra

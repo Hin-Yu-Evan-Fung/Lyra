@@ -1,9 +1,9 @@
 #pragma once
 
-#include <immintrin.h>
-
 #include "defs.hpp"
 #include "immintrin.h"
+
+#include <immintrin.h>
 
 namespace Lyra {
 
@@ -49,9 +49,8 @@ inline int    popcount(BB bb) { return _mm_popcnt_u64(bb); }
 constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>
-constexpr void bitloop(BB bb, Func&& func) {
-  for (; bb; bb &= bb - 1)
-    func(lsb(bb));
+constexpr void bitloop(BB bb, Func &&func) {
+  for (; bb; bb &= bb - 1) func(lsb(bb));
 }
 
 /******************************************\
@@ -87,7 +86,7 @@ constexpr BB shift(BB b) {
 \******************************************/
 
 struct Magic {
-  BB* attacks;
+  BB *attacks;
   BB  mask;
   BB  operator[](BB occ) { return attacks[index(occ)]; }
 #ifdef USE_PEXT
@@ -119,8 +118,23 @@ constexpr BB pawn_attack_bb(BB bb) {
   return C == White ? shift<NE, NW>(bb) : shift<SE, SW>(bb);
 }
 
-constexpr bool is_aligned(Square sq1, Square sq2, Square sq3) { return LINE_BB[sq1][sq2] & from(sq3); }
+template <Colour C>
+constexpr BB attack_bb(PieceType att, Square sq, BB occ) {
+  switch (att) {
+  case P: return PAWN_ATK[C][sq];
+  case N: return KNIGHT_ATK[sq];
+  case B: return BISHOP_ATK[sq][occ];
+  case R: return ROOK_ATK[sq][occ];
+  case Q: return (BISHOP_ATK[sq][occ] | ROOK_ATK[sq][occ]);
+  case K: return KING_ATK[sq];
+  default: return EmptyBB;
+  }
+}
 
-}  // namespace BBUtils
+constexpr bool is_aligned(Square sq1, Square sq2, Square sq3) {
+  return LINE_BB[sq1][sq2] & from(sq3);
+}
 
-}  // namespace Lyra
+} // namespace BBUtils
+
+} // namespace Lyra

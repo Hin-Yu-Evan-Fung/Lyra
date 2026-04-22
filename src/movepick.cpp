@@ -16,6 +16,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     , tt_move_(tt_move)
     , depth_(depth)
     , killer_(*mostats.killer)
+    , hist_quiet_(*mostats.hist_quiet)
     , skip_quiet_(false)
     , type_(type) {
 
@@ -47,8 +48,8 @@ Eval MovePicker<Us>::score_cap(Move move) {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  static Eval score = 0;
-  return score++;
+  const PieceTo p = piece_to(board_, move);
+  return hist_quiet_[p.pc][p.to];
 }
 
 template <Colour Us>

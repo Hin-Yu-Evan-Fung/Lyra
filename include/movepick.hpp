@@ -25,7 +25,8 @@ enum MPStage {
 
 // Contains all info required for MovePicker
 struct MOStats {
-  const Killer *killer;
+  const Killer    *killer;
+  const HistQuiet *hist_quiet;
 };
 
 template <Colour Us>
@@ -59,7 +60,8 @@ private:
   Move         tt_move_;
   Depth        depth_;
 
-  Killer killer_;
+  Killer           killer_;
+  const HistQuiet &hist_quiet_;
 
   bool     skip_quiet_;
   MPType   type_;

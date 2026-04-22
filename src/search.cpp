@@ -130,7 +130,7 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     }
   }
 
-  if (best_move) update_all_stats(se, best_move);
+  if (best_move) update_all_stats(se, depth, best_move);
 
   if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
 

@@ -3,6 +3,8 @@
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
+#include "movepick.hpp"
+#include "search_utils.hpp"
 
 #include <atomic>
 
@@ -10,22 +12,6 @@ namespace Lyra {
 
 class ThreadPool;
 class Thread;
-
-struct PVLine {
-  Move   moves[MaxDepth];
-  size_t length;
-
-  void        update(const PVLine &other, Move best);
-  void        clear() { length = 0; }
-  std::string format(bool chess960) const;
-};
-
-struct StackEntry {
-  PVLine pv;
-  Eval   eval;
-  Ply    ply_from_null;
-  Move   move;
-};
 
 class Worker {
   enum NodeType { PV, NonPV };
@@ -51,6 +37,9 @@ class Worker {
   constexpr void do_null_move(StackEntry *se);
   template <Colour Us>
   constexpr void undo_null_move(StackEntry *se);
+
+  void    update_all_stats(StackEntry *se, Move best);
+  MOStats mostats(StackEntry *se);
 
   Clock             clock_;
   std::atomic_bool &stop_;

@@ -15,6 +15,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     : board_(board)
     , tt_move_(tt_move)
     , depth_(depth)
+    , killer_(*mostats.killer)
     , skip_quiet_(false)
     , type_(type) {
 
@@ -26,6 +27,11 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
   if (type == MPType::QSearch && !is_capture(tt_move_)) {
     tt_move_ = NoMove;
   }
+
+  if (killer_[0] == tt_move_ || is_capture(killer_[0]) || !board.is_legal<Us>(killer_[0]))
+    killer_[0] = NoMove;
+  if (killer_[1] == tt_move_ || is_capture(killer_[1]) || !board.is_legal<Us>(killer_[1]))
+    killer_[1] = NoMove;
 }
 
 template <Colour Us>
@@ -66,7 +72,7 @@ template <Colour Us>
 void MovePicker<Us>::gen_score_quiet() {
   start_ptr = 0;
   enum_moves<Us, GenQuiet>(board_, [&](Move move) {
-    if (move == tt_move_) return;
+    if (move == tt_move_ || move == killer_[0] || move == killer_[1]) return;
 
     moves_[start_ptr]    = move;
     scores_[start_ptr++] = score_quiet(move);
@@ -115,6 +121,14 @@ Move MovePicker<Us>::next() {
     if (peek_front()) return pop_front();
     ++stage_;
     return next();
+  case KILLER_1:
+    ++stage_;
+    if (killer_[0]) return killer_[0];
+    return next();
+  case KILLER_2:
+    ++stage_;
+    if (killer_[1]) return killer_[1];
+    return next();
   case INIT_QUIET:
     if (!skip_quiet_) gen_score_quiet();
     ++stage_;
@@ -136,5 +150,93 @@ Move MovePicker<Us>::next() {
 
 template class MovePicker<White>;
 template class MovePicker<Black>;
+
+/******************************************\
+|==========================================|
+|             Is Legal function            |
+|==========================================|
+\******************************************/
+
+template <Colour Us>
+bool Board::is_legal(Move move) const {
+  using namespace MoveUtils;
+  using namespace BBUtils;
+  using enum Direction;
+
+  constexpr Direction Up        = Us == White ? N : S;
+  constexpr Castle    OO        = Us == White ? WhiteOO : BlackOO;
+  constexpr Castle    OOO       = Us == White ? WhiteOOO : BlackOOO;
+  constexpr Rank      PromoRank = Us == White ? Rank7 : Rank2;
+
+  if (!move) return false;
+
+  // Move params
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
+  const Piece     pc        = on(src);
+  const PieceType pt        = pt_of(pc);
+  const Piece     cap       = on(dst);
+  const bool      is_castle = MoveUtils::is_castle(move);
+  const bool      is_cap    = MoveUtils::is_capture(move);
+  const bool      is_promo  = MoveUtils::is_promo(move);
+  const bool      is_ep     = flag == EP;
+  const bool      is_dp     = flag == DoublePush;
+  const bool      is_quiet  = flag == Quiet;
+
+  // Board info
+  const Square ksq_       = ksq<Us>();
+  const BB     occ        = bb();
+  const BB     hv_pin     = undo_->hv_pin;
+  const BB     diag_pin   = undo_->diag_pin;
+  const BB     check_mask = undo_->check_mask;
+  const BB     attacked   = undo_->attacked;
+
+  // Check if the moving piece is ours or not
+  if (pc == NoPiece || colour_of(pc) != Us) return false;
+  // Check if the squares makes sense
+  if (!is_castle && src == dst) return false;
+  // Check if the captured piece is theirs or not
+  if (!is_castle && cap != NoPiece && colour_of(cap) == Us) return false;
+  // Check if the capture flag is consistent with a piece being captured
+  if (!is_castle && !is_ep && is_cap == (cap == NoPiece)) return false;
+  // Check if the promotion flag is consistent
+  if (is_promo && (pt_of(pc) != P || rank_of(src) != PromoRank)) return false;
+
+  if (is_castle) {
+    if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
+    if (flag == QueenCastle && undo_->c_rights & OOO) return !in_check() && can_castle<Us, true>();
+    return false;
+  }
+
+  if (pt == K) return KING_ATK[src] & from(dst) && !(attacked & from(dst));
+
+  // Check if there is a pin and if so check if the movement is aligned
+  // to the king
+  const bool valid_pin =
+      !(diag_pin & from(src) || hv_pin & from(src)) || is_aligned(src, dst, ksq_);
+
+  if (pt == P) {
+    // Enpassant is illegal if the destination is incorrect, the attack
+    // pattern is wrong, or the move results in check.
+    if (is_ep)
+      return undo_->ep == dst && valid_pin && PAWN_ATK[Us][src] & from(dst) & shift<Up>(check_mask);
+    // Capture is illegal if the move does not correspond to the attack
+    // pattern
+    if (is_cap && !(PAWN_ATK[Us][src] & from(dst))) return false;
+    // Double Push is illegal if there are pieces in the way
+    if (is_dp && (BTWN_BB[src][dst] | from(dst)) & occ) return false;
+    // Single Push is illegal if its the wrong pattern and there are
+    // pieces in the way
+    if (is_quiet && (dst != forward<Us>(src) || from(dst) & occ)) return false;
+
+    return valid_pin && from(dst) & check_mask;
+  }
+
+  return valid_pin && from(dst) & check_mask & attack_bb<Us>(pt, src, occ);
+}
+
+template bool Board::is_legal<White>(Move move) const;
+template bool Board::is_legal<Black>(Move move) const;
 
 } // namespace Lyra

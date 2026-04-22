@@ -2,6 +2,7 @@
 
 #include "board.hpp"
 #include "defs.hpp"
+#include "history.hpp"
 
 namespace Lyra {
 
@@ -11,6 +12,8 @@ enum MPStage {
   MAIN_TT,
   INIT_CAP,
   GOOD_CAP,
+  KILLER_1,
+  KILLER_2,
   INIT_QUIET,
   QUIET,
   BAD_CAP,
@@ -21,7 +24,9 @@ enum MPStage {
 };
 
 // Contains all info required for MovePicker
-struct MOStats {};
+struct MOStats {
+  const Killer *killer;
+};
 
 template <Colour Us>
 class MovePicker {
@@ -53,6 +58,8 @@ private:
   const Board &board_;
   Move         tt_move_;
   Depth        depth_;
+
+  Killer killer_;
 
   bool     skip_quiet_;
   MPType   type_;

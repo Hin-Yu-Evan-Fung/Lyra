@@ -1,5 +1,6 @@
 #include "search_utils.hpp"
 
+#include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
 #include "params.hpp"
@@ -40,7 +41,7 @@ bool Worker::should_search_deeper() {
          && !clock_.stop_iter(depth_, last_best_move_depth_, avg_eval_, eval_, nodes_, best_move_);
 }
 
-MOStats Worker::mostats(StackEntry *se) { return {&se->killer}; }
+MOStats Worker::mostats(StackEntry *se) { return {&se->killer, &hist_quiet_}; }
 
 void Worker::reset(const Board &board) {
   board_.copy(board);
@@ -54,6 +55,8 @@ void Worker::reset(const Board &board) {
 
   eval_     = 0;
   avg_eval_ = 0;
+
+  hist_quiet_ = {};
 }
 
 void Worker::uci_report(const PVLine &pv) {
@@ -68,9 +71,13 @@ void Worker::report_best_move() {
   std::fflush(stdout);
 }
 
-void Worker::update_all_stats(StackEntry *se, Move best) {
+void Worker::update_all_stats(StackEntry *se, Depth depth, Move best) {
+
+  const Eval bonus = std::min(300 * depth - 250, 1500);
+
   if (!is_capture(best)) {
     update_killer(se->killer, best);
+    update_hist_quiet(hist_quiet_, board_, best, bonus);
   }
 }
 

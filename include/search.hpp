@@ -38,7 +38,7 @@ class Worker {
   template <Colour Us>
   constexpr void undo_null_move(StackEntry *se);
 
-  void    update_all_stats(StackEntry *se, Move best);
+  void    update_all_stats(StackEntry *se, Depth depth, Move best);
   MOStats mostats(StackEntry *se);
 
   Clock             clock_;
@@ -56,6 +56,8 @@ class Worker {
   Ply    ply_from_null_;
   Eval   eval_;
   Eval   avg_eval_;
+
+  HistQuiet hist_quiet_;
 
 public:
   Worker(std::atomic_bool &stop, size_t id)

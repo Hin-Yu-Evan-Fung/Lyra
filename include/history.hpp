@@ -6,7 +6,8 @@
 
 namespace Lyra {
 
-using Killer = NDArray<Move, 2>;
+using Killer    = NDArray<Move, 2>;
+using HistQuiet = NDArray<Eval, NPiece, NSquare>;
 
 struct PieceTo {
   Piece  pc;
@@ -22,6 +23,15 @@ constexpr void update_killer(Killer &killer, Move best) {
     killer[1] = killer[0];
     killer[0] = best;
   }
+}
+
+constexpr void hist_gravity(Eval &hist, Eval bonus) {
+  hist += bonus - hist * std::abs(bonus) / HistMax;
+}
+
+constexpr void update_hist_quiet(HistQuiet &hist, const Board &board, Move move, Eval bonus) {
+  const PieceTo p = piece_to(board, move);
+  hist_gravity(hist[p.pc][p.to], bonus);
 }
 
 } // namespace Lyra

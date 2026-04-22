@@ -21,6 +21,7 @@ SRC := \
 	src/eval.cpp \
 	src/perft.cpp \
 	src/search.cpp \
+	src/search_utils.cpp \
 	src/engine.cpp \
 	src/uci.cpp \
 	src/main.cpp 

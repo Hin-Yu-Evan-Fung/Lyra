@@ -1,67 +1,21 @@
 #include "search.hpp"
 
 #include "defs.hpp"
+#include "move.hpp"
 #include "movepick.hpp"
+#include "search_utils.hpp"
 
 #include <atomic>
-#include <cstdio>
+#include <cassert>
 #include <print>
 
 namespace Lyra {
 
 /******************************************\
 |==========================================|
-|                  PVLine                  |
-|==========================================|
-\******************************************/
-
-void PVLine::update(const PVLine &other, Move best) {
-  length   = other.length + 1;
-  moves[0] = best;
-  std::copy_n(other.moves, other.length, &moves[1]);
-}
-
-std::string PVLine::format(bool chess960) const {
-  std::ostringstream os;
-  for (size_t i = 0; i < length; i++) os << MoveUtils::format(moves[i], chess960) << " ";
-  return os.str();
-}
-
-/******************************************\
-|==========================================|
 |              Search Helpers              |
 |==========================================|
 \******************************************/
-
-bool Worker::should_search_deeper() {
-  return depth_ < MaxDepth
-         && !clock_.stop_iter(depth_, last_best_move_depth_, avg_eval_, eval_, nodes_, best_move_);
-}
-
-void Worker::reset(const Board &board) {
-  board_.copy(board);
-  best_move_            = NoMove;
-  nodes_                = 0;
-  depth_                = 0;
-  seldepth_             = 0;
-  last_best_move_depth_ = 0;
-  ply_                  = 0;
-
-  eval_     = 0;
-  avg_eval_ = 0;
-}
-
-void Worker::uci_report(const PVLine &pv) {
-  std::println("info depth {} seldepth 0 score {} time {} nodes {} nps {} pv {}", depth_,
-               format_eval(eval_), clock_.elapsed(), nodes_,
-               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), pv.format(board_.chess960));
-  std::fflush(stdout);
-}
-
-void Worker::report_best_move() {
-  std::println("bestmove {}", MoveUtils::format(best_move_, board_.chess960));
-  std::fflush(stdout);
-}
 
 void Worker::start(const TimeControl &tc) {
   Colour stm = board_.stm();
@@ -116,14 +70,14 @@ template <Colour Us, Worker::NodeType NT>
 Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
+  const bool     root     = ply_ == 0;
+  if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
 
-  if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
-
-  if (ply_) {
+  if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
-    if (board_.is_draw(ply_from_null_)) return EvalDraw;
+    if (board_.is_draw(ply_)) return EvalDraw;
     if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
@@ -139,11 +93,14 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |        Main Search Loop        |
   \********************************/
 
-  MovePicker<Us> mp{MPType::Main, board_, {}, NoMove, depth};
+  MovePicker<Us> mp{MPType::Main, board_, mostats(se), NoMove, depth};
 
   Eval best       = -EvalInf;
   int  move_count = 0;
   Move move       = NoMove;
+  Move best_move  = NoMove;
+
+  (se + 1)->killer.fill(NoMove);
 
   while ((move = mp.next())) {
     move_count++;
@@ -165,12 +122,15 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (val > best) {
       best = val;
       if (val > alpha) {
+        best_move = move;
         if (pv) se->pv.update((se + 1)->pv, move);
         if (val >= beta) break;
         alpha = val;
       }
     }
   }
+
+  if (best_move) update_all_stats(se, best_move);
 
   if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
 
@@ -185,13 +145,13 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
 
+  se->pv.clear();
+
   if (clock_.stop(nodes_)) return EvalStop;
   if (board_.is_draw(ply_from_null_)) return EvalDraw;
   if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
-  se->pv.clear();
-
-  MovePicker<Us> mp{MPType::QSearch, board_, {}, NoMove, DepthQS};
+  MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), NoMove, DepthQS};
 
   /********************************\
   |            Stand Pat           |
@@ -209,6 +169,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   \********************************/
 
   Move move = NoMove;
+
+  (se + 1)->killer.fill(NoMove);
 
   while ((move = mp.next())) {
 

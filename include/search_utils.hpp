@@ -1,0 +1,25 @@
+#pragma once
+
+#include "defs.hpp"
+#include "history.hpp"
+#include "params.hpp"
+namespace Lyra {
+
+struct PVLine {
+  Move   moves[MaxDepth];
+  size_t length;
+
+  void        update(const PVLine &other, Move best);
+  void        clear() { length = 0; }
+  std::string format(bool chess960) const;
+};
+
+struct StackEntry {
+  PVLine pv;
+  Killer killer;
+  Eval   eval;
+  Ply    ply_from_null;
+  Move   move;
+};
+
+} // namespace Lyra

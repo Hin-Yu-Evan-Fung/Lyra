@@ -3,6 +3,7 @@
 #include "defs.hpp"
 #include "history.hpp"
 #include "params.hpp"
+#include "tt.hpp"
 namespace Lyra {
 
 struct PVLine {
@@ -21,5 +22,16 @@ struct StackEntry {
   Ply    ply_from_null;
   Move   move;
 };
+
+/******************************************\
+|==========================================|
+|               Search Utils               |
+|==========================================|
+\******************************************/
+
+// We can use eval if it is tighter than bounded
+constexpr bool can_use_bound(Bound bound, Eval eval, Eval bounded) {
+  return bound & (eval >= bounded ? Bound::Lower : Bound::Upper);
+}
 
 } // namespace Lyra

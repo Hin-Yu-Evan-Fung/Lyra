@@ -11,9 +11,9 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-Thread::Thread(std::atomic_bool &stop, size_t id)
+Thread::Thread(std::atomic_bool &stop, size_t id, TT &tt)
     : id_(id)
-    , worker_(stop, id)
+    , worker_(stop, id, tt)
     , exit_(false)
     , busy_(false)
     , thread_(&Thread::loop, this) {}
@@ -64,12 +64,12 @@ void Thread::loop() {
 |==========================================|
 \******************************************/
 
-ThreadPool::ThreadPool(size_t num)
+ThreadPool::ThreadPool(size_t num, TT &tt)
     : stop_(false) {
-  resize(num);
+  resize(num, tt);
 }
 
-void ThreadPool::resize(size_t num) {
+void ThreadPool::resize(size_t num, TT &tt) {
   wait();
 
   if (threads_.size() > 0) threads_.clear();
@@ -77,7 +77,7 @@ void ThreadPool::resize(size_t num) {
   threads_.reserve(num);
 
   while (threads_.size() < num)
-    threads_.emplace_back(std::make_unique<Thread>(stop_, threads_.size()));
+    threads_.emplace_back(std::make_unique<Thread>(stop_, threads_.size(), tt));
 
   wait();
 }

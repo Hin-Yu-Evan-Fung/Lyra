@@ -20,7 +20,10 @@ namespace Lyra {
 void Worker::start(const TimeControl &tc) {
   Colour stm = board_.stm();
 
-  if (is_main()) clock_.set(stm, tc);
+  if (is_main()) {
+    clock_.set(stm, tc);
+    tt_.incr_age();
+  }
 
   StackEntry  stack[MaxDepth + StackOffset]{};
   StackEntry *se = stack + StackOffset;
@@ -71,6 +74,7 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
   const bool     root     = ply_ == 0;
+
   if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
@@ -90,10 +94,24 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   }
 
   /********************************\
-  |        Main Search Loop        |
+  |   Transposition Table Lookup   |
   \********************************/
 
-  MovePicker<Us> mp{MPType::Main, board_, mostats(se), NoMove, depth};
+  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
+
+  Move tt_move = NoMove;
+
+  if (tt_hit) {
+    // if (!pv && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
+    //   return tte.value;
+    // }
+
+    tt_move = tte.move;
+  }
+
+  /********************************\
+  |        Main Search Loop        |
+  \********************************/
 
   Eval val         = 0;
   Eval best        = -EvalInf;
@@ -104,10 +122,12 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   (se + 1)->killer.fill(NoMove);
 
+  MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
-    const Depth new_depth = depth - 1;
-
+    const Depth new_depth    = depth - 1;
+    const U64   cached_nodes = nodes_;
     move_count++;
+
     do_move<Us>(se, move);
 
     /********************************\
@@ -134,6 +154,8 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // If we are stopping, return a placeholder score.
     if (stop_.load(std::memory_order::relaxed)) return EvalStop;
 
+    if (root) clock_.update_effort(nodes_ - cached_nodes, move);
+
     /********************************\
     |       Alpha Beta Pruning       |
     \********************************/
@@ -156,6 +178,12 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
 
+  tt_.write(board_.key(), depth, ply_,
+            best >= beta        ? Bound::Lower
+            : (pv && best_move) ? Bound::Exact
+                                : Bound::Upper,
+            best_move, EvalInvalid, best);
+
   return best;
 }
 
@@ -173,7 +201,21 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   if (board_.is_draw(ply_from_null_)) return EvalDraw;
   if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
-  MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), NoMove, DepthQS};
+  /********************************\
+  |   Transposition Table Lookup   |
+  \********************************/
+
+  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
+
+  Move tt_move = NoMove;
+
+  if (tt_hit) {
+    // if (!pv && can_use_bound(tte.bound, tte.value, beta)) {
+    //   return tte.value;
+    // }
+
+    tt_move = tte.move;
+  }
 
   /********************************\
   |            Stand Pat           |
@@ -190,10 +232,12 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   |        Main Search Loop        |
   \********************************/
 
-  Move move = NoMove;
+  Move move      = NoMove;
+  Move best_move = NoMove;
 
   (se + 1)->killer.fill(NoMove);
 
+  MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
   while ((move = mp.next())) {
 
     do_move<Us>(se, move);
@@ -210,12 +254,16 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     if (val > best) {
       best = val;
       if (val > alpha) {
+        best_move = move;
         if (pv) se->pv.update((se + 1)->pv, move);
         if (val >= beta) break;
         alpha = val;
       }
     }
   }
+
+  tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
+            EvalInvalid, best);
 
   return best;
 }

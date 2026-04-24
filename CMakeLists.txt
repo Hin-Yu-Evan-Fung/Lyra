@@ -24,6 +24,7 @@ set(
     src/perft.cpp
     src/search.cpp
     src/search_utils.cpp
+    src/tt.cpp
     src/engine.cpp
     src/uci.cpp
 )

@@ -8,7 +8,7 @@
 
 namespace Lyra {
 
-constexpr Depth    BenchDepth = 4;
+constexpr Depth    BenchDepth = 5;
 constexpr unsigned NBenchPos  = 66;
 
 /******************************************\
@@ -282,7 +282,8 @@ void run_bench(int argc, char **argv) {
   std::atomic_bool stop;
 
   Board       board;
-  Worker      worker{stop, 0};
+  TT          tt{TT_SIZE};
+  Worker      worker{stop, 0, tt};
   TimeControl tc;
 
   tc.depth = argc > 2 ? atoi(argv[2]) : BenchDepth;

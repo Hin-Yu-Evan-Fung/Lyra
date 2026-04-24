@@ -5,6 +5,7 @@
 #include "defs.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
+#include "tt.hpp"
 
 #include <atomic>
 
@@ -57,13 +58,16 @@ class Worker {
   Eval   eval_;
   Eval   avg_eval_;
 
+  TT &tt_;
+
   HistQuiet hist_quiet_;
 
 public:
-  Worker(std::atomic_bool &stop, size_t id)
+  Worker(std::atomic_bool &stop, size_t id, TT &tt)
       : clock_(stop)
       , stop_(stop)
-      , id_(id) {}
+      , id_(id)
+      , tt_(tt) {}
   bool is_main() { return id_ == 0; }
 
   void reset(const Board &board);
@@ -87,6 +91,7 @@ constexpr void Worker::do_move(StackEntry *se, Move move) {
   se->ply_from_null = ply_from_null_++;
   se->move          = move;
   board_.do_move<Us>(move);
+  tt_.prefetch(board_.key());
 }
 
 template <Colour Us>
@@ -105,6 +110,7 @@ constexpr void Worker::do_null_move(StackEntry *se) {
   ply_from_null_    = 0;
   se->move          = NullMove;
   board_.do_null_move<Us>();
+  tt_.prefetch(board_.key());
 }
 
 template <Colour Us>

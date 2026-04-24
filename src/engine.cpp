@@ -2,6 +2,7 @@
 
 #include "defs.hpp"
 #include "movegen.hpp"
+#include "params.hpp"
 #include "perft.hpp"
 
 #include <atomic>
@@ -9,7 +10,8 @@
 namespace Lyra {
 
 Engine::Engine()
-    : pool_(THREADS) {}
+    : pool_(THREADS, tt_)
+    , tt_(TT_SIZE) {}
 
 /******************************************\
 |==========================================|
@@ -74,7 +76,17 @@ void Engine::set_pos(const std::string fen, const std::vector<std::string> &move
 
 void Engine::set_threads(size_t num) {
   pool_.wait();
-  pool_.resize(num);
+  pool_.resize(num, tt_);
+}
+
+void Engine::set_tt_size(size_t mb) {
+  pool_.wait();
+  tt_.resize(mb);
+}
+
+void Engine::clear_tt() {
+  pool_.wait();
+  tt_.clear();
 }
 
 void Engine::set_chess960(bool chess960) { board_.chess960 = chess960; }

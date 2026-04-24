@@ -133,19 +133,25 @@ void UCI::parse_pos(std::istringstream &is) {
 }
 
 void UCI::parse_option(std::istringstream &is) {
-  std::string token, name;
+  std::string token, name, value;
   is >> token;
 
   if (token != "name") return;
-  is >> name;
 
-  is >> token;
-  if (token != "value") return;
+  while (is >> token && token != "value") name += (name.empty() ? "" : " ") + token;
+
+  while (is >> token) value += (value.empty() ? "" : " ") + token;
 
   if (name == "UCI_Chess960") {
-    bool chess960;
-    is >> std::boolalpha >> chess960;
-    engine_.set_chess960(chess960);
+    engine_.set_chess960(value == "true");
+  } else if (name == "Clear Hash") {
+    engine_.clear_tt();
+  } else if (name == "Threads") {
+    size_t n = std::stoi(value);
+    if (n >= 1 && n <= 32) engine_.set_threads(n);
+  } else if (name == "Hash") {
+    size_t mb = std::stoi(value);
+    if (mb >= 1 && mb <= 128) engine_.set_tt_size(mb);
   }
 }
 

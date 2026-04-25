@@ -18,6 +18,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     , depth_(depth)
     , killer_(*mostats.killer)
     , hist_quiet_(*mostats.hist_quiet)
+    , hist_cap_(*mostats.hist_cap)
     , cont_buf_(mostats.cont_buf)
     , type_(type) {
 
@@ -38,13 +39,10 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
 
 template <Colour Us>
 Eval MovePicker<Us>::score_cap(Move move) {
-  static constexpr Eval PIECE_VALS[NPieceType] = {100, 200, 300, 400, 500, 0};
-  // MVV LVA
-  PieceType attacker = board_.moved(move);
-  PieceType victim   = board_.captured(move);
-
-  Eval mvv_lva = PIECE_VALS[victim] + 6 - PIECE_VALS[attacker] / 100;
-  return mvv_lva;
+  const Eval      MVV[NPieceType] = {0, 2400, 2400, 4800, 9600, 0};
+  const PieceTo   p               = board_.piece_to(move);
+  const PieceType vic             = board_.captured(move);
+  return MVV[vic] + hist_cap_[p.pc][p.to][vic];
 }
 
 template <Colour Us>
@@ -64,12 +62,14 @@ void MovePicker<Us>::gen_score_cap() {
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
+    Eval score = score_cap(move);
+
     if (type_ == MPType::QSearch || board_.see(move, EvalDraw)) {
       moves_[start_ptr]    = move;
-      scores_[start_ptr++] = score_cap(move);
+      scores_[start_ptr++] = score;
     } else {
       moves_[end_ptr]    = move;
-      scores_[end_ptr--] = score_cap(move);
+      scores_[end_ptr--] = score;
     }
   });
 }

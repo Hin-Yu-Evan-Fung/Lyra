@@ -42,7 +42,7 @@ bool Worker::should_search_deeper() {
 }
 
 MOStats Worker::mostats(StackEntry *se) {
-  return {&se->killer, &hist_quiet_, {(se - 1)->cont, (se - 2)->cont}};
+  return {&se->killer, &hist_quiet_, &hist_cap_, {(se - 1)->cont, (se - 2)->cont}};
 }
 
 void Worker::reset(const Board &board) {
@@ -59,6 +59,7 @@ void Worker::reset(const Board &board) {
   avg_eval_ = 0;
 
   hist_quiet_ = {};
+  hist_cap_   = {};
   hist_cont_  = {};
   hist_corr_  = {};
 
@@ -102,6 +103,12 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
       update_hist_quiet(hist_quiet_, board_, m, -bonus);
       update_hist_cont(se, m, -bonus);
     }
+  } else {
+    update_hist_cap(hist_cap_, board_, best, bonus);
+  }
+
+  for (Move m : captures) {
+    update_hist_cap(hist_cap_, board_, m, -bonus);
   }
 }
 

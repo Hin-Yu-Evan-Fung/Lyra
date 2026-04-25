@@ -53,6 +53,7 @@ class Worker {
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
+  constexpr bool can_hp(Depth depth, Eval hist) const;
   constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmp(Depth depth, int move_count, bool improving) const;
@@ -83,6 +84,7 @@ class Worker {
   TT &tt_;
 
   HistQuiet hist_quiet_;
+  HistCap   hist_cap_;
   HistCont  hist_cont_;
   HistCorr  hist_corr_;
 
@@ -167,6 +169,10 @@ constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
   return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
          && board_.has_non_pawn_material(board_.stm());
+}
+
+constexpr bool Worker::can_hp(Depth depth, Eval hist) const {
+  return depth <= 2 && hist < -2000 * depth;
 }
 
 constexpr bool Worker::can_fp(Depth lmr_depth, Eval eval, Eval alpha) const {

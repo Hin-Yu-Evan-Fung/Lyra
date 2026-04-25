@@ -9,6 +9,7 @@ namespace Lyra {
 
 using Killer    = NDArray<Move, 2>;
 using HistQuiet = NDArray<Eval, NPiece, NSquare>;
+using HistCap   = NDArray<Eval, NPiece, NSquare, NPieceType>;
 using HistCont  = NDArray<HistQuiet, NPiece, NSquare>;
 using ContBuf   = NDArray<HistQuiet *, ContSize>;
 using HistCorr  = NDArray<Eval, NColour, CorrHistSize>;
@@ -28,6 +29,12 @@ constexpr void hist_gravity(Eval &hist, Eval bonus) {
 constexpr void update_hist_quiet(HistQuiet &hist, const Board &board, Move move, Eval bonus) {
   const PieceTo p = board.piece_to(move);
   hist_gravity<HistMax>(hist[p.pc][p.to], bonus);
+}
+
+constexpr void update_hist_cap(HistCap &hist, const Board &board, Move move, Eval bonus) {
+  const PieceTo   p   = board.piece_to(move);
+  const PieceType vic = board.captured(move);
+  hist_gravity<HistMax>(hist[p.pc][p.to][vic], bonus);
 }
 
 constexpr void update_hist_corr(HistCorr &hist, const Board &board, Depth depth, Eval best,

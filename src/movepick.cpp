@@ -59,7 +59,7 @@ void MovePicker<Us>::gen_score_cap() {
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
-    if (true) {
+    if (type_ == MPType::QSearch || board_.see(move, EvalDraw)) {
       moves_[start_ptr]    = move;
       scores_[start_ptr++] = score_cap(move);
     } else {
@@ -239,5 +239,92 @@ bool Board::is_legal(Move move) const {
 
 template bool Board::is_legal<White>(Move move) const;
 template bool Board::is_legal<Black>(Move move) const;
+
+/******************************************\
+|==========================================|
+|               SEE function               |
+|==========================================|
+\******************************************/
+
+inline BB Board::attackers_to(Square to, BB occ) const {
+  return (PAWN_ATK[Black][to] & bb(White, P)) | (PAWN_ATK[White][to] & bb(Black, P))
+         | (KNIGHT_ATK[to] & bb(N)) | (BISHOP_ATK[to][occ] & bb(B, Q))
+         | (ROOK_ATK[to][occ] & bb(R, Q)) | (KING_ATK[to] & bb(K));
+}
+
+bool Board::see(Move move, Eval lower_bound) const {
+  using namespace MoveUtils;
+  using namespace BBUtils;
+
+  const Square    src       = MoveUtils::src(move);
+  const Square    dst       = MoveUtils::dst(move);
+  const MoveFlag  flag      = MoveUtils::flag(move);
+  const PieceType promo     = MoveUtils::promoted_pt(move);
+  const PieceType att       = pt_of(on(src));
+  const PieceType vic       = pt_of(on(dst));
+  const Square    ep_target = stm_ == White ? shift<Direction::N>(dst) : shift<Direction::S>(dst);
+  const BB        diag_sliders = bb(B, Q);
+  const BB        hv_sliders   = bb(R, Q);
+
+  // Calculate move value
+  Eval gain = -lower_bound;
+  if (is_castle(move)) return 0 <= gain;
+  if (is_capture(move)) gain += flag == EP ? SeePieceVals[P] : SeePieceVals[vic];
+  if (is_promo(move)) gain += SeePieceVals[promo] - SeePieceVals[att];
+
+  // If we are still losing after the capture then, it is a bad move
+  if (gain < EvalDraw) return false;
+  // Simulate recapture
+  gain -= is_promo(move) ? SeePieceVals[promo] : SeePieceVals[att];
+  // If we are still winning after recapture then, it is a good move
+  if (gain >= EvalDraw) return true;
+
+  // Simulate the capture
+  BB occ = (bb() ^ from(src)) | from(dst);
+  if (flag == EP) occ ^= from(ep_target);
+
+  // Simulate the rest of the exchanges
+  Colour    stm  = ~stm_;
+  BB        atks = attackers_to(dst, occ);
+  BB        stm_atks, b;
+  PieceType lva_pt = NoPieceType;
+
+  // Switch sides in every iteration,
+  while (true) {
+    // Restrict attackers to occupancy
+    atks &= occ;
+    // Get attackers from our side
+    stm_atks = atks & bb(stm);
+    if (!stm_atks) break;
+
+    // Get least valuable attacker and update the gains
+    for (const PieceType pt : {P, N, B, R, Q, K}) {
+      if (!(b = stm_atks & bb(stm, pt))) continue;
+      // Remove attacking piece
+      lva_pt = pt;
+      occ ^= from(lsb(b));
+      break;
+    }
+
+    // Register discover attacks
+    if (lva_pt == P || lva_pt == B || lva_pt == Q) atks |= BISHOP_ATK[dst][occ] & diag_sliders;
+    if (lva_pt == R || lva_pt == Q) atks |= ROOK_ATK[dst][occ] & hv_sliders;
+
+    // Switch sides
+    stm = ~stm;
+    // Speculate the gains after recapture (discourage drawing
+    // captures)
+    gain = -SeePieceVals[lva_pt] - gain - 1;
+
+    if (gain >= EvalDraw) {
+      // If we capture with the king but the opponent can recapture,
+      // then they win
+      if (lva_pt == K && atks & bb(stm)) return stm == stm_;
+      break;
+    }
+  }
+
+  return stm != stm_;
+}
 
 } // namespace Lyra

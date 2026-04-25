@@ -18,6 +18,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     , depth_(depth)
     , killer_(*mostats.killer)
     , hist_quiet_(*mostats.hist_quiet)
+    , cont_buf_(mostats.cont_buf)
     , type_(type) {
 
   switch (type) {
@@ -48,8 +49,12 @@ Eval MovePicker<Us>::score_cap(Move move) {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  const PieceTo p = piece_to(board_, move);
-  return hist_quiet_[p.pc][p.to];
+  const PieceTo p     = piece_to(board_, move);
+  Eval          score = hist_quiet_[p.pc][p.to];
+
+  for (HistQuiet *cont : cont_buf_) score += (*cont)[p.pc][p.to];
+
+  return score;
 }
 
 template <Colour Us>

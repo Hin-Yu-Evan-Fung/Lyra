@@ -27,6 +27,7 @@ enum MPStage {
 struct MOStats {
   const Killer    *killer;
   const HistQuiet *hist_quiet;
+  const ContBuf    cont_buf;
 };
 
 template <Colour Us>
@@ -65,6 +66,7 @@ private:
 
   Killer           killer_;
   const HistQuiet &hist_quiet_;
+  const ContBuf    cont_buf_;
 
   MPType   type_;
   unsigned stage_ = MAIN_TT;

@@ -2,12 +2,15 @@
 
 #include "board.hpp"
 #include "defs.hpp"
+#include "params.hpp"
 #include "utils.hpp"
 
 namespace Lyra {
 
 using Killer    = NDArray<Move, 2>;
 using HistQuiet = NDArray<Eval, NPiece, NSquare>;
+using HistCont  = NDArray<HistQuiet, NPiece, NSquare>;
+using ContBuf   = NDArray<HistQuiet *, ContSize>;
 
 struct PieceTo {
   Piece  pc;

@@ -48,11 +48,13 @@ U64 perft(Board &board, Depth depth) {
 namespace {
 Killer    killer{};
 HistQuiet hist_quiet{};
+HistCont  hist_cont{};
 } // namespace
 
 template <bool Div, Colour Us>
 U64 perftmp(Board &board, Depth depth) {
-  MovePicker<Us> mp(MPType::Main, board, {&killer, &hist_quiet}, NoMove, 0);
+  MovePicker<Us> mp(MPType::Main, board,
+                    {&killer, &hist_quiet, {&hist_cont[wP][A1], &hist_cont[wP][A1]}}, NoMove, 0);
 
   if (!Div && depth <= 1) {
     U64 n = 0;

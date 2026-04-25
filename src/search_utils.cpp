@@ -41,7 +41,9 @@ bool Worker::should_search_deeper() {
          && !clock_.stop_iter(depth_, last_best_move_depth_, avg_eval_, eval_, nodes_, best_move_);
 }
 
-MOStats Worker::mostats(StackEntry *se) { return {&se->killer, &hist_quiet_}; }
+MOStats Worker::mostats(StackEntry *se) {
+  return {&se->killer, &hist_quiet_, {(se - 1)->cont, (se - 2)->cont}};
+}
 
 void Worker::reset(const Board &board) {
   board_.copy(board);
@@ -57,6 +59,7 @@ void Worker::reset(const Board &board) {
   avg_eval_ = 0;
 
   hist_quiet_ = {};
+  hist_cont_  = {};
 }
 
 void Worker::uci_report(const PVLine &pv) {
@@ -72,6 +75,14 @@ void Worker::report_best_move() {
   std::fflush(stdout);
 }
 
+void Worker::update_hist_cont(StackEntry *se, Move move, Eval bonus) {
+  for (unsigned i = 1; i <= ContSize; ++i) {
+    if ((se - i)->move == NoMove) continue;
+    HistQuiet &cont = *(se - i)->cont;
+    update_hist_quiet(cont, board_, move, bonus);
+  }
+}
+
 void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vector<Move> &captures,
                               std::vector<Move> &quiets) {
   const Eval bonus = std::min(300 * depth - 250, 1500);
@@ -79,9 +90,11 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
   if (!is_capture(best)) {
     update_killer(se->killer, best);
     update_hist_quiet(hist_quiet_, board_, best, bonus);
+    update_hist_cont(se, best, bonus);
 
     for (Move m : quiets) {
       update_hist_quiet(hist_quiet_, board_, m, -bonus);
+      update_hist_cont(se, m, -bonus);
     }
   }
 }

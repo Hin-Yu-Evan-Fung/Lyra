@@ -35,6 +35,7 @@ public:
   MovePicker(MPType type, const Board &board, MOStats &&stats, Move tt_move, Depth depth);
 
   Move next();
+  bool skip_quiet_;
 
 private:
   void gen_score_cap();
@@ -63,7 +64,6 @@ private:
   Killer           killer_;
   const HistQuiet &hist_quiet_;
 
-  bool     skip_quiet_;
   MPType   type_;
   unsigned stage_ = MAIN_TT;
 };

@@ -3,6 +3,7 @@
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
+#include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
@@ -43,6 +44,7 @@ class Worker {
 
   void    update_all_stats(StackEntry *se, Depth depth, Move best, std::vector<Move> &captures,
                            std::vector<Move> &quiets);
+  void    update_hist_cont(StackEntry *se, Move move, Eval bonus);
   MOStats mostats(StackEntry *se);
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
@@ -75,6 +77,7 @@ class Worker {
   TT &tt_;
 
   HistQuiet hist_quiet_;
+  HistCont  hist_cont_;
 
 public:
   Worker(std::atomic_bool &stop, size_t id, TT &tt)
@@ -99,11 +102,13 @@ public:
 
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
+  const PieceTo p = piece_to(board_, move);
   ++nodes_;
   ++ply_;
 
   se->ply_from_null = ply_from_null_++;
   se->move          = move;
+  se->cont          = &hist_cont_[p.pc][p.to];
   board_.do_move<Us>(move);
   tt_.prefetch(board_.key());
 }
@@ -123,6 +128,7 @@ constexpr void Worker::do_null_move(StackEntry *se) {
   se->ply_from_null = ply_from_null_;
   ply_from_null_    = 0;
   se->move          = NullMove;
+  se->cont          = &hist_cont_[wP][A1]; // Dummy table
   board_.do_null_move<Us>();
   tt_.prefetch(board_.key());
 }

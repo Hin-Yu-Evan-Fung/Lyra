@@ -16,11 +16,12 @@ struct PVLine {
 };
 
 struct StackEntry {
-  PVLine pv;
-  Killer killer;
-  Eval   eval;
-  Ply    ply_from_null;
-  Move   move;
+  PVLine     pv;
+  Killer     killer;
+  HistQuiet *cont;
+  Eval       eval;
+  Ply        ply_from_null;
+  Move       move;
 };
 
 /******************************************\

@@ -28,6 +28,8 @@ void Worker::start(const TimeControl &tc) {
   StackEntry  stack[MaxDepth + StackOffset]{};
   StackEntry *se = stack + StackOffset;
 
+  for (int i = 1; i <= StackOffset; i++) (se - i)->cont = &hist_cont_[wP][A1];
+
   while (should_search_deeper()) {
 
     stm == White ? aspwin<White>(se) : aspwin<Black>(se);

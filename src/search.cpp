@@ -155,12 +155,16 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   Move best_move   = NoMove;
   bool full_search = false;
 
+  std::vector<Move> captures, quiets;
+
   (se + 1)->killer.fill(NoMove);
 
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
+    const bool  is_cap       = MoveUtils::is_capture(move);
     const Depth new_depth    = depth - 1;
     const U64   cached_nodes = nodes_;
+
     move_count++;
 
     Depth r = 1;
@@ -226,9 +230,11 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
         alpha = val;
       }
     }
+
+    if (move != best_move) (is_cap ? captures : quiets).push_back(move);
   }
 
-  if (best_move) update_all_stats(se, depth, best_move);
+  if (best_move) update_all_stats(se, depth, best_move, captures, quiets);
 
   if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
 

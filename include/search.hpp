@@ -26,7 +26,7 @@ class Worker {
   void aspwin(StackEntry *se);
 
   template <Colour Us, NodeType NT>
-  Eval search(StackEntry *se, Eval alpha, Eval beta, Depth depth);
+  Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth);
   template <Colour Us, NodeType NT>
   Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 
@@ -44,6 +44,7 @@ class Worker {
   MOStats mostats(StackEntry *se);
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
+  constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -132,6 +133,11 @@ constexpr void Worker::undo_null_move(StackEntry *se) {
 constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) const {
   return depth > 2 && move_count > 2 + pv && !MoveUtils::is_capture(move)
          && !MoveUtils::is_promo(move);
+}
+
+constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
+  return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
+         && board_.has_non_pawn_material(board_.stm());
 }
 
 } // namespace Lyra

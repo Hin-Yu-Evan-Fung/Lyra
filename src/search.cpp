@@ -46,7 +46,7 @@ void Worker::aspwin(StackEntry *se) {
   Eval alpha = -EvalInf;
   Eval beta  = EvalInf;
 
-  Eval val = search<Us, PV>(se, alpha, beta, depth_ + 1);
+  Eval val = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
 
   if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -69,7 +69,7 @@ void Worker::aspwin(StackEntry *se) {
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
+Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
   const bool     root     = ply_ == 0;
@@ -108,6 +108,29 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     tt_move = tte.move;
   }
 
+  Eval eval = board_.eval();
+
+  /********************************\
+  |         Forward Pruning        |
+  \********************************/
+
+  if (!pv && !in_check) {
+
+    /********************************\
+    |        Null Move Pruning       |
+    \********************************/
+
+    if (can_nmp(se, depth, eval, beta)) {
+      Depth r = 2;
+
+      do_null_move<Us>(se);
+      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);
+      undo_null_move<Us>(se);
+
+      if (val >= beta) return is_win(val) ? beta : val;
+    }
+  }
+
   /********************************\
   |        Main Search Loop        |
   \********************************/
@@ -136,7 +159,7 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (can_lmr(depth, move_count, pv, move)) {
       Depth r = 1;
 
-      val = -search<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth - r);
+      val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth - r);
 
       full_search = val > alpha && r > 0;
     } else {
@@ -147,10 +170,10 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     |   Principal Variation Search   |
     \********************************/
 
-    if (full_search) val = -search<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
+    if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
 
     if (pv && (move_count == 1 || val > alpha))
-      val = -search<~Us, NT>(se + 1, -beta, -alpha, new_depth);
+      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth);
 
     undo_move<Us>(se);
 
@@ -185,7 +208,7 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
             best >= beta        ? Bound::Lower
             : (pv && best_move) ? Bound::Exact
                                 : Bound::Upper,
-            best_move, EvalInvalid, best);
+            best_move, eval, best);
 
   return best;
 }
@@ -220,6 +243,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     tt_move = tte.move;
   }
 
+  Eval eval = board_.eval();
+
   /********************************\
   |            Stand Pat           |
   \********************************/
@@ -227,7 +252,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   // The current eval is the lower bound because we can just not capture anything (assume its not a
   // zugzwang) If lower bound >= beta, then we fail high (opponent has better options) If lower
   // bound > alpha, then we update alpha (the best we can do)
-  Eval best = board_.eval();
+  Eval best = eval;
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
@@ -266,7 +291,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   }
 
   tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
-            EvalInvalid, best);
+            eval, best);
 
   return best;
 }

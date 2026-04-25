@@ -35,6 +35,8 @@ public:
   MovePicker(MPType type, const Board &board, MOStats &&stats, Move tt_move, Depth depth);
 
   Move next();
+  int  stage() { return stage_; }
+
   bool skip_quiet_;
 
 private:

@@ -9,6 +9,7 @@
 #include "tt.hpp"
 
 #include <atomic>
+#include <cmath>
 
 namespace Lyra {
 
@@ -48,6 +49,9 @@ class Worker {
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
+
+  // Reductions
+  constexpr Depth lmr_reduction(Depth depth, int move_count);
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -149,6 +153,16 @@ constexpr bool Worker::can_fp(Depth lmr_depth, Eval eval, Eval alpha) const {
 
 constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
   return depth <= 8 && !is_win(eval) && !is_loss(beta) && eval - 100 * depth > beta;
+}
+
+/******************************************\
+|==========================================|
+|                Reductions                |
+|==========================================|
+\******************************************/
+
+constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
+  return 0.75 + std::log(depth) * std::log(move_count) / 4;
 }
 
 } // namespace Lyra

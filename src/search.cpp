@@ -167,7 +167,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     move_count++;
 
-    Depth r = 1;
+    Depth r = lmr_reduction(depth, move_count);
 
     /********************************\
     |             Pruning            |
@@ -191,9 +191,11 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     \********************************/
 
     if (can_lmr(depth, move_count, pv, move)) {
-      val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth - r);
 
-      full_search = val > alpha && r > 0;
+      Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
+      val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
+
+      full_search = val > alpha && new_depth > d;
     } else {
       full_search = !pv || move_count > 1;
     }

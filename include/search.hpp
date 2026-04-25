@@ -40,7 +40,8 @@ class Worker {
   template <Colour Us>
   constexpr void undo_null_move(StackEntry *se);
 
-  void    update_all_stats(StackEntry *se, Depth depth, Move best);
+  void    update_all_stats(StackEntry *se, Depth depth, Move best, std::vector<Move> &captures,
+                           std::vector<Move> &quiets);
   MOStats mostats(StackEntry *se);
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;

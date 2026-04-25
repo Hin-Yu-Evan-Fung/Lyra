@@ -4,6 +4,7 @@
 #include "move.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
+#include "utils.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -150,6 +151,23 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     const U64   cached_nodes = nodes_;
     move_count++;
 
+    Depth r = 1;
+
+    /********************************\
+    |             Pruning            |
+    \********************************/
+
+    if (!pv && !in_check && !mp.skip_quiet_ && !is_terminal(best)) {
+
+      /********************************\
+      |        Futility Pruning        |
+      \********************************/
+
+      // At low depths, we can skip quiets if its unlikely that a positional move can give us enough
+      // advantage
+      if (can_apply_fp(new_depth - r, eval, alpha)) mp.skip_quiet_ = true;
+    }
+
     do_move<Us>(se, move);
 
     /********************************\
@@ -157,8 +175,6 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     \********************************/
 
     if (can_lmr(depth, move_count, pv, move)) {
-      Depth r = 1;
-
       val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth - r);
 
       full_search = val > alpha && r > 0;

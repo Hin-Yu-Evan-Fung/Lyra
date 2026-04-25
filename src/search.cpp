@@ -268,6 +268,16 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
   while ((move = mp.next())) {
 
+    if (!is_loss(best)) {
+
+      /********************************\
+      |           SEE Pruning          |
+      \********************************/
+
+      // Can safely (probably!) ignore losing captures.
+      if (!board_.see(move, -30)) continue;
+    }
+
     do_move<Us>(se, move);
     Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
     undo_move<Us>(se);

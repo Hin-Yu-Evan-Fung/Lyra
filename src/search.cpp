@@ -7,7 +7,6 @@
 
 #include <atomic>
 #include <cassert>
-#include <print>
 
 namespace Lyra {
 
@@ -102,9 +101,9 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    // if (!pv && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
-    //   return tte.value;
-    // }
+    if (!pv && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
+      return tte.value;
+    }
 
     tt_move = tte.move;
   }
@@ -144,10 +143,14 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       full_search = !pv || move_count > 1;
     }
 
+    /********************************\
+    |   Principal Variation Search   |
+    \********************************/
+
     if (full_search) val = -search<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
 
     if (pv && (move_count == 1 || val > alpha))
-      val = -search<~Us, PV>(se + 1, -beta, -alpha, new_depth);
+      val = -search<~Us, NT>(se + 1, -beta, -alpha, new_depth);
 
     undo_move<Us>(se);
 
@@ -210,9 +213,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   Move tt_move = NoMove;
 
   if (tt_hit) {
-    // if (!pv && can_use_bound(tte.bound, tte.value, beta)) {
-    //   return tte.value;
-    // }
+    if (!pv && can_use_bound(tte.bound, tte.value, beta)) {
+      return tte.value;
+    }
 
     tt_move = tte.move;
   }

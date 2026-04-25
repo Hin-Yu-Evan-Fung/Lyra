@@ -3,6 +3,7 @@
 #include "board.hpp"
 #include "clock.hpp"
 #include "defs.hpp"
+#include "move.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
 
@@ -40,6 +41,8 @@ class Worker {
 
   void    update_all_stats(StackEntry *se, Depth depth, Move best);
   MOStats mostats(StackEntry *se);
+
+  constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -112,6 +115,17 @@ constexpr void Worker::undo_null_move(StackEntry *se) {
   --ply_;
   ply_from_null_ = se->ply_from_null;
   board_.undo_null_move<Us>();
+}
+
+/******************************************\
+|==========================================|
+|            Pruning Conditions            |
+|==========================================|
+\******************************************/
+
+constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) const {
+  return depth > 2 && move_count > 2 + pv && !MoveUtils::is_capture(move)
+         && !MoveUtils::is_promo(move);
 }
 
 } // namespace Lyra

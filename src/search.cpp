@@ -95,18 +95,40 @@ Eval Worker::search(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), NoMove, depth};
 
-  Eval best       = -EvalInf;
-  int  move_count = 0;
-  Move move       = NoMove;
-  Move best_move  = NoMove;
+  Eval val         = 0;
+  Eval best        = -EvalInf;
+  int  move_count  = 0;
+  Move move        = NoMove;
+  Move best_move   = NoMove;
+  bool full_search = false;
 
   (se + 1)->killer.fill(NoMove);
 
   while ((move = mp.next())) {
-    move_count++;
+    const Depth new_depth = depth - 1;
 
+    move_count++;
     do_move<Us>(se, move);
-    Eval val = -search<~Us, PV>(se + 1, -beta, -alpha, depth - 1);
+
+    /********************************\
+    |      Late move reductions      |
+    \********************************/
+
+    if (can_lmr(depth, move_count, pv, move)) {
+      Depth r = 1;
+
+      val = -search<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth - r);
+
+      full_search = val > alpha && r > 0;
+    } else {
+      full_search = !pv || move_count > 1;
+    }
+
+    if (full_search) val = -search<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
+
+    if (pv && (move_count == 1 || val > alpha))
+      val = -search<~Us, PV>(se + 1, -beta, -alpha, new_depth);
+
     undo_move<Us>(se);
 
     // If we are stopping, return a placeholder score.

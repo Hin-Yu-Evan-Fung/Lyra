@@ -118,8 +118,20 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   if (!pv && !in_check) {
 
     /********************************\
+    |    Reverse Futility Pruning    |
+    \********************************/
+
+    // If the eval of the current position is way above beta, then we can not do anything and still
+    // be good enough
+
+    if (can_rfp(depth, eval, beta)) return eval;
+
+    /********************************\
     |        Null Move Pruning       |
     \********************************/
+
+    // If the position seems to be quite good, then we give the opponent a second move, and if that
+    // doesn't help the opponent then we can prune this node
 
     if (can_nmp(se, depth, eval, beta)) {
       Depth r = 2;
@@ -165,7 +177,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
       // At low depths, we can skip quiets if its unlikely that a positional move can give us enough
       // advantage
-      if (can_apply_fp(new_depth - r, eval, alpha)) mp.skip_quiet_ = true;
+      if (can_fp(new_depth - r, eval, alpha)) mp.skip_quiet_ = true;
     }
 
     do_move<Us>(se, move);

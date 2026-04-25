@@ -45,7 +45,8 @@ class Worker {
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
-  constexpr bool can_apply_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
+  constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
+  constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -141,10 +142,12 @@ constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta
          && board_.has_non_pawn_material(board_.stm());
 }
 
-constexpr bool Worker::can_apply_fp(Depth lmr_depth, Eval eval, Eval alpha) const {
-  Eval fp_margin = 100 + lmr_depth * 100;
+constexpr bool Worker::can_fp(Depth lmr_depth, Eval eval, Eval alpha) const {
+  return lmr_depth <= 5 && eval + 100 * lmr_depth + 100 < alpha;
+}
 
-  return lmr_depth <= 5 && eval + fp_margin < alpha;
+constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
+  return depth <= 8 && !is_win(eval) && !is_loss(beta) && eval - 100 * depth > beta;
 }
 
 } // namespace Lyra

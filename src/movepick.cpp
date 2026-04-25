@@ -12,12 +12,12 @@ namespace Lyra {
 template <Colour Us>
 MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, Move tt_move,
                            Depth depth)
-    : board_(board)
+    : skip_quiet_(false)
+    , board_(board)
     , tt_move_(tt_move)
     , depth_(depth)
     , killer_(*mostats.killer)
     , hist_quiet_(*mostats.hist_quiet)
-    , skip_quiet_(false)
     , type_(type) {
 
   switch (type) {

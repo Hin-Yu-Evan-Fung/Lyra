@@ -198,6 +198,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       }
     }
 
+    if (mp.stage() > GOOD_CAP && can_see(depth, move, best)) continue;
+
     do_move<Us>(se, move);
 
     /********************************\

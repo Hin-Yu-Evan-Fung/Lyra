@@ -49,6 +49,7 @@ class Worker {
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
+  constexpr bool can_lmp(Depth depth, int move_count, bool improving) const;
 
   // Reductions
   constexpr Depth lmr_reduction(Depth depth, int move_count);
@@ -154,6 +155,10 @@ constexpr bool Worker::can_fp(Depth lmr_depth, Eval eval, Eval alpha) const {
 
 constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
   return depth <= 8 && !is_win(eval) && !is_loss(beta) && eval - 100 * depth > beta;
+}
+
+constexpr bool Worker::can_lmp(Depth depth, int move_count, bool improving) const {
+  return depth <= 8 && move_count >= (3 + depth * depth) / (2 - improving);
 }
 
 /******************************************\

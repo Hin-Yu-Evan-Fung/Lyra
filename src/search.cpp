@@ -110,7 +110,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     tt_move = tte.move;
   }
 
-  Eval eval = board_.eval();
+  Eval eval = se->eval = board_.eval();
+
+  const bool improving = !in_check && ply_ >= 2 && se->eval > (se - 2)->eval;
 
   /********************************\
   |         Forward Pruning        |
@@ -177,12 +179,23 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     if (!pv && !in_check && !mp.skip_quiet_ && !is_terminal(best)) {
 
       /********************************\
+      |        Late Move Pruning       |
+      \********************************/
+
+      // We can trust move ordering at the leaf nodes and prune late quiet moves
+      if (can_lmp(depth, move_count, improving)) {
+        mp.skip_quiet_ = true;
+      }
+
+      /********************************\
       |        Futility Pruning        |
       \********************************/
 
       // At low depths, we can skip quiets if its unlikely that a positional move can give us enough
       // advantage
-      if (can_fp(new_depth - r, eval, alpha)) mp.skip_quiet_ = true;
+      if (can_fp(new_depth - r, eval, alpha)) {
+        mp.skip_quiet_ = true;
+      }
     }
 
     do_move<Us>(se, move);

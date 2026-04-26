@@ -60,8 +60,8 @@ void Worker::reset(const Board &board) {
 }
 
 void Worker::uci_report(const PVLine &pv) {
-  std::println("info depth {} seldepth 0 score {} time {} nodes {} nps {} hashfull {} pv {}",
-               depth_, format_eval(eval_), clock_.elapsed(), nodes_,
+  std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} hashfull {} pv {}",
+               depth_, seldepth_, format_eval(eval_), clock_.elapsed(), nodes_,
                nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(),
                pv.format(board_.chess960));
   std::fflush(stdout);

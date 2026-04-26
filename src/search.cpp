@@ -78,6 +78,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
   se->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(ply_ + 1));
 
   if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
@@ -134,7 +135,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     // doesn't help the opponent then we can prune this node
 
     if (can_nmp(se, depth, eval, beta)) {
-      Depth r = 2;
+      Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
       Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);
@@ -258,6 +259,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   const bool     in_check = board_.in_check();
 
   se->pv.clear();
+  seldepth_ = std::max(seldepth_, Depth(ply_ + 1));
 
   if (clock_.stop(nodes_)) return EvalStop;
   if (board_.is_draw(ply_from_null_)) return EvalDraw;

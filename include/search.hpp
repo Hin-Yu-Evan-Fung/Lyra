@@ -50,6 +50,7 @@ class Worker {
   constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmp(Depth depth, int move_count, bool improving) const;
+  constexpr bool can_see(Depth depth, Move move, Eval best) const;
 
   // Reductions
   constexpr Depth lmr_reduction(Depth depth, int move_count);
@@ -159,6 +160,11 @@ constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
 
 constexpr bool Worker::can_lmp(Depth depth, int move_count, bool improving) const {
   return depth <= 8 && move_count >= (3 + depth * depth) / (2 - improving);
+}
+
+constexpr bool Worker::can_see(Depth depth, Move move, Eval best) const {
+  return depth <= 10 && !is_loss(best)
+         && !board_.see(move, MoveUtils::is_capture(move) ? -20 * depth * depth : -70 * depth);
 }
 
 /******************************************\

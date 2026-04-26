@@ -52,6 +52,7 @@ class Worker {
 
   // Reductions
   constexpr Depth lmr_reduction(Depth depth, int move_count);
+  constexpr Depth nmp_reduction(Depth depth) const;
 
   Clock             clock_;
   std::atomic_bool &stop_;
@@ -164,5 +165,7 @@ constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
 constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
   return 0.75 + std::log(depth) * std::log(move_count) / 4;
 }
+
+constexpr Depth Worker::nmp_reduction(Depth depth) const { return 3 + depth / 5; }
 
 } // namespace Lyra

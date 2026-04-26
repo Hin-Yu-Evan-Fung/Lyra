@@ -165,7 +165,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
     const bool  is_cap       = MoveUtils::is_capture(move);
-    const Depth new_depth    = depth - 1;
+    const Depth new_depth    = depth - 1 + in_check;
     const U64   cached_nodes = nodes_;
 
     move_count++;

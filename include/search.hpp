@@ -53,6 +53,8 @@ class Worker {
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmp(Depth depth, int move_count, bool improving) const;
   constexpr bool can_see(Depth depth, Move move, Eval best) const;
+  constexpr bool can_singular(Bound tt_bound, Depth tt_depth, Move tt_move, Eval tt_value,
+                              Depth depth, Move move) const;
 
   // Reductions
   constexpr Depth lmr_reduction(Depth depth, int move_count);
@@ -171,6 +173,12 @@ constexpr bool Worker::can_lmp(Depth depth, int move_count, bool improving) cons
 constexpr bool Worker::can_see(Depth depth, Move move, Eval best) const {
   return depth <= 10 && !is_loss(best)
          && !board_.see(move, MoveUtils::is_capture(move) ? -20 * depth * depth : -70 * depth);
+}
+
+constexpr bool Worker::can_singular(Bound tt_bound, Depth tt_depth, Move tt_move, Eval tt_value,
+                                    Depth depth, Move move) const {
+  return move == tt_move && depth >= 8 && !is_terminal(tt_value) && (tt_bound & Bound::Lower)
+         && tt_depth >= depth - 3;
 }
 
 /******************************************\

@@ -46,12 +46,36 @@ void Worker::start(const TimeControl &tc) {
 
 template <Colour Us>
 void Worker::aspwin(StackEntry *se) {
-  Eval alpha = -EvalInf;
-  Eval beta  = EvalInf;
+  Eval  alpha  = -EvalInf;
+  Eval  beta   = EvalInf;
+  Eval  window = 20;
+  Depth r      = 0;
+  Eval  val;
 
-  Eval val = negamax<Us, PV>(se, alpha, beta, depth_ + 1);
+  if (depth_ >= 5) {
+    alpha = std::max(eval_ - window, -EvalInf);
+    beta  = std::min(eval_ + window, EvalInf);
+  }
 
-  if (stop_.load(std::memory_order::relaxed)) return;
+  while (true) {
+
+    val = negamax<Us, PV>(se, alpha, beta, depth_ + 1 - r);
+
+    if (stop_.load(std::memory_order::relaxed)) return;
+
+    if (val <= alpha) {
+      beta  = (alpha + beta) / 2;
+      alpha = std::max(val - window, -EvalInf);
+      r     = 0;
+    } else if (val >= beta) {
+      beta = std::min(val + window, EvalInf);
+      r += !is_terminal(val);
+    } else {
+      break;
+    }
+
+    window += window / 2;
+  }
 
   eval_     = val;
   avg_eval_ = depth_ > 1 ? (avg_eval_ * 8 + eval_ * 2) / 10 : eval_;
@@ -216,8 +240,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     \********************************/
 
     Depth ext = 0;
-    if (!root && !singular && move == tt_move && depth >= 8 && !is_terminal(tt_value)
-        && (tt_bound & Bound::Lower) && tt_depth >= depth - 3) {
+    if (!root && !singular && can_singular(tt_bound, tt_depth, tt_move, tt_value, depth, move)) {
       Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
 
       se->excl = move;

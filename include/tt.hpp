@@ -25,9 +25,9 @@ namespace Lyra {
 
 enum Bound {
   None,  // Writing static eval to TT
-  Exact, // PV nodes
   Lower, // Fail high nodes, lower bound for position eval
-  Upper  // Fail low nodes, upper bound for position eval
+  Upper, // Fail low nodes, upper bound for position eval
+  Exact, // PV nodes
 };
 
 struct TTEntry {

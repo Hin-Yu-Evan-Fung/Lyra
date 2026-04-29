@@ -76,6 +76,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
   const bool     root     = ply_ == 0;
+  const bool     singular = se->excl != NoMove;
 
   if (depth <= 0) return qsearch<Us, NT>(se, alpha, beta);
 
@@ -102,14 +103,20 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
 
-  Move tt_move = NoMove;
+  Bound tt_bound = Bound::None;
+  Depth tt_depth = 0;
+  Move  tt_move  = NoMove;
+  Eval  tt_value = EvalInvalid;
 
   if (tt_hit) {
     if (!pv && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
       return tte.value;
     }
 
-    tt_move = tte.move;
+    tt_bound = tte.bound;
+    tt_depth = tte.depth;
+    tt_move  = tte.move;
+    tt_value = tte.value;
   }
 
   Eval eval = se->eval = board_.eval();
@@ -120,7 +127,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   |         Forward Pruning        |
   \********************************/
 
-  if (!pv && !in_check) {
+  if (!pv && !in_check && !singular) {
 
     /********************************\
     |    Reverse Futility Pruning    |
@@ -166,13 +173,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
-    const bool  is_cap       = MoveUtils::is_capture(move);
-    const Depth new_depth    = depth - 1 + in_check;
-    const U64   cached_nodes = nodes_;
+    const bool is_cap       = MoveUtils::is_capture(move);
+    const U64  cached_nodes = nodes_;
+
+    if (move == se->excl) continue;
 
     move_count++;
 
-    Depth r = lmr_reduction(depth, move_count);
+    Depth new_depth = depth - 1 + in_check;
+    Depth r         = lmr_reduction(depth, move_count);
 
     /********************************\
     |             Pruning            |
@@ -201,6 +210,24 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     }
 
     if (mp.stage() > GOOD_CAP && can_see(depth, move, best)) continue;
+
+    /********************************\
+    |       Singular Extensions      |
+    \********************************/
+
+    Depth ext = 0;
+    if (!root && !singular && move == tt_move && depth >= 8 && !is_terminal(tt_value)
+        && (tt_bound & Bound::Lower) && tt_depth >= depth - 3) {
+      Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
+
+      se->excl = move;
+      Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2);
+      se->excl = NoMove;
+
+      if (val < s_beta) ext = 1;
+    }
+
+    new_depth += ext;
 
     do_move<Us>(se, move);
 
@@ -256,13 +283,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   if (best_move) update_all_stats(se, depth, best_move, captures, quiets);
 
-  if (move_count == 0) best = in_check ? mated_in(ply_) : EvalDraw;
+  if (move_count == 0) best = singular ? alpha : in_check ? mated_in(ply_) : EvalDraw;
 
-  tt_.write(board_.key(), depth, ply_,
-            best >= beta        ? Bound::Lower
-            : (pv && best_move) ? Bound::Exact
-                                : Bound::Upper,
-            best_move, eval, best);
+  if (!singular)
+    tt_.write(board_.key(), depth, ply_,
+              best >= beta        ? Bound::Lower
+              : (pv && best_move) ? Bound::Exact
+                                  : Bound::Upper,
+              best_move, eval, best);
 
   return best;
 }

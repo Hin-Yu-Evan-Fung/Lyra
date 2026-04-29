@@ -8,7 +8,7 @@
 
 namespace Lyra {
 
-constexpr Depth    BenchDepth = 7;
+constexpr Depth    BenchDepth = 10;
 constexpr unsigned NBenchPos  = 66;
 
 /******************************************\

@@ -22,6 +22,7 @@ struct StackEntry {
   Eval       eval;
   Ply        ply_from_null;
   Move       move;
+  Move       excl;
 };
 
 /******************************************\

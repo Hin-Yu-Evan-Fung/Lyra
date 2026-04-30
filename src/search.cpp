@@ -1,6 +1,7 @@
 #include "search.hpp"
 
 #include "defs.hpp"
+#include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
 #include "search_utils.hpp"
@@ -197,13 +198,15 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
-    const bool is_cap       = MoveUtils::is_capture(move);
-    const U64  cached_nodes = nodes_;
+    const bool    is_cap       = MoveUtils::is_capture(move);
+    const U64     cached_nodes = nodes_;
+    const PieceTo p            = piece_to(board_, move);
 
     if (move == se->excl) continue;
 
     move_count++;
 
+    Eval  hist      = is_cap ? 0 : hist_quiet_[p.pc][p.to];
     Depth new_depth = depth - 1 + in_check;
     Depth r         = lmr_reduction(depth, move_count);
 
@@ -259,6 +262,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     \********************************/
 
     if (can_lmr(depth, move_count, pv, move)) {
+
+      r -= hist / 7000;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

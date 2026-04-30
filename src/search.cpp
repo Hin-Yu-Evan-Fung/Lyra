@@ -133,7 +133,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
   Eval  tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
+    if (!pv && !singular && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
       return tte.value;
     }
 

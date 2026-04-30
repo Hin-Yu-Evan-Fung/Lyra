@@ -29,7 +29,7 @@ class Worker {
   void aspwin(StackEntry *se);
 
   template <Colour Us, NodeType NT>
-  Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth);
+  Eval negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode);
   template <Colour Us, NodeType NT>
   Eval qsearch(StackEntry *se, Eval alpha, Eval beta);
 

@@ -61,7 +61,7 @@ void Worker::aspwin(StackEntry *se) {
 
   while (true) {
 
-    val = negamax<Us, PV>(se, alpha, beta, depth_ + 1 - r);
+    val = negamax<Us, PV>(se, alpha, beta, depth_ + 1 - r, false);
 
     if (stop_.load(std::memory_order::relaxed)) return;
 
@@ -98,7 +98,7 @@ void Worker::aspwin(StackEntry *se) {
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
-Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
+Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cutnode) {
   constexpr bool pv       = NT == PV;
   const bool     in_check = board_.in_check();
   const bool     root     = ply_ == 0;
@@ -175,12 +175,18 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       Depth r = nmp_reduction(depth);
 
       do_null_move<Us>(se);
-      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r);
+      Eval val = -negamax<~Us, NonPV>(se + 1, -beta, -beta + 1, depth - r, false);
       undo_null_move<Us>(se);
 
       if (val >= beta) return is_win(val) ? beta : val;
     }
   }
+
+  /********************************\
+  |  Internal Iterative Reductions |
+  \********************************/
+
+  if ((pv || cutnode) && depth >= 4 && !tt_move) depth--;
 
   /********************************\
   |        Main Search Loop        |
@@ -248,7 +254,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
 
       se->excl = move;
-      Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2);
+      Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2, cutnode);
       se->excl = NoMove;
 
       if (val < s_beta) ext = 1;
@@ -267,7 +273,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
       r -= hist / LmrMultHist;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
-      val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);
+      val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d, true);
 
       full_search = val > alpha && new_depth > d;
     } else {
@@ -278,10 +284,10 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
     |   Principal Variation Search   |
     \********************************/
 
-    if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth);
+    if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth, !cutnode);
 
     if (pv && (move_count == 1 || val > alpha))
-      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth);
+      val = -negamax<~Us, NT>(se + 1, -beta, -alpha, new_depth, false);
 
     undo_move<Us>(se);
 

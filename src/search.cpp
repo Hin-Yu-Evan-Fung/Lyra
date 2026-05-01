@@ -252,6 +252,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       }
 
       /********************************\
+      |         History Pruning        |
+      \********************************/
+
+      if (!is_cap && depth <= 2 && hist < -2000 * depth) {
+        mp.skip_quiet_ = true;
+      }
+
+      /********************************\
       |        Futility Pruning        |
       \********************************/
 

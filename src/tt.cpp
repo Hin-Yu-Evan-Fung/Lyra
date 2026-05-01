@@ -2,10 +2,11 @@
 
 #include "defs.hpp"
 #include "move.hpp"
+#include "params.hpp"
 #include "utils.hpp"
 
-#include <atomic>
 #include <cassert>
+#include <cstdlib>
 
 namespace Lyra {
 
@@ -16,57 +17,58 @@ namespace Lyra {
 \******************************************/
 
 void TT::resize(size_t mb) {
-  size_t target = calc_no_of_entries(mb);
-  entries_.resize(target);
+  n_entries_ = calc_no_of_entries(mb);
+
+  std::free(entries_);
+  entries_ = static_cast<TTEntry *>(std::aligned_alloc(32, n_entries_ * sizeof(TTEntry)));
 }
 
 void TT::clear() {
-  for (size_t i = 0; i < size(); i++) entries_[i].clear();
+  age8_ = 0;
+  for (size_t i = 0; i < n_entries(); ++i) {
+    entries_[i] = {};
+  }
 }
 
 size_t TT::hashfull() const {
   size_t count = 0;
-  for (int i = 0; i < 1000; i++) {
-    const TTEntry &entry = entries_[i].unpack(0);
-    count += (entry.key != 0 && entry.age == age_);
+  for (size_t i = 0; i < 1000U; ++i) {
+    const TTEntry &entry = entries_[i];
+    count += (entry.key16 != 0 && !entry.relative_age(age8_));
   }
   return count;
 }
 
 /******************************************\
 |==========================================|
-|            PackedTTEntry Utils           |
+|                 Read/Write               |
 |==========================================|
 \******************************************/
 
-void PackedTTEntry::pack(const TTEntry &e, Ply ply) {
-  U8 depth = std::clamp(e.depth, (Depth)0, (Depth)127);
-
-  U64 d = U64(e.age) & AgeMask;
-  d |= (U64(depth) << 7) & DepthMask;
-  d |= (U64(e.bound) << 14) & BoundMask;
-  d |= (U64(e.move) << 16) & MoveMask;
-  d |= (U64(U16(e.eval)) << 32) & EvalMask;
-  d |= (U64(U16(to_TT(e.value, ply))) << 48) & ValueMask;
-
-  key.store(e.key ^ d, std::memory_order_relaxed);
-  data.store(d, std::memory_order_relaxed);
+TTData TTEntry::read(Ply p) const {
+  return {
+      Bound((age_bound8 & BoundMask) >> BoundShift),
+      Depth(depth8 + TTDepthOff),
+      Move(move16),
+      Eval(eval16),
+      from_TT(Eval(value16), p),
+  };
 }
 
-TTEntry PackedTTEntry::unpack(Ply ply) const {
-  U64 k       = key.load(std::memory_order_relaxed);
-  U64 d       = data.load(std::memory_order_relaxed);
-  Key pos_key = k ^ d;
+void TTEntry::save(Key k, Age curr, Bound b, Depth d, Ply p, Move m, Eval ev, Eval v) {
+  // Preserve old tt move if we don't have a new one
+  if (m || U16(k) != key16) {
+    move16 = m;
+  }
 
-  return {
-      pos_key,
-      U8(d & AgeMask),
-      Depth((d & DepthMask) >> 7),
-      Bound((d & BoundMask) >> 14),
-      Move((d & MoveMask) >> 16),
-      I16((d & EvalMask) >> 32),
-      from_TT(I16((d & ValueMask) >> 48), ply),
-  };
+  // Overwrite less valuable entries
+  if (b == Bound::Exact || U16(k) != key16 || relative_age(curr) || d - TTDepthOff > depth8) {
+    key16      = U16(k);
+    depth8     = U8(d - TTDepthOff);
+    age_bound8 = Age(curr | b << BoundShift);
+    eval16     = I16(ev);
+    value16    = I16(to_TT(v, p));
+  }
 }
 
 /******************************************\
@@ -77,32 +79,17 @@ TTEntry PackedTTEntry::unpack(Ply ply) const {
 
 void TT::prefetch(Key key) const { __builtin_prefetch(&entries_[index(key)]); }
 
-std::pair<bool, TTEntry> TT::read(Key key, Ply ply) {
-  const size_t         index = this->index(key);
-  const PackedTTEntry &pe    = entries_[index];
+TTResult TT::probe(Key key, Ply ply) {
+  TTEntry *const tte   = &entries_[index(key)];
+  const U16      key16 = U16(key);
 
-  const Key pe_key  = pe.key.load(std::memory_order_relaxed);
-  const U64 pe_data = pe.data.load(std::memory_order_relaxed);
-
-  if ((pe_key ^ key) == pe_data) {
-    return {true, pe.unpack(ply)};
-  } else {
-    return {false, {}};
+  if (tte->key16 == key16) {
+    tt_hits_++;
+    return {tte->is_occupied(), tte, tte->read(ply)};
   }
-}
 
-void TT::write(Key key, Depth depth, Ply ply, Bound bound, Move move, Eval eval, Eval value) {
-  const size_t   index = this->index(key);
-  PackedTTEntry &pe    = entries_[index];
-  const TTEntry &old   = pe.unpack(ply);
-
-  if (old.age != age_ || old.key != key || bound == Bound::Exact || old.depth < depth) {
-    Move    tt_move = (key == old.key && move == NoMove) ? old.move : move;
-    TTEntry e{
-        key, age_, depth, bound, tt_move, eval, value,
-    };
-    pe.pack(std::move(e), ply);
-  }
+  tt_collisions_++;
+  return {false, tte, TTData{Bound::None, TTDepthOff, NoMove, EvalInvalid, EvalInvalid}};
 }
 
 } // namespace Lyra

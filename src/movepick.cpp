@@ -26,6 +26,10 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
   case MPType::QSearch: stage_ = Q_TT; break;
   }
 
+  if (!board.is_legal<Us>(tt_move_)) {
+    tt_move_ = NoMove;
+  }
+
   if (type == MPType::QSearch && !is_capture(tt_move_)) {
     tt_move_ = NoMove;
   }

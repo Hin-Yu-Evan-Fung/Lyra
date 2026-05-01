@@ -298,6 +298,8 @@ void run_bench(int argc, char **argv) {
   U64 total_fm_cutoffs     = 0;
   U64 total_lmr_searches   = 0;
   U64 total_lmr_researches = 0;
+  U64 total_tt_hits        = 0;
+  U64 total_tt_collisions  = 0;
 
   for (unsigned i = 0; i < NBenchPos; ++i) {
     // Reset worker and board
@@ -315,12 +317,19 @@ void run_bench(int argc, char **argv) {
     total_fm_cutoffs += worker.first_move_cutoffs_;
     total_lmr_searches += worker.lmr_searches_;
     total_lmr_researches += worker.lmr_researches_;
+
+    total_tt_hits += tt.tt_hits_;
+    total_tt_collisions += tt.tt_collisions_;
   }
 
   std::println("{}% first move cutoffs", (float)total_fm_cutoffs * 100.0f / (float)total_cutoffs);
   std::println("{}% lmr_researches",
                (float)total_lmr_researches * 100.0f / (float)total_lmr_searches);
-
+  std::println("{} tt entries", tt.n_entries());
+  std::println("{}\% collisions, {}\% hits out of {} probes",
+               float(total_tt_collisions) * 100.0f / float(total_tt_hits + total_tt_collisions),
+               float(total_tt_hits) * 100.0f / float(total_tt_hits + total_tt_collisions),
+               total_tt_hits + total_tt_collisions);
   std::println("{} nodes {} nps {} time", total_nodes, total_nps / NBenchPos, total_time);
 }
 

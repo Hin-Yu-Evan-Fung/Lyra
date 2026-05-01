@@ -127,7 +127,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
+  auto [tt_hit, tte, tt_data] = tt_.probe(board_.key(), ply_);
 
   Bound tt_bound = Bound::None;
   Depth tt_depth = 0;
@@ -136,15 +136,16 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   Eval  tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && !singular && tte.depth >= depth && can_use_bound(tte.bound, tte.value, beta)) {
-      return tte.value;
+    if (!pv && !singular && tt_data.depth >= depth
+        && can_use_bound(tt_data.bound, tt_data.value, beta)) {
+      return tt_data.value;
     }
 
-    tt_bound = tte.bound;
-    tt_depth = tte.depth;
-    tt_eval  = tte.eval;
-    tt_move  = tte.move;
-    tt_value = tte.value;
+    tt_bound = tt_data.bound;
+    tt_depth = tt_data.depth;
+    tt_eval  = tt_data.eval;
+    tt_move  = tt_data.move;
+    tt_value = tt_data.value;
   }
 
   /********************************\
@@ -361,7 +362,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     update_hist_corr(hist_corr_, board_, depth_, best, se->eval);
   }
 
-  if (!singular) tt_.write(board_.key(), depth, ply_, bound, best_move, raw_eval, best);
+  if (!singular) tte->save(board_.key(), tt_.age(), bound, depth, ply_, best_move, raw_eval, best);
 
   return best;
 }
@@ -385,7 +386,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   |   Transposition Table Lookup   |
   \********************************/
 
-  auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
+  auto [tt_hit, tte, tt_data] = tt_.probe(board_.key(), ply_);
 
   Bound tt_bound = Bound::None;
   Eval  tt_eval  = EvalInvalid;
@@ -393,14 +394,14 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   Eval  tt_value = EvalInvalid;
 
   if (tt_hit) {
-    if (!pv && can_use_bound(tte.bound, tte.value, beta)) {
-      return tte.value;
+    if (!pv && can_use_bound(tt_data.bound, tt_data.value, beta)) {
+      return tt_data.value;
     }
 
-    tt_bound = tte.bound;
-    tt_eval  = tte.eval;
-    tt_move  = tte.move;
-    tt_value = tte.value;
+    tt_bound = tt_data.bound;
+    tt_eval  = tt_data.eval;
+    tt_move  = tt_data.move;
+    tt_value = tt_data.value;
   }
 
   /********************************\
@@ -486,8 +487,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   if (in_check && move_count == 0) return mated_in(ply_);
 
-  tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
-            raw_eval, best);
+  tte->save(board_.key(), tt_.age(), best >= beta ? Bound::Lower : Bound::Upper, DepthQS, ply_,
+            best_move, raw_eval, best);
 
   return best;
 }

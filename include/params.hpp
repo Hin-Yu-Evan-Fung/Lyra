@@ -79,13 +79,11 @@ static constexpr size_t MaxMoves  = 256;
 static constexpr Ply    Rule50Ply = 100;
 
 // Hash table constants
-static constexpr size_t NBuckets  = 4;
-static constexpr U64    AgeMask   = 0x7FUL;
-static constexpr U64    DepthMask = 0x7FUL << 7;
-static constexpr U64    BoundMask = 0x3UL << 14;
-static constexpr U64    MoveMask  = 0xFFFFUL << 16;
-static constexpr U64    EvalMask  = 0xFFFFUL << 32;
-static constexpr U64    ValueMask = 0xFFFFUL << 48;
+static constexpr size_t BucketSize = 3;
+static constexpr U64    AgeMask    = 0x3FUL;
+static constexpr int    BoundShift = 6;
+static constexpr U64    BoundMask  = 0x3UL << BoundShift;
+static constexpr Depth  TTDepthOff = -3; // Buffer for TT depth flags
 
 // History Constant
 static constexpr Eval   HistMax      = 16384;

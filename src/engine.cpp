@@ -27,7 +27,7 @@ void Engine::newgame() {
 void Engine::go(const TimeControl &tc) {
   pool_.wait();
   pool_.stop_.store(false, std::memory_order::relaxed);
-  pool_.exec([&](Thread &th) {
+  pool_.exec([this, tc](Thread &th) {
     th.worker_.reset(board_);
     th.worker_.start(tc);
   });

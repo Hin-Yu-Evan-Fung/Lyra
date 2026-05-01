@@ -30,6 +30,9 @@ void UCI::loop() {
       std::println("option name ClearHash type button");
       std::println("option name Hash type spin default 32 min 1 max 128");
       std::println("option name Threads type spin default 1 min 1 max 12");
+#ifdef TUNE
+      TunableRegistry::instance().print_options();
+#endif
       std::println("uciok");
     } else if (token == "isready")
       std::println("readyok");
@@ -141,6 +144,10 @@ void UCI::parse_option(std::istringstream &is) {
   while (is >> token && token != "value") name += (name.empty() ? "" : " ") + token;
 
   while (is >> token) value += (value.empty() ? "" : " ") + token;
+
+#ifdef TUNE
+  TunableRegistry::instance().set(name, std::stoi(value));
+#endif
 
   if (name == "UCI_Chess960") {
     engine_.set_chess960(value == "true");

@@ -6,6 +6,7 @@
 #include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
+#include "params.hpp"
 #include "search_utils.hpp"
 #include "tt.hpp"
 
@@ -90,7 +91,7 @@ public:
   bool is_main() { return id_ == 0; }
 
   void reset(const Board &board);
-  void start(const TimeControl &tc);
+  void start(TimeControl tc);
 
   const Clock &clock() const { return clock_; }
   const U64    nodes() const { return nodes_; }
@@ -188,7 +189,9 @@ constexpr bool Worker::can_singular(Bound tt_bound, Depth tt_depth, Move tt_move
 \******************************************/
 
 constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
-  return 0.75 + std::log(depth) * std::log(move_count) / 4;
+  const float lmr_base = LmrBaseQuiet / 1024.0;
+  const float lmr_mult = LmrMultQuiet / 1024.0;
+  return lmr_base + std::log(depth) * std::log(move_count) / lmr_mult;
 }
 
 constexpr Depth Worker::nmp_reduction(Depth depth) const { return 3 + depth / 5; }

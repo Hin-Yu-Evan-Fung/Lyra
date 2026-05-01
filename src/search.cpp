@@ -4,6 +4,7 @@
 #include "history.hpp"
 #include "move.hpp"
 #include "movepick.hpp"
+#include "params.hpp"
 #include "search_utils.hpp"
 #include "utils.hpp"
 
@@ -18,7 +19,7 @@ namespace Lyra {
 |==========================================|
 \******************************************/
 
-void Worker::start(const TimeControl &tc) {
+void Worker::start(TimeControl tc) {
   Colour stm = board_.stm();
 
   if (is_main()) {
@@ -263,7 +264,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth) {
 
     if (can_lmr(depth, move_count, pv, move)) {
 
-      r -= hist / 7000;
+      r -= hist / LmrMultHist;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d);

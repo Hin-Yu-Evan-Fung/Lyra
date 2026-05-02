@@ -208,6 +208,41 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   if ((pv || cutnode) && depth >= 4 && !tt_move) depth--;
 
   /********************************\
+  |            Prob Cut            |
+  \********************************/
+
+  // If we have a good enough capture and a reduced saerch returns a value >> beta, we can (almost)
+  // safely prune the previous move
+
+  Eval pc_beta = beta + 170 + 50 * !improving;
+
+  if (!in_check && depth >= 5 && !is_terminal(beta)
+      && (!tt_hit || tt_value > pc_beta || tt_depth < depth - 3)) {
+
+    Move  move     = NoMove;
+    Depth pc_depth = depth - 4;
+
+    MovePicker<Us> mp{MPType::ProbCut, board_, mostats(se), tt_move, depth, pc_beta - se->eval};
+    while ((move = mp.next())) {
+
+      if (move == se->excl) continue;
+
+      do_move<Us>(se, move);
+
+      Eval v = -qsearch<~Us, NonPV>(se + 1, -pc_beta, -pc_beta + 1);
+
+      if (v >= pc_beta)
+        v = -negamax<~Us, NonPV>(se + 1, -pc_beta, -pc_beta + 1, pc_depth, !cutnode);
+
+      undo_move<Us>(se);
+
+      if (v >= pc_beta && !is_terminal(v)) {
+        return v;
+      }
+    }
+  }
+
+  /********************************\
   |        Main Search Loop        |
   \********************************/
 

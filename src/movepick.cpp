@@ -11,22 +11,23 @@ namespace Lyra {
 
 template <Colour Us>
 MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, Move tt_move,
-                           Depth depth)
+                           Depth depth, Eval threshold)
     : skip_quiet_(false)
     , board_(board)
     , tt_move_(tt_move)
     , depth_(depth)
+    , threshold_(threshold)
     , killer_(*mostats.killer)
     , hist_quiet_(*mostats.hist_quiet)
     , cont_buf_(mostats.cont_buf)
     , type_(type) {
-
   switch (type) {
   case MPType::Main: stage_ = MAIN_TT; break;
   case MPType::QSearch: stage_ = Q_TT; break;
+  case MPType::ProbCut: stage_ = PC_TT; break;
   }
 
-  if (type == MPType::QSearch && !is_capture(tt_move_)) {
+  if (type != MPType::Main && !is_capture(tt_move_)) {
     tt_move_ = NoMove;
   }
 
@@ -64,7 +65,7 @@ void MovePicker<Us>::gen_score_cap() {
   enum_moves<Us, GenCap>(board_, [&](Move move) {
     if (move == tt_move_) return;
 
-    if (type_ == MPType::QSearch || board_.see(move, EvalDraw)) {
+    if (type_ == MPType::QSearch || board_.see(move, threshold_)) {
       moves_[start_ptr]    = move;
       scores_[start_ptr++] = score_cap(move);
     } else {
@@ -115,11 +116,13 @@ Move MovePicker<Us>::next() {
   switch (stage_) {
   case MAIN_TT:
   case Q_TT:
+  case PC_TT:
     ++stage_;
     if (tt_move_) return tt_move_;
     return next();
   case INIT_CAP:
   case Q_INIT:
+  case PC_INIT:
     gen_score_cap();
     ++stage_;
     return next();
@@ -147,6 +150,9 @@ Move MovePicker<Us>::next() {
     if (peek_back()) return pop_back();
     return NoMove;
   case Q_CAP:
+    if (peek_front()) return pop_front();
+    return NoMove;
+  case PC_CAP:
     if (peek_front()) return pop_front();
     return NoMove;
   };

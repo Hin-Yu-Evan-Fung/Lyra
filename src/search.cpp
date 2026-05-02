@@ -131,6 +131,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   Bound tt_bound = Bound::None;
   Depth tt_depth = 0;
+  Eval  tt_eval  = EvalInvalid;
   Move  tt_move  = NoMove;
   Eval  tt_value = EvalInvalid;
 
@@ -141,11 +142,27 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
     tt_bound = tte.bound;
     tt_depth = tte.depth;
+    tt_eval  = tte.eval;
     tt_move  = tte.move;
     tt_value = tte.value;
   }
 
-  Eval eval = se->eval = board_.eval();
+  /********************************\
+  |          Static Eval           |
+  \********************************/
+
+  Eval eval     = -EvalInf;
+  Eval raw_eval = -EvalInf;
+
+  if (in_check) {
+    eval = se->eval = -EvalInf;
+  } else if (singular) {
+    eval = se->eval;
+  } else {
+    eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+    if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, eval)) eval = tt_value;
+  }
 
   const bool improving = !in_check && ply_ >= 2 && se->eval > (se - 2)->eval;
 
@@ -325,7 +342,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
               best >= beta        ? Bound::Lower
               : (pv && best_move) ? Bound::Exact
                                   : Bound::Upper,
-              best_move, eval, best);
+              best_move, raw_eval, best);
 
   return best;
 }
@@ -351,17 +368,32 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   auto [tt_hit, tte] = tt_.read(board_.key(), ply_);
 
-  Move tt_move = NoMove;
+  Bound tt_bound = Bound::None;
+  Eval  tt_eval  = EvalInvalid;
+  Move  tt_move  = NoMove;
+  Eval  tt_value = EvalInvalid;
 
   if (tt_hit) {
     if (!pv && can_use_bound(tte.bound, tte.value, beta)) {
       return tte.value;
     }
 
-    tt_move = tte.move;
+    tt_bound = tte.bound;
+    tt_eval  = tte.eval;
+    tt_move  = tte.move;
+    tt_value = tte.value;
   }
 
-  Eval eval = board_.eval();
+  /********************************\
+  |           Static Eval          |
+  \********************************/
+
+  Eval raw_eval = -EvalInf;
+  Eval best     = -EvalInf;
+
+  best = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+  if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
 
   /********************************\
   |            Stand Pat           |
@@ -370,7 +402,6 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   // The current eval is the lower bound because we can just not capture anything (assume its not a
   // zugzwang) If lower bound >= beta, then we fail high (opponent has better options) If lower
   // bound > alpha, then we update alpha (the best we can do)
-  Eval best = eval;
   if (best >= beta) return best;
   alpha = std::max(alpha, best);
 
@@ -419,7 +450,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   }
 
   tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
-            eval, best);
+            raw_eval, best);
 
   return best;
 }

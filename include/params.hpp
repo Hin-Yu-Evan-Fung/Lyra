@@ -88,8 +88,10 @@ static constexpr U64    EvalMask  = 0xFFFFUL << 32;
 static constexpr U64    ValueMask = 0xFFFFUL << 48;
 
 // History Constant
-static constexpr Eval HistMax  = 16384;
-static constexpr Eval ContSize = 2;
+static constexpr Eval   HistMax      = 16384;
+static constexpr Eval   ContSize     = 2;
+static constexpr size_t CorrHistSize = 32768;
+static constexpr Eval   CorrHistMax  = 1024;
 
 // General search constants
 static constexpr Depth DepthQS     = 0;

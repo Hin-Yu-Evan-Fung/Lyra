@@ -47,6 +47,7 @@ class Worker {
                            std::vector<Move> &quiets);
   void    update_hist_cont(StackEntry *se, Move move, Eval bonus);
   MOStats mostats(StackEntry *se);
+  Eval    adjust_eval(Eval eval) const;
 
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
@@ -81,6 +82,7 @@ class Worker {
 
   HistQuiet hist_quiet_;
   HistCont  hist_cont_;
+  HistCorr  hist_corr_;
 
 public:
   Worker(std::atomic_bool &stop, size_t id, TT &tt)

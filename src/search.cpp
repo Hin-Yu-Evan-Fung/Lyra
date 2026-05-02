@@ -111,7 +111,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   if (!root) {
     if (clock_.stop(nodes_)) return EvalStop;
-    if (board_.is_draw(ply_)) return EvalDraw;
+    if (board_.is_draw(ply_from_null_)) return EvalDraw;
     if (ply_ >= MaxDepth) return in_check ? EvalDraw : board_.eval();
 
     // Our guaranteed score will not be worse than mated in ply.
@@ -397,7 +397,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     }
 
     do_move<Us>(se, move);
-    Eval val = -qsearch<~Us, PV>(se + 1, -beta, -alpha);
+    Eval val = -qsearch<~Us, NT>(se + 1, -beta, -alpha);
     undo_move<Us>(se);
 
     /********************************\

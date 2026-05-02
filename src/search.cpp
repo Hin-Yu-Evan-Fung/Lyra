@@ -157,9 +157,11 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   if (in_check) {
     eval = se->eval = -EvalInf;
   } else if (singular) {
-    eval = se->eval;
+    raw_eval = eval = se->eval;
   } else {
-    eval = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+    raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+    eval = se->eval = adjust_eval(raw_eval);
 
     if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, eval)) eval = tt_value;
   }
@@ -337,12 +339,13 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   if (move_count == 0) best = singular ? alpha : in_check ? mated_in(ply_) : EvalDraw;
 
-  if (!singular)
-    tt_.write(board_.key(), depth, ply_,
-              best >= beta        ? Bound::Lower
-              : (pv && best_move) ? Bound::Exact
-                                  : Bound::Upper,
-              best_move, raw_eval, best);
+  const Bound bound = best >= beta ? Bound::Lower : (pv && best_move) ? Bound::Exact : Bound::Upper;
+
+  if (!in_check && !MoveUtils::is_capture(best_move) && can_use_bound(bound, best, se->eval)) {
+    update_hist_corr(hist_corr_, board_, depth_, best, se->eval);
+  }
+
+  if (!singular) tt_.write(board_.key(), depth, ply_, bound, best_move, raw_eval, best);
 
   return best;
 }
@@ -391,7 +394,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   Eval raw_eval = -EvalInf;
   Eval best     = -EvalInf;
 
-  best = se->eval = raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+  raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+
+  best = se->eval = adjust_eval(raw_eval);
 
   if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
 

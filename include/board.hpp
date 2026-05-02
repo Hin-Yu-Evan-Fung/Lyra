@@ -141,6 +141,7 @@ public:
   Eval                  eval() const;
   constexpr CastleMask  castle_mask() const;
   constexpr Key         key() const;
+  constexpr Key         pawn_key() const;
 
   // Movegen Helpers
   template <Colour Us, bool QueenSide>
@@ -168,6 +169,7 @@ constexpr Undo *const Board::undo() const { return undo_; }
 constexpr Colour      Board::stm() const { return stm_; }
 constexpr CastleMask  Board::castle_mask() const { return castling_mask_; }
 constexpr Key         Board::key() const { return undo_->key; }
+constexpr Key         Board::pawn_key() const { return undo_->pawn_key; }
 
 /******************************************\
 |==========================================|
@@ -214,6 +216,8 @@ constexpr void Board::set_piece(Piece pc, Square sq) {
 
   if constexpr (!DoMove) return;
 
+  if (pt_of(pc) == P) undo_->pawn_key ^= Zobrist::PIECE_KEYS[pc][sq];
+
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
   undo_->psq += EvalUtils::PSQT[pc][sq];
   undo_->game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
@@ -227,6 +231,8 @@ constexpr void Board::pop_piece(Square sq) {
   board_[sq] = NoPiece;
 
   if constexpr (!DoMove) return;
+
+  if (pt_of(pc) == P) undo_->pawn_key ^= Zobrist::PIECE_KEYS[pc][sq];
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
   undo_->psq -= EvalUtils::PSQT[pc][sq];
@@ -243,7 +249,10 @@ constexpr void Board::move_piece(Square src, Square dst) {
 
   if constexpr (!DoMove) return;
 
-  undo_->key ^= Zobrist::PIECE_KEYS[pc][src] ^ Zobrist::PIECE_KEYS[pc][dst];
+  Key toggle = Zobrist::PIECE_KEYS[pc][src] ^ Zobrist::PIECE_KEYS[pc][dst];
+
+  if (pt_of(pc) == P) undo_->pawn_key ^= toggle;
+  undo_->key ^= toggle;
   undo_->psq += EvalUtils::PSQT[pc][dst] - EvalUtils::PSQT[pc][src];
 }
 

@@ -60,6 +60,7 @@ void Worker::reset(const Board &board) {
 
   hist_quiet_ = {};
   hist_cont_  = {};
+  hist_corr_  = {};
 }
 
 void Worker::uci_report(const PVLine &pv) {
@@ -97,6 +98,12 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
       update_hist_cont(se, m, -bonus);
     }
   }
+}
+
+Eval Worker::adjust_eval(Eval eval) const {
+  Eval pcv = hist_corr_[board_.stm()][board_.pawn_key() % CorrHistSize] / 16;
+  eval += pcv;
+  return std::clamp(eval, -EvalMateBound, EvalMateBound);
 }
 
 } // namespace Lyra

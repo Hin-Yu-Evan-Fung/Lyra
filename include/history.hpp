@@ -13,15 +13,6 @@ using HistCont  = NDArray<HistQuiet, NPiece, NSquare>;
 using ContBuf   = NDArray<HistQuiet *, ContSize>;
 using HistCorr  = NDArray<Eval, NColour, CorrHistSize>;
 
-struct PieceTo {
-  Piece  pc;
-  Square to;
-};
-
-constexpr PieceTo piece_to(const Board &board, Move move) {
-  return {board.on(MoveUtils::src(move)), MoveUtils::dst(move)};
-}
-
 constexpr void update_killer(Killer &killer, Move best) {
   if (killer[0] != best) {
     killer[1] = killer[0];
@@ -35,7 +26,7 @@ constexpr void hist_gravity(Eval &hist, Eval bonus) {
 }
 
 constexpr void update_hist_quiet(HistQuiet &hist, const Board &board, Move move, Eval bonus) {
-  const PieceTo p = piece_to(board, move);
+  const PieceTo p = board.piece_to(move);
   hist_gravity<HistMax>(hist[p.pc][p.to], bonus);
 }
 

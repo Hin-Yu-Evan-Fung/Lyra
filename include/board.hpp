@@ -19,6 +19,17 @@ constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK
 
 /******************************************\
 |==========================================|
+|                 Piece To                 |
+|==========================================|
+\******************************************/
+
+struct PieceTo {
+  Piece  pc;
+  Square to;
+};
+
+/******************************************\
+|==========================================|
 |                Undo State                |
 |==========================================|
 \******************************************/
@@ -136,6 +147,7 @@ public:
   constexpr Piece       on(Square sq) const;
   constexpr PieceType   moved(Move move) const;
   constexpr PieceType   captured(Move move) const;
+  constexpr PieceTo     piece_to(Move move) const;
   constexpr Colour      stm() const;
   constexpr Undo *const undo() const;
   Eval                  eval() const;
@@ -196,6 +208,9 @@ constexpr Piece     Board::on(Square sq) const { return board_[sq]; }
 constexpr PieceType Board::moved(Move move) const { return pt_of(on(MoveUtils::src(move))); }
 constexpr PieceType Board::captured(Move move) const {
   return MoveUtils::is_ep(move) ? P : pt_of(on(MoveUtils::dst(move)));
+}
+constexpr PieceTo Board::piece_to(Move move) const {
+  return {on(MoveUtils::src(move)), MoveUtils::dst(move)};
 }
 template <Colour C>
 constexpr Square Board::ksq() const {

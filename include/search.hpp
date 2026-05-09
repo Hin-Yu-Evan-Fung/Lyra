@@ -115,7 +115,7 @@ public:
 
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
-  const PieceTo p = piece_to(board_, move);
+  const PieceTo p = board_.piece_to(move);
   ++nodes_;
   ++ply_;
 

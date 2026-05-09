@@ -82,9 +82,10 @@ class Worker {
 
   TT &tt_;
 
-  HistQuiet hist_quiet_;
-  HistCont  hist_cont_;
-  HistCorr  hist_corr_;
+  HistQuiet   hist_quiet_;
+  HistCont    hist_cont_;
+  HistCorr    hist_corr_;
+  HistCounter hist_counter_;
 
 public:
   // Stats terms
@@ -121,6 +122,7 @@ constexpr void Worker::do_move(StackEntry *se, Move move) {
 
   se->ply_from_null = ply_from_null_++;
   se->move          = move;
+  se->piece_to      = piece_to(board_, move);
   se->cont          = &hist_cont_[p.pc][p.to];
   board_.do_move<Us>(move);
   tt_.prefetch(board_.key());
@@ -141,6 +143,7 @@ constexpr void Worker::do_null_move(StackEntry *se) {
   se->ply_from_null = ply_from_null_;
   ply_from_null_    = 0;
   se->move          = NullMove;
+  se->piece_to      = {};
   se->cont          = &hist_cont_[wP][A1]; // Dummy table
   board_.do_null_move<Us>();
   tt_.prefetch(board_.key());

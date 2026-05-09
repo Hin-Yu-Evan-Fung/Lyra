@@ -54,7 +54,8 @@ HistCont  hist_cont{};
 template <bool Div, Colour Us>
 U64 perftmp(Board &board, Depth depth) {
   MovePicker<Us> mp(MPType::Main, board,
-                    {&killer, &hist_quiet, {&hist_cont[wP][A1], &hist_cont[wP][A1]}}, NoMove, 0);
+                    {&killer, &hist_quiet, NoMove, {&hist_cont[wP][A1], &hist_cont[wP][A1]}},
+                    NoMove, 0);
 
   if (!Div && depth <= 1) {
     U64 n = 0;

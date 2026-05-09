@@ -69,6 +69,7 @@ constexpr bool is_promo(Move move) { return flag(move) & PromoMask; }
 constexpr bool is_castle(Move move) {
   return flag(move) == KingCastle || flag(move) == QueenCastle;
 }
+constexpr bool is_move_valid(Move move) { return move != NoMove || move != NullMove; }
 
 constexpr PieceType promoted_pt(Move move) {
   return static_cast<PieceType>(((flag(move) & PromoPieceMask) >> 12) + N);

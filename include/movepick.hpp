@@ -14,6 +14,7 @@ enum MPStage {
   GOOD_CAP,
   KILLER_1,
   KILLER_2,
+  COUNTER,
   INIT_QUIET,
   QUIET,
   BAD_CAP,
@@ -27,6 +28,7 @@ enum MPStage {
 struct MOStats {
   const Killer    *killer;
   const HistQuiet *hist_quiet;
+  Move             counter;
   const ContBuf    cont_buf;
 };
 
@@ -66,6 +68,7 @@ private:
 
   Killer           killer_;
   const HistQuiet &hist_quiet_;
+  Move             counter_;
   const ContBuf    cont_buf_;
 
   MPType   type_;

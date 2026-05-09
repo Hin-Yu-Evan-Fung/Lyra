@@ -42,7 +42,13 @@ bool Worker::should_search_deeper() {
 }
 
 MOStats Worker::mostats(StackEntry *se) {
-  return {&se->killer, &hist_quiet_, {(se - 1)->cont, (se - 2)->cont}};
+  Move          counter = NoMove;
+  Move          prev    = (se - 1)->move;
+  const PieceTo p       = (se - 1)->piece_to;
+  if (is_move_valid(prev)) {
+    counter = hist_counter_[p.pc][p.to];
+  }
+  return {&se->killer, &hist_quiet_, counter, {(se - 1)->cont, (se - 2)->cont}};
 }
 
 void Worker::reset(const Board &board) {
@@ -58,9 +64,10 @@ void Worker::reset(const Board &board) {
   eval_     = 0;
   avg_eval_ = 0;
 
-  hist_quiet_ = {};
-  hist_cont_  = {};
-  hist_corr_  = {};
+  hist_quiet_   = {};
+  hist_cont_    = {};
+  hist_corr_    = {};
+  hist_counter_ = {};
 
   cutoffs_            = 0;
   first_move_cutoffs_ = 0;
@@ -97,6 +104,12 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
     update_killer(se->killer, best);
     update_hist_quiet(hist_quiet_, board_, best, bonus);
     update_hist_cont(se, best, bonus);
+
+    Move          prev = (se - 1)->move;
+    const PieceTo p    = (se - 1)->piece_to;
+    if (is_move_valid(prev)) {
+      hist_counter_[p.pc][p.to] = best;
+    }
 
     for (Move m : quiets) {
       update_hist_quiet(hist_quiet_, board_, m, -bonus);

@@ -18,6 +18,7 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     , depth_(depth)
     , killer_(*mostats.killer)
     , hist_quiet_(*mostats.hist_quiet)
+    , counter_(mostats.counter)
     , cont_buf_(mostats.cont_buf)
     , type_(type) {
 
@@ -34,6 +35,8 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     killer_[0] = NoMove;
   if (killer_[1] == tt_move_ || is_capture(killer_[1]) || !board.is_legal<Us>(killer_[1]))
     killer_[1] = NoMove;
+  if (counter_ == tt_move_ || is_capture(counter_) || !board.is_legal<Us>(counter_))
+    counter_ = NoMove;
 }
 
 template <Colour Us>
@@ -78,7 +81,7 @@ template <Colour Us>
 void MovePicker<Us>::gen_score_quiet() {
   start_ptr = 0;
   enum_moves<Us, GenQuiet>(board_, [&](Move move) {
-    if (move == tt_move_ || move == killer_[0] || move == killer_[1]) return;
+    if (move == tt_move_ || move == killer_[0] || move == killer_[1] || move == counter_) return;
 
     moves_[start_ptr]    = move;
     scores_[start_ptr++] = score_quiet(move);
@@ -134,6 +137,10 @@ Move MovePicker<Us>::next() {
   case KILLER_2:
     ++stage_;
     if (killer_[1]) return killer_[1];
+    return next();
+  case COUNTER:
+    ++stage_;
+    if (counter_) return counter_;
     return next();
   case INIT_QUIET:
     if (!skip_quiet_) gen_score_quiet();

@@ -23,6 +23,7 @@ struct StackEntry {
   Ply        ply_from_null;
   Move       move;
   Move       excl;
+  PieceTo    piece_to;
 };
 
 /******************************************\

@@ -7,11 +7,12 @@
 
 namespace Lyra {
 
-using Killer    = NDArray<Move, 2>;
-using HistQuiet = NDArray<Eval, NPiece, NSquare>;
-using HistCont  = NDArray<HistQuiet, NPiece, NSquare>;
-using ContBuf   = NDArray<HistQuiet *, ContSize>;
-using HistCorr  = NDArray<Eval, NColour, CorrHistSize>;
+using Killer      = NDArray<Move, 2>;
+using HistQuiet   = NDArray<Eval, NPiece, NSquare>;
+using HistCont    = NDArray<HistQuiet, NPiece, NSquare>;
+using HistCounter = NDArray<Move, NPiece, NSquare>;
+using ContBuf     = NDArray<HistQuiet *, ContSize>;
+using HistCorr    = NDArray<Eval, NColour, CorrHistSize>;
 
 struct PieceTo {
   Piece  pc;

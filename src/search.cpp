@@ -226,7 +226,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   while ((move = mp.next())) {
     const bool    is_cap       = MoveUtils::is_capture(move);
     const U64     cached_nodes = nodes_;
-    const PieceTo p            = piece_to(board_, move);
+    const PieceTo p            = board_.piece_to(move);
 
     if (move == se->excl) continue;
 

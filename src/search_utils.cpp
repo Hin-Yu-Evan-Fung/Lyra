@@ -42,12 +42,10 @@ bool Worker::should_search_deeper() {
 }
 
 MOStats Worker::mostats(StackEntry *se) {
-  Move          counter = NoMove;
   Move          prev    = (se - 1)->move;
   const PieceTo p       = (se - 1)->piece_to;
-  if (is_move_valid(prev)) {
-    counter = hist_counter_[p.pc][p.to];
-  }
+  Move          counter = is_move_valid(prev) ? hist_counter_[p.pc][p.to] : NoMove;
+
   return {&se->killer, &hist_quiet_, counter, {(se - 1)->cont, (se - 2)->cont}};
 }
 

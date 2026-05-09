@@ -116,13 +116,13 @@ public:
 
 template <Colour Us>
 constexpr void Worker::do_move(StackEntry *se, Move move) {
-  const PieceTo p = piece_to(board_, move);
+  const PieceTo p = board_.piece_to(move);
   ++nodes_;
   ++ply_;
 
   se->ply_from_null = ply_from_null_++;
   se->move          = move;
-  se->piece_to      = piece_to(board_, move);
+  se->piece_to      = p;
   se->cont          = &hist_cont_[p.pc][p.to];
   board_.do_move<Us>(move);
   tt_.prefetch(board_.key());

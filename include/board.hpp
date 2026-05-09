@@ -19,6 +19,17 @@ constexpr std::string_view start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK
 
 /******************************************\
 |==========================================|
+|                 Piece To                 |
+|==========================================|
+\******************************************/
+
+struct PieceTo {
+  Piece  pc;
+  Square to;
+};
+
+/******************************************\
+|==========================================|
 |                Undo State                |
 |==========================================|
 \******************************************/
@@ -142,6 +153,7 @@ public:
   constexpr CastleMask  castle_mask() const;
   constexpr Key         key() const;
   constexpr Key         pawn_key() const;
+  constexpr PieceTo     piece_to(Move move) const;
 
   // Movegen Helpers
   template <Colour Us, bool QueenSide>
@@ -200,6 +212,9 @@ constexpr PieceType Board::captured(Move move) const {
 template <Colour C>
 constexpr Square Board::ksq() const {
   return BBUtils::lsb(bb(C, K));
+}
+constexpr PieceTo Board::piece_to(Move move) const {
+  return {on(MoveUtils::src(move)), MoveUtils::dst(move)};
 }
 
 /******************************************\

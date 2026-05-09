@@ -35,8 +35,10 @@ MovePicker<Us>::MovePicker(MPType type, const Board &board, MOStats &&mostats, M
     killer_[0] = NoMove;
   if (killer_[1] == tt_move_ || is_capture(killer_[1]) || !board.is_legal<Us>(killer_[1]))
     killer_[1] = NoMove;
-  if (counter_ == tt_move_ || is_capture(counter_) || !board.is_legal<Us>(counter_))
+  if (counter_ == tt_move_ || counter_ == killer_[0] || counter_ == killer_[1]
+      || is_capture(counter_) || !board.is_legal<Us>(counter_)) {
     counter_ = NoMove;
+  }
 }
 
 template <Colour Us>
@@ -52,7 +54,7 @@ Eval MovePicker<Us>::score_cap(Move move) {
 
 template <Colour Us>
 Eval MovePicker<Us>::score_quiet(Move move) {
-  const PieceTo p     = piece_to(board_, move);
+  const PieceTo p     = board_.piece_to(move);
   Eval          score = hist_quiet_[p.pc][p.to];
 
   for (HistQuiet *cont : cont_buf_) score += (*cont)[p.pc][p.to];
@@ -213,8 +215,8 @@ bool Board::is_legal(Move move) const {
   if (!is_castle && cap != NoPiece && colour_of(cap) == Us) return false;
   // Check if the capture flag is consistent with a piece being captured
   if (!is_castle && !is_ep && is_cap == (cap == NoPiece)) return false;
-  // Check if the promotion flag is consistent
-  if (is_promo && (pt_of(pc) != P || rank_of(src) != PromoRank)) return false;
+  // Check if the pawn move flags are consistent
+  if ((is_promo || is_dp || is_ep) && pt_of(pc) != P) return false;
 
   if (is_castle) {
     if (flag == KingCastle && undo_->c_rights & OO) return !in_check() && can_castle<Us, false>();
@@ -242,6 +244,8 @@ bool Board::is_legal(Move move) const {
     // Single Push is illegal if its the wrong pattern and there are
     // pieces in the way
     if (is_quiet && (dst != forward<Us>(src) || from(dst) & occ)) return false;
+    // Check if a promotion has the right flag
+    if (rank_of(src) == PromoRank && !is_promo) return false;
 
     return valid_pin && from(dst) & check_mask;
   }

@@ -166,7 +166,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, eval)) eval = tt_value;
   }
 
-  const bool improving = !in_check && ply_ >= 2 && se->eval > (se - 2)->eval;
+  const bool improving = !in_check && is_improving(se);
 
   /********************************\
   |         Forward Pruning        |
@@ -297,12 +297,14 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
     if (can_lmr(depth, move_count, pv, move)) {
 
+      r += !improving;
       r -= hist / LmrMultHist;
 
       Depth d = std::clamp(new_depth - r, 1, (int)new_depth);
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d, true);
 
       full_search = val > alpha && new_depth > d;
+
       lmr_searches_++;
       if (full_search) lmr_researches_++;
     } else {

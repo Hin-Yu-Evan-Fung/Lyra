@@ -85,6 +85,12 @@ class Worker {
   HistCorr  hist_corr_;
 
 public:
+  // Stats terms
+  U64 cutoffs_;
+  U64 first_move_cutoffs_;
+  U64 lmr_searches_;
+  U64 lmr_researches_;
+
   Worker(std::atomic_bool &stop, size_t id, TT &tt)
       : clock_(stop)
       , stop_(stop)

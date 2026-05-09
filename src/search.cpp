@@ -303,6 +303,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       val     = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, d, true);
 
       full_search = val > alpha && new_depth > d;
+      lmr_searches_++;
+      if (full_search) lmr_researches_++;
     } else {
       full_search = !pv || move_count > 1;
     }
@@ -335,7 +337,11 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       if (val > alpha) {
         best_move = move;
         if (pv) se->pv.update((se + 1)->pv, move);
-        if (val >= beta) break;
+        if (val >= beta) {
+          cutoffs_++;
+          if (move_count == 1) first_move_cutoffs_++;
+          break;
+        }
         alpha = val;
       }
     }
@@ -422,13 +428,16 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   |        Main Search Loop        |
   \********************************/
 
-  Move move      = NoMove;
-  Move best_move = NoMove;
+  Move move       = NoMove;
+  Move best_move  = NoMove;
+  int  move_count = 0;
 
   (se + 1)->killer.fill(NoMove);
 
   MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
   while ((move = mp.next())) {
+
+    move_count++;
 
     if (!is_loss(best)) {
 
@@ -456,7 +465,11 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       if (val > alpha) {
         best_move = move;
         if (pv) se->pv.update((se + 1)->pv, move);
-        if (val >= beta) break;
+        if (val >= beta) {
+          cutoffs_++;
+          if (move_count == 1) first_move_cutoffs_++;
+          break;
+        }
         alpha = val;
       }
     }

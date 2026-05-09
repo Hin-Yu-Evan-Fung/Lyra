@@ -111,4 +111,14 @@ Eval Worker::adjust_eval(Eval eval) const {
   return std::clamp(eval, -EvalMateBound, EvalMateBound);
 }
 
+bool Worker::is_improving(StackEntry *se) const {
+  if (ply_ >= 2 && (se - 2)->eval != -EvalInf) {
+    return se->eval > (se - 2)->eval;
+  } else if (ply_ >= 4 && (se - 4)->eval != -EvalInf) {
+    return se->eval > (se - 4)->eval;
+  } else {
+    return true;
+  }
+}
+
 } // namespace Lyra

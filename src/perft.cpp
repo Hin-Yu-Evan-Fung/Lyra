@@ -294,6 +294,11 @@ void run_bench(int argc, char **argv) {
   U64  total_nps   = 0;
   Time total_time  = 0;
 
+  U64 total_cutoffs        = 0;
+  U64 total_fm_cutoffs     = 0;
+  U64 total_lmr_searches   = 0;
+  U64 total_lmr_researches = 0;
+
   for (unsigned i = 0; i < NBenchPos; ++i) {
     // Reset worker and board
     stop.store(false, std::memory_order_relaxed);
@@ -305,7 +310,17 @@ void run_bench(int argc, char **argv) {
     total_nodes += worker.nodes();
     total_time += worker.clock().elapsed();
     total_nps += worker.nodes() * 1000 / std::max(worker.clock().elapsed(), 1UL);
+
+    total_cutoffs += worker.cutoffs_;
+    total_fm_cutoffs += worker.first_move_cutoffs_;
+    total_lmr_searches += worker.lmr_searches_;
+    total_lmr_researches += worker.lmr_researches_;
   }
+
+  std::println("{}% first move cutoffs", (float)total_fm_cutoffs * 100.0f / (float)total_cutoffs);
+  std::println("{}% lmr_researches",
+               (float)total_lmr_researches * 100.0f / (float)total_lmr_searches);
+
   std::println("{} nodes {} nps {} time", total_nodes, total_nps / NBenchPos, total_time);
 }
 

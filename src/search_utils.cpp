@@ -61,6 +61,11 @@ void Worker::reset(const Board &board) {
   hist_quiet_ = {};
   hist_cont_  = {};
   hist_corr_  = {};
+
+  cutoffs_            = 0;
+  first_move_cutoffs_ = 0;
+  lmr_searches_       = 0;
+  lmr_researches_     = 0;
 }
 
 void Worker::uci_report(const PVLine &pv) {

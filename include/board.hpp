@@ -167,6 +167,7 @@ public:
 
   // Game State functions
   bool is_draw(Ply ply) const;
+  bool is_insufficient_material() const;
   bool in_check() const;
   bool has_non_pawn_material(Colour us) const;
 };

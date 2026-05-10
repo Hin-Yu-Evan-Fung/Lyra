@@ -410,21 +410,26 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
   Eval raw_eval = -EvalInf;
   Eval best     = -EvalInf;
 
-  raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+  if (in_check) {
+    best     = -EvalInf;
+    se->eval = -EvalInf;
+  } else {
 
-  best = se->eval = adjust_eval(raw_eval);
+    raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
+    best = se->eval = adjust_eval(raw_eval);
 
-  if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
+    if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
 
-  /********************************\
-  |            Stand Pat           |
-  \********************************/
+    /********************************\
+    |            Stand Pat           |
+    \********************************/
 
-  // The current eval is the lower bound because we can just not capture anything (assume its not a
-  // zugzwang) If lower bound >= beta, then we fail high (opponent has better options) If lower
-  // bound > alpha, then we update alpha (the best we can do)
-  if (best >= beta) return best;
-  alpha = std::max(alpha, best);
+    // The current eval is the lower bound because we can just not capture anything (assume its not
+    // a zugzwang) If lower bound >= beta, then we fail high (opponent has better options) If lower
+    // bound > alpha, then we update alpha (the best we can do)
+    if (best >= beta) return best;
+    alpha = std::max(alpha, best);
+  }
 
   /********************************\
   |        Main Search Loop        |
@@ -436,7 +441,9 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   (se + 1)->killer.fill(NoMove);
 
-  MovePicker<Us> mp{MPType::QSearch, board_, mostats(se), tt_move, DepthQS};
+  MovePicker<Us> mp{in_check ? MPType::Main : MPType::QSearch, board_, mostats(se), tt_move,
+                    DepthQS};
+
   while ((move = mp.next())) {
 
     move_count++;
@@ -448,7 +455,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       \********************************/
 
       // Can safely (probably!) ignore losing captures.
-      if (!board_.see(move, -30)) continue;
+      if (!in_check && !board_.see(move, -30)) continue;
     }
 
     do_move<Us>(se, move);
@@ -476,6 +483,8 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       }
     }
   }
+
+  if (in_check && move_count == 0) return mated_in(ply_);
 
   tt_.write(board_.key(), DepthQS, ply_, best >= beta ? Bound::Lower : Bound::Upper, best_move,
             raw_eval, best);

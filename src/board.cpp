@@ -264,8 +264,8 @@ Eval Board::eval() const {
 \******************************************/
 
 bool Board::is_draw(Ply ply) const {
-  if (undo_->rule50 >= Rule50Ply)
-    if (undo_->check_mask == FullBB || list_moves(*this).size()) return true;
+  if (is_insufficient_material()) return true;
+  if (undo_->rule50 >= Rule50Ply) return true;
   return undo_->reps && undo_->reps < ply;
 }
 
@@ -280,6 +280,29 @@ void Board::update_reps() const {
         break;
       }
     }
+}
+
+bool Board::is_insufficient_material() const {
+  unsigned n_pieces       = popcount(bb());
+  unsigned n_white_pieces = popcount(bb(White));
+  unsigned n_black_pieces = popcount(bb(Black));
+  BB       knights        = bb(N);
+  BB       bishops        = bb(B);
+
+  switch (n_pieces) {
+  case 2: return true;
+  case 3: return bb(N) | bb(B);
+  case 4:
+    if (bb(P) | bb(R) | bb(Q)) return false;
+    if (n_white_pieces == n_black_pieces) return true;
+    if (knights && !bishops) return true;
+    if (!knights && bishops)
+      return ((bishops & WhiteSqBB) == bishops) || ((bishops & BlackSqBB) == bishops);
+    return false;
+  default: return false;
+  }
+
+  return false;
 }
 
 bool Board::in_check() const { return undo_->check_mask != FullBB; }

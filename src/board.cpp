@@ -5,7 +5,7 @@
 #include "defs.hpp"
 #include "eval.hpp"
 #include "mask.hpp"
-#include "movegen.hpp"
+#include "move.hpp"
 #include "utils.hpp"
 #include "zobrist.hpp"
 
@@ -308,5 +308,55 @@ bool Board::is_insufficient_material() const {
 bool Board::in_check() const { return undo_->check_mask != FullBB; }
 
 bool Board::has_non_pawn_material(Colour us) const { return bb(us) ^ bb(us, K) ^ bb(us, P); }
+
+template <Colour Us>
+bool Board::gives_check(Move move) const {
+  constexpr Colour Them = ~Us;
+
+  Square    src  = MoveUtils::src(move);
+  Square    dst  = MoveUtils::dst(move);
+  MoveFlag  flag = MoveUtils::flag(move);
+  PieceType pt   = MoveUtils::is_promo(move) ? MoveUtils::promoted_pt(move) : moved(move);
+
+  Square ksq = this->ksq<~Us>();
+  BB     occ = bb() ^ from(src);
+
+  // Direct check (Including promoted pieces)
+  if (attack_bb<Them>(pt, ksq, occ) & from(dst)) {
+    return true;
+  }
+
+  // Bishop/Queen discovered check
+  BB bishop_king_line = attack_bb<Them>(B, ksq, occ);
+  if ((bishop_king_line & from(src)) || (bishop_king_line & bb(Us, B, Q))) {
+    return !is_aligned(ksq, src, dst);
+  }
+
+  // Rook/Queen discovered check
+  BB rook_king_line = attack_bb<Them>(R, ksq, occ);
+  if ((rook_king_line & from(src)) || (rook_king_line & bb(Us, R, Q))) {
+    return !is_aligned(ksq, src, dst);
+  }
+
+  // Handle Castling
+  if (MoveUtils::is_castle(move)) {
+    Square rook_dst = castling_mask_.rook_dst<Us>(flag == QueenCastle);
+    return attack_bb<Them>(R, ksq, occ) & from(rook_dst);
+  }
+
+  // Handle Enpassant
+  if (MoveUtils::is_ep(move)) {
+    Square cap_sq = make_square(file_of(dst), rank_of(src));
+    BB     b      = (occ ^ from(cap_sq)) | from(dst);
+
+    return (attack_bb<Them>(B, ksq, b) & bb(Us, B, Q))
+           || (attack_bb<Them>(R, ksq, b) & bb(Us, R, Q));
+  }
+
+  return false;
+}
+
+template bool Board::gives_check<White>(Move move) const;
+template bool Board::gives_check<Black>(Move move) const;
 
 } // namespace Lyra

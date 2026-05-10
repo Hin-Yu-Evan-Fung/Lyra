@@ -169,6 +169,8 @@ public:
   bool is_draw(Ply ply) const;
   bool is_insufficient_material() const;
   bool in_check() const;
+  template <Colour Us>
+  bool gives_check(Move move) const;
   bool has_non_pawn_material(Colour us) const;
 };
 

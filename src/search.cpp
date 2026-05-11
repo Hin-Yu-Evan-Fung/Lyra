@@ -410,16 +410,20 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
 
   Eval raw_eval = -EvalInf;
   Eval best     = -EvalInf;
+  Eval futility = -EvalInf;
 
   if (in_check) {
     best     = -EvalInf;
     se->eval = -EvalInf;
+    futility = -EvalInf;
   } else {
 
     raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
     best = se->eval = adjust_eval(raw_eval);
 
     if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
+
+    futility = se->eval + 300;
 
     /********************************\
     |            Stand Pat           |
@@ -450,6 +454,17 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     move_count++;
 
     if (!is_loss(best)) {
+
+      /********************************\
+      |        Futility Pruning        |
+      \********************************/
+
+      // If our position + bonus can't reach our best option, and the move doesn't win any material
+      // according to SEE, skip it.
+      if (futility <= alpha && !board_.gives_check<Us>(move) && !board_.see(move, 1)) {
+        best = std::max(best, futility);
+        continue;
+      }
 
       /********************************\
       |           SEE Pruning          |

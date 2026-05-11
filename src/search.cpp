@@ -185,6 +185,17 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (can_rfp(depth, eval, beta)) return eval;
 
     /********************************\
+    |            Razoring            |
+    \********************************/
+
+    // When evaluation is far below alpha, we could probably only catch up with a good capture, thus
+    // we can do a qsearch and cutoff if it still can't hit alpha
+    if (!is_loss(eval) && alpha < 2000 && eval + 400 * depth < alpha) {
+      Eval val = qsearch<Us, NT>(se, alpha, beta);
+      if (val <= alpha) return val;
+    }
+
+    /********************************\
     |        Null Move Pruning       |
     \********************************/
 

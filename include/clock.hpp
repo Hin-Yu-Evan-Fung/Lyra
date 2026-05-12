@@ -32,6 +32,7 @@ public:
 
   void set(Colour stm, TimeControl tc);
   Time elapsed() const { return now() - start_; }
+  void stop_all_threads() { stop_.store(true, std::memory_order_relaxed); }
 
   bool stop_iter(Depth depth, Depth last_best_move_depth, Eval avg_eval, Eval eval, U64 nodes,
                  Move best_move);

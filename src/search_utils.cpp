@@ -41,6 +41,7 @@ bool Worker::should_search_deeper() {
          && !clock_.stop_iter(depth_, last_best_move_depth_, avg_eval_, eval_, nodes_, best_move_);
 }
 
+// Returns a structure containing all the history tables for move ordering
 MOStats Worker::mostats(StackEntry *se) {
   return {&se->killer, &hist_quiet_, {(se - 1)->cont, (se - 2)->cont}};
 }
@@ -89,6 +90,7 @@ void Worker::update_hist_cont(StackEntry *se, Move move, Eval bonus) {
   }
 }
 
+// Apply bonus to the best move and maluses to worse moves that came before it.
 void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vector<Move> &captures,
                               std::vector<Move> &quiets) {
   const Eval bonus = std::min(300 * depth - 250, 1500);
@@ -105,12 +107,14 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
   }
 }
 
+// Adjust eval using correction history
 Eval Worker::adjust_eval(Eval eval) const {
   Eval pcv = hist_corr_[board_.stm()][board_.pawn_key() % CorrHistSize] / 16;
   eval += pcv;
   return std::clamp(eval, -EvalMateBound, EvalMateBound);
 }
 
+// Check if the position is an improvement compared to a move or two ago
 bool Worker::is_improving(StackEntry *se) const {
   if (ply_ >= 2 && (se - 2)->eval != -EvalInf) {
     return se->eval > (se - 2)->eval;

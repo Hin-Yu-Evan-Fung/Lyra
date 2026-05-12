@@ -46,6 +46,15 @@ void Worker::start(TimeControl tc) {
   report_best_move();
 }
 
+/******************************************\
+|==========================================|
+|            Aspiration window             |
+|==========================================|
+\******************************************/
+
+// Instead of doing a full windowed search every time, we hope that the score remains near the
+// previous eval (hence "aspiration"), and expand the window when the results suggests otherwise
+
 template <Colour Us>
 void Worker::aspwin(StackEntry *se) {
   Eval  alpha  = -EvalInf;
@@ -79,6 +88,10 @@ void Worker::aspwin(StackEntry *se) {
     window += window / 2;
   }
 
+  /********************************\
+  |     Update Search Statistics   |
+  \********************************/
+
   eval_     = val;
   avg_eval_ = depth_ > 1 ? (avg_eval_ * 8 + eval_ * 2) / 10 : eval_;
 
@@ -94,7 +107,6 @@ void Worker::aspwin(StackEntry *se) {
 |==========================================|
 \******************************************/
 
-// ** Search **
 // Alpha is our guaranteed score
 // Beta is our opponent's guaranteed score
 template <Colour Us, Worker::NodeType NT>
@@ -127,6 +139,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |   Transposition Table Lookup   |
   \********************************/
 
+  // Can cutoff if we have a higher depth entry in the TT and it proves that the best move is
+  // outside the [alpha, beta] window.
+
   auto [tt_hit, tte, tt_data] = tt_.probe(board_.key(), ply_);
 
   Bound tt_bound = Bound::None;
@@ -151,6 +166,8 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   /********************************\
   |          Static Eval           |
   \********************************/
+
+  // Adjust raw eval based on correction history and tt values with tighter bounds
 
   Eval eval     = -EvalInf;
   Eval raw_eval = -EvalInf;
@@ -206,6 +223,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   |  Internal Iterative Reductions |
   \********************************/
 
+  // Lack of tt_move implies (hopefully!) that this node is not promising. Decrement depth.
   if ((pv || cutnode) && depth >= 4 && !tt_move) depth--;
 
   /********************************\
@@ -221,26 +239,28 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
 
   std::vector<Move> captures, quiets;
 
+  // Reset killer moves for child nodes
   (se + 1)->killer.fill(NoMove);
 
   MovePicker<Us> mp{MPType::Main, board_, mostats(se), tt_move, depth};
   while ((move = mp.next())) {
-    const bool    is_cap       = MoveUtils::is_capture(move);
-    const U64     cached_nodes = nodes_;
-    const PieceTo p            = board_.piece_to(move);
 
     if (move == se->excl) continue;
 
     move_count++;
 
-    Eval  hist      = is_cap ? 0 : hist_quiet_[p.pc][p.to];
-    Depth new_depth = depth - 1 + in_check;
-    Depth r         = lmr_reduction(depth, move_count);
+    const bool    is_cap       = MoveUtils::is_capture(move);
+    const U64     cached_nodes = nodes_;
+    const PieceTo p            = board_.piece_to(move);
+    const Eval    hist         = is_cap ? 0 : hist_quiet_[p.pc][p.to];
+    Depth         r            = lmr_reduction(depth, move_count);
+    Depth         new_depth    = depth - 1 + in_check;
 
     /********************************\
     |             Pruning            |
     \********************************/
 
+    // Basic guards for quiet move pruning
     if (!pv && !in_check && !mp.skip_quiet_ && !is_terminal(best)) {
 
       /********************************\
@@ -271,15 +291,26 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
       }
     }
 
+    /********************************\
+    |           SEE Pruning          |
+    \********************************/
+
+    // If we are not playing important tactical moves and SEE suggests that the move is quite bad,
+    // then we can safely (hopefully!) skip it.
+
     if (mp.stage() > GOOD_CAP && can_see(depth, move, best)) continue;
 
     /********************************\
     |       Singular Extensions      |
     \********************************/
 
+    // If we know the lower bound (tt_value) of a position, check if all the other moves result in a
+    // score that is significantly below that bound, if so we have a singular move and we should
+    // extend the search for that.
+
     Depth ext = 0;
     if (!root && !singular && can_singular(tt_bound, tt_depth, tt_move, tt_value, depth, move)) {
-      Eval s_beta = std::max(tt_value - 2 * depth, -EvalMate);
+      Eval s_beta = std::max(tt_value - SingularMult * depth, -EvalMate);
 
       se->excl = move;
       Eval val = negamax<Us, NonPV>(se, s_beta - 1, s_beta, (depth - 1) / 2, cutnode);
@@ -295,6 +326,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     /********************************\
     |      Late move reductions      |
     \********************************/
+
+    // Use a reduced null window search for later moves to "prove" that the moves are less
+    // promising. If they seem to be promising, research at full depth.
 
     if (can_lmr(depth, move_count, pv, move)) {
 
@@ -315,6 +349,9 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     /********************************\
     |   Principal Variation Search   |
     \********************************/
+
+    // Optimisation that aims to prove that all moves after the first are bad using a null window
+    // search, which is more efficient than a full windowed search.
 
     if (full_search) val = -negamax<~Us, NonPV>(se + 1, -alpha - 1, -alpha, new_depth, !cutnode);
 
@@ -352,15 +389,37 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     if (move != best_move) (is_cap ? captures : quiets).push_back(move);
   }
 
+  /********************************\
+  |         Update History         |
+  \********************************/
+
+  // Update history heuristics if we find a best move, applying a bonus to the best move and a malus
+  // to the worse moves.
+
   if (best_move) update_all_stats(se, depth, best_move, captures, quiets);
+
+  /********************************\
+  |     Mate / Stalemate Check     |
+  \********************************/
 
   if (move_count == 0) best = singular ? alpha : in_check ? mated_in(ply_) : EvalDraw;
 
+  /********************************\
+  |    Update Correction History   |
+  \********************************/
+
+  // If the position can be evaluated accurately (best move not a capture), and the search result
+  // provides a tigheter bound than the static eval, update correction history so we can correct the
+  // raw_eval in a later search.
+
   const Bound bound = best >= beta ? Bound::Lower : (pv && best_move) ? Bound::Exact : Bound::Upper;
 
-  if (!in_check && !MoveUtils::is_capture(best_move) && can_use_bound(bound, best, se->eval)) {
+  if (!in_check && !MoveUtils::is_capture(best_move) && can_use_bound(bound, best, se->eval))
     update_hist_corr(hist_corr_, board_, depth_, best, se->eval);
-  }
+
+  /********************************\
+  |          Write to TT           |
+  \********************************/
 
   if (!singular) tte->save(board_.key(), tt_.age(), bound, depth, ply_, best_move, raw_eval, best);
 
@@ -417,13 +476,12 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     se->eval = -EvalInf;
     futility = -EvalInf;
   } else {
-
     raw_eval = is_valid(tt_eval) ? tt_eval : board_.eval();
     best = se->eval = adjust_eval(raw_eval);
 
     if (is_valid(tt_value) && can_use_bound(tt_bound, tt_value, best)) best = tt_value;
 
-    futility = se->eval + 300;
+    futility = se->eval + QFPMargin;
 
     /********************************\
     |            Stand Pat           |
@@ -471,7 +529,7 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
       \********************************/
 
       // Can safely (probably!) ignore losing captures.
-      if (!in_check && !board_.see(move, -30)) continue;
+      if (!in_check && !board_.see(move, -QSEEMargin)) continue;
     }
 
     do_move<Us>(se, move);
@@ -500,7 +558,15 @@ Eval Worker::qsearch(StackEntry *se, Eval alpha, Eval beta) {
     }
   }
 
+  /********************************\
+  |           Mate Check           |
+  \********************************/
+
   if (in_check && move_count == 0) return mated_in(ply_);
+
+  /********************************\
+  |          Write to TT           |
+  \********************************/
 
   tte->save(board_.key(), tt_.age(), best >= beta ? Bound::Lower : Bound::Upper, DepthQS, ply_,
             best_move, raw_eval, best);

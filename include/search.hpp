@@ -54,6 +54,8 @@ class Worker {
   constexpr bool can_lmr(Depth depth, int move_count, bool pv, Move move) const;
   constexpr bool can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_fp(Depth lmr_depth, Eval eval, Eval alpha) const;
+  template <Colour Us>
+  constexpr bool can_qfp(Move move, Eval futility, Eval alpha) const;
   constexpr bool can_rfp(Depth depth, Eval eval, Eval beta) const;
   constexpr bool can_lmp(Depth depth, int move_count, bool improving) const;
   constexpr bool can_hp(Depth depth, Eval hist) const;
@@ -161,40 +163,46 @@ constexpr void Worker::undo_null_move(StackEntry *se) {
 \******************************************/
 
 constexpr bool Worker::can_lmr(Depth depth, int move_count, bool pv, Move move) const {
-  return depth > 2 && move_count > 2 + pv && !MoveUtils::is_capture(move)
+  return depth >= LMRDepth && move_count >= LMRMoveCount + pv && !MoveUtils::is_capture(move)
          && !MoveUtils::is_promo(move);
 }
 
 constexpr bool Worker::can_nmp(StackEntry *se, Depth depth, Eval eval, Eval beta) const {
-  return depth >= 2 && (se - 1)->move != NullMove && eval >= beta && !is_win(eval) && !is_loss(beta)
-         && board_.has_non_pawn_material(board_.stm());
+  return depth >= NMPDepth && (se - 1)->move != NullMove && eval >= beta && !is_win(eval)
+         && !is_loss(beta) && board_.has_non_pawn_material(board_.stm());
 }
 
 constexpr bool Worker::can_fp(Depth lmr_depth, Eval eval, Eval alpha) const {
-  return lmr_depth <= 5 && eval + 100 * lmr_depth + 100 < alpha;
+  return lmr_depth <= FPDepth && eval + FPBase + FPMult * lmr_depth < alpha;
+}
+
+template <Colour Us>
+constexpr bool Worker::can_qfp(Move move, Eval futility, Eval alpha) const {
+  return futility <= alpha && !board_.gives_check<Us>(move) && !board_.see(move, 1);
 }
 
 constexpr bool Worker::can_rfp(Depth depth, Eval eval, Eval beta) const {
-  return depth <= 8 && !is_win(eval) && !is_loss(beta) && eval - 100 * depth > beta;
+  return depth <= RFPDepth && !is_win(eval) && !is_loss(beta) && eval - RFPMult * depth > beta;
 }
 
 constexpr bool Worker::can_lmp(Depth depth, int move_count, bool improving) const {
-  return depth <= 8 && move_count >= (3 + depth * depth) / (2 - improving);
+  return depth <= LMPDepth && move_count >= (LMPBase + depth * depth) / (LMPMult - improving);
 }
 
 constexpr bool Worker::can_hp(Depth depth, Eval hist) const {
-  return depth <= 2 && hist < -2000 * depth;
+  return depth <= HPDepth && hist < -HPMult * depth;
 }
 
 constexpr bool Worker::can_see(Depth depth, Move move, Eval best) const {
-  return depth <= 10 && !is_loss(best)
-         && !board_.see(move, MoveUtils::is_capture(move) ? -20 * depth * depth : -70 * depth);
+  return depth <= SEEPruneDepth && !is_loss(best)
+         && !board_.see(move, MoveUtils::is_capture(move) ? -SEENoisyMargin * depth * depth
+                                                          : -SEEQuietMargin * depth);
 }
 
 constexpr bool Worker::can_singular(Bound tt_bound, Depth tt_depth, Move tt_move, Eval tt_value,
                                     Depth depth, Move move) const {
-  return move == tt_move && depth >= 8 && !is_terminal(tt_value) && (tt_bound & Bound::Lower)
-         && tt_depth >= depth - 3;
+  return move == tt_move && depth >= SingularDepth && !is_terminal(tt_value)
+         && (tt_bound & Bound::Lower) && tt_depth >= depth - 3;
 }
 
 /******************************************\
@@ -209,6 +217,6 @@ constexpr Depth Worker::lmr_reduction(Depth depth, int move_count) {
   return lmr_base + std::log(depth) * std::log(move_count) / lmr_mult;
 }
 
-constexpr Depth Worker::nmp_reduction(Depth depth) const { return 3 + depth / 5; }
+constexpr Depth Worker::nmp_reduction(Depth depth) const { return NmpBase + depth / NmpMult; }
 
 } // namespace Lyra

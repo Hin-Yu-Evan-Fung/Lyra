@@ -24,8 +24,8 @@ void UCI::loop() {
     is >> std::skipws >> token;
 
     if (token == "uci") {
-      std::println("id name {} {}", NAME, VERSION);
-      std::println("id author {}", AUTHOR);
+      std::println("id name {} {}", EngineName, EngineVersion);
+      std::println("id author {}", EngineAuthor);
       std::println("option name UCI_Chess960 type check default false");
       std::println("option name ClearHash type button");
       std::println("option name Hash type spin default 32 min 1 max 128");

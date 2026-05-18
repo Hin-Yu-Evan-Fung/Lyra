@@ -162,6 +162,8 @@ constexpr Score &operator-=(Score &s1, Score s2) { return s1 = s1 - s2; }
 \******************************************/
 
 constexpr Square flip_rank(Square sq) noexcept { return static_cast<Square>(sq ^ A8); }
+constexpr Square flip_file(Square sq) noexcept { return static_cast<Square>(sq ^ H1); }
+
 constexpr Square relative_sq(Colour c, Square sq) noexcept {
   return c == White ? sq : flip_rank(sq);
 }

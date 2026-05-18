@@ -43,3 +43,6 @@
 .cache/
 build/
 .clang-format
+*.pgn
+perf.data
+perf.data.old

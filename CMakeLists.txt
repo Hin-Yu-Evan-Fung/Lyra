@@ -11,25 +11,27 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O3 -g -fsanitize=undefined,addres
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -g")
 
 include_directories(include)
+include_directories(nnue)
 set(
     SOURCES 
-    src/main.cpp
     src/bitboard.cpp
     src/board.cpp
     src/move.cpp
     src/thread.cpp
     src/movepick.cpp
     src/clock.cpp
-    src/eval.cpp
     src/perft.cpp
     src/search.cpp
     src/search_utils.cpp
     src/tt.cpp
     src/engine.cpp
     src/uci.cpp
+    nnue/network.cpp
 )
 
+
 add_library(LyraLib STATIC ${SOURCES})
+target_compile_definitions(LyraLib PRIVATE NETWORK_PATH="${CMAKE_SOURCE_DIR}/data/big.nnue")
 add_executable(Lyra src/main.cpp)
 target_link_libraries(Lyra PRIVATE LyraLib)
 

@@ -5,7 +5,16 @@
 
 #include <chrono>
 
+#define ALWAYS_ASSERT(x)                                                                           \
+  do {                                                                                             \
+    if (!(x)) {                                                                                    \
+      std::fprintf(stderr, "Assertion failed: %s\n", #x);                                          \
+      std::abort();                                                                                \
+    }                                                                                              \
+  } while (0)
+
 namespace Lyra {
+
 /******************************************\
 |==========================================|
 |                 ND Array                 |
@@ -91,7 +100,7 @@ inline std::string format_eval(Eval v) {
   else if (v <= -EvalMateBound)
     return std::format("mate {}", (-EvalMate - v - 1) / 2);
   else
-    return std::format("cp {}", v);
+    return std::format("cp {}", v / 2); // normalise score
 }
 
 /******************************************\

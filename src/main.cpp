@@ -1,4 +1,4 @@
-#include "eval.hpp"
+#include "network.hpp"
 #include "uci.hpp"
 
 using namespace Lyra;
@@ -6,7 +6,7 @@ using namespace Lyra;
 int main(int argc, char *argv[]) {
   BBUtils::init();
   Zobrist::init();
-  EvalUtils::init();
+  NNUE::load_network();
 
   if (argc > 1) {
     std::string mode = argv[1];

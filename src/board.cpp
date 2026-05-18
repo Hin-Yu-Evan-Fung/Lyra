@@ -3,15 +3,14 @@
 #include "bitboard.hpp"
 #include "castle.hpp"
 #include "defs.hpp"
-#include "eval.hpp"
 #include "mask.hpp"
 #include "move.hpp"
+#include "nnue.hpp"
 #include "utils.hpp"
 #include "zobrist.hpp"
 
 #include <algorithm>
 #include <cassert>
-#include <cstring>
 #include <ios>
 #include <iostream>
 #include <print>
@@ -31,19 +30,17 @@ Board::Board()
 }
 
 void Board::reset() {
-  chess960          = false;
-  gameply_          = 0;
-  undo_             = history_.data();
-  undo_->ply        = 0;
-  undo_->c_rights   = NoCastle;
-  undo_->ep         = NoSquare;
-  undo_->rule50     = 0;
-  undo_->psq        = {};
-  undo_->game_phase = 0;
+  chess960        = false;
+  gameply_        = 0;
+  undo_           = history_.data();
+  undo_->ply      = 0;
+  undo_->c_rights = NoCastle;
+  undo_->ep       = NoSquare;
+  undo_->rule50   = 0;
 
-  memset(pieceBB_, BBUtils::EmptyBB, sizeof(pieceBB_));
-  memset(colourBB_, BBUtils::EmptyBB, sizeof(colourBB_));
-  memset(board_, NoPiece, sizeof(board_));
+  std::fill(piece_bbs_.begin(), piece_bbs_.end(), BBUtils::EmptyBB);
+  std::fill(colour_bbs_.begin(), colour_bbs_.end(), BBUtils::EmptyBB);
+  std::fill(board_.begin(), board_.end(), NoPiece);
 
   castling_mask_.reset();
 }
@@ -139,9 +136,11 @@ void Board::copy(const Board &board) {
   gameply_       = board.gameply_;
   castling_mask_ = board.castling_mask_;
   stm_           = board.stm_;
-  std::copy_n(board.pieceBB_, NPieceType, pieceBB_);
-  std::copy_n(board.colourBB_, NColour, colourBB_);
-  std::copy_n(board.board_, NSquare, board_);
+
+  piece_bbs_  = board.piece_bbs_;
+  colour_bbs_ = board.colour_bbs_;
+  board_      = board.board_;
+
   std::copy_n(board.history_.begin(), board.undo_->ply + 1, history_.begin());
   undo_ = history_.data() + board.undo_->ply;
 }
@@ -162,6 +161,7 @@ void Board::print() const {
   std::println("Enpassant Square: {}", format_sq(undo_->ep));
   std::println("Hash Key: {:#X}", undo_->key);
   std::println("Chess960: {}", chess960 ? "true" : "false");
+  std::println("Eval: {}\n", eval());
 }
 
 std::string Board::fen() const {
@@ -236,26 +236,8 @@ Key Board::compute_pawn_key() const {
 |==========================================|
 \******************************************/
 
-Eval Board::compute_raw_eval() const {
-  Score score{};
-  int   game_phase = 0;
-
-  for (Square sq = A1; sq <= H8; ++sq) {
-    Piece pc = on(sq);
-    if (pc == NoPiece) continue;
-
-    score += EvalUtils::PSQT[pc][sq];
-    game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
-  }
-
-  Eval raw = score.to_eval(game_phase);
-  return stm_ == White ? raw : -raw;
-}
-
-Eval Board::eval() const {
-  Eval raw = undo_->psq.to_eval(undo_->game_phase);
-  return stm_ == White ? raw : -raw;
-}
+Eval Board::compute_raw_eval() const { return NNUE::nnue.evaluate(*this); }
+Eval Board::eval() const { return NNUE::nnue.evaluate(*this); }
 
 /******************************************\
 |==========================================|

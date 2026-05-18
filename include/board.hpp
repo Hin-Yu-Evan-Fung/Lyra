@@ -3,8 +3,8 @@
 #include "bitboard.hpp"
 #include "castle.hpp"
 #include "defs.hpp"
-#include "eval.hpp"
 #include "move.hpp"
+#include "utils.hpp"
 #include "zobrist.hpp"
 
 namespace Lyra {
@@ -40,9 +40,6 @@ struct Undo {
   // Hash keys
   Key key;
   Key pawn_key;
-  // Piece square table scores
-  Score psq;
-  int   game_phase;
   // Board variables
   Ply    ply; // Half move counter from Board::set position
   Move   move;
@@ -65,9 +62,9 @@ struct Undo {
 \******************************************/
 
 class Board {
-  BB    pieceBB_[NPieceType];
-  BB    colourBB_[NColour];
-  Piece board_[NSquare];
+  NDArray<BB, NPieceType> piece_bbs_;
+  NDArray<BB, NColour>    colour_bbs_;
+  NDArray<Piece, NSquare> board_;
 
   Colour stm_;
   // Ply from the start of the game, which includes the half move clock in fen.
@@ -134,26 +131,30 @@ public:
   void undo_null_move();
 
   // Bitboard getters
-  constexpr BB bb() const;
-  constexpr BB bb(Colour c) const;
-  constexpr BB bb(PieceType pt) const;
-  constexpr BB bb(PieceType pt1, PieceType pt2) const;
-  constexpr BB bb(Colour c, PieceType pt) const;
-  constexpr BB bb(Colour c, PieceType pt1, PieceType pt2) const;
+  constexpr BB bb() const { return colour_bbs_[White] | colour_bbs_[Black]; }
+  constexpr BB bb(Colour c) const { return colour_bbs_[c]; }
+  constexpr BB bb(PieceType pt) const { return piece_bbs_[pt]; }
+  constexpr BB bb(PieceType pt1, PieceType pt2) const { return bb(pt1) | bb(pt2); }
+  constexpr BB bb(Colour c, PieceType pt) const { return bb(c) & bb(pt); }
+  constexpr BB bb(Colour c, PieceType pt1, PieceType pt2) const { return bb(c) & bb(pt1, pt2); }
+
+  const NDArray<BB, NColour>    &colour_bbs() const { return colour_bbs_; }
+  const NDArray<BB, NPieceType> &piece_bbs() const { return piece_bbs_; }
 
   // Getters
+  constexpr Piece       on(Square sq) const { return board_[sq]; }
+  constexpr Colour      stm() const { return stm_; }
+  constexpr Undo *const undo() const { return undo_; }
+  constexpr CastleMask  castle_mask() const { return castling_mask_; }
+  constexpr Key         key() const { return undo_->key; }
+  constexpr Key         pawn_key() const { return undo_->pawn_key; }
+
   template <Colour C>
-  constexpr Square      ksq() const;
-  constexpr Piece       on(Square sq) const;
-  constexpr PieceType   moved(Move move) const;
-  constexpr PieceType   captured(Move move) const;
-  constexpr PieceTo     piece_to(Move move) const;
-  constexpr Colour      stm() const;
-  constexpr Undo *const undo() const;
-  Eval                  eval() const;
-  constexpr CastleMask  castle_mask() const;
-  constexpr Key         key() const;
-  constexpr Key         pawn_key() const;
+  constexpr Square    ksq() const;
+  constexpr PieceType moved(Move move) const;
+  constexpr PieceType captured(Move move) const;
+  constexpr PieceTo   piece_to(Move move) const;
+  Eval                eval() const;
 
   // Movegen Helpers
   template <Colour Us, bool QueenSide>
@@ -176,39 +177,12 @@ public:
 
 /******************************************\
 |==========================================|
-|           Board State Helpers            |
-|==========================================|
-\******************************************/
-
-constexpr Undo *const Board::undo() const { return undo_; }
-constexpr Colour      Board::stm() const { return stm_; }
-constexpr CastleMask  Board::castle_mask() const { return castling_mask_; }
-constexpr Key         Board::key() const { return undo_->key; }
-constexpr Key         Board::pawn_key() const { return undo_->pawn_key; }
-
-/******************************************\
-|==========================================|
-|          Board BitBoard Getters          |
-|==========================================|
-\******************************************/
-
-constexpr BB Board::bb() const { return colourBB_[White] | colourBB_[Black]; }
-constexpr BB Board::bb(Colour c) const { return colourBB_[c]; }
-constexpr BB Board::bb(PieceType pt) const { return pieceBB_[pt]; }
-constexpr BB Board::bb(PieceType pt1, PieceType pt2) const { return bb(pt1) | bb(pt2); }
-constexpr BB Board::bb(Colour c, PieceType pt) const { return bb(c) & bb(pt); }
-constexpr BB Board::bb(Colour c, PieceType pt1, PieceType pt2) const {
-  return bb(c) & bb(pt1, pt2);
-}
-
-/******************************************\
-|==========================================|
 |              Board Getters               |
 |==========================================|
 \******************************************/
 
-constexpr Piece     Board::on(Square sq) const { return board_[sq]; }
 constexpr PieceType Board::moved(Move move) const { return pt_of(on(MoveUtils::src(move))); }
+
 constexpr PieceType Board::captured(Move move) const {
   return MoveUtils::is_ep(move) ? P : pt_of(on(MoveUtils::dst(move)));
 }
@@ -228,8 +202,8 @@ constexpr Square Board::ksq() const {
 
 template <bool DoMove, Colour C>
 constexpr void Board::set_piece(Piece pc, Square sq) {
-  colourBB_[C] |= BBUtils::from(sq);
-  pieceBB_[pt_of(pc)] |= BBUtils::from(sq);
+  colour_bbs_[C] |= BBUtils::from(sq);
+  piece_bbs_[pt_of(pc)] |= BBUtils::from(sq);
   board_[sq] = pc;
 
   if constexpr (!DoMove) return;
@@ -237,15 +211,13 @@ constexpr void Board::set_piece(Piece pc, Square sq) {
   if (pt_of(pc) == P) undo_->pawn_key ^= Zobrist::PIECE_KEYS[pc][sq];
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
-  undo_->psq += EvalUtils::PSQT[pc][sq];
-  undo_->game_phase += EvalUtils::GamePhaseInc[pt_of(pc)];
 }
 
 template <bool DoMove, Colour C>
 constexpr void Board::pop_piece(Square sq) {
   const Piece pc = board_[sq];
-  colourBB_[C] &= ~BBUtils::from(sq);
-  pieceBB_[pt_of(pc)] &= ~BBUtils::from(sq);
+  colour_bbs_[C] &= ~BBUtils::from(sq);
+  piece_bbs_[pt_of(pc)] &= ~BBUtils::from(sq);
   board_[sq] = NoPiece;
 
   if constexpr (!DoMove) return;
@@ -253,15 +225,13 @@ constexpr void Board::pop_piece(Square sq) {
   if (pt_of(pc) == P) undo_->pawn_key ^= Zobrist::PIECE_KEYS[pc][sq];
 
   undo_->key ^= Zobrist::PIECE_KEYS[pc][sq];
-  undo_->psq -= EvalUtils::PSQT[pc][sq];
-  undo_->game_phase -= EvalUtils::GamePhaseInc[pt_of(pc)];
 }
 
 template <bool DoMove, Colour C>
 constexpr void Board::move_piece(Square src, Square dst) {
   const Piece pc = board_[src];
-  colourBB_[C] ^= BBUtils::from(src) ^ BBUtils::from(dst);
-  pieceBB_[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
+  colour_bbs_[C] ^= BBUtils::from(src) ^ BBUtils::from(dst);
+  piece_bbs_[pt_of(pc)] ^= BBUtils::from(src) ^ BBUtils::from(dst);
   board_[src] = NoPiece;
   board_[dst] = pc;
 
@@ -271,7 +241,6 @@ constexpr void Board::move_piece(Square src, Square dst) {
 
   if (pt_of(pc) == P) undo_->pawn_key ^= toggle;
   undo_->key ^= toggle;
-  undo_->psq += EvalUtils::PSQT[pc][dst] - EvalUtils::PSQT[pc][src];
 }
 
 /******************************************\

@@ -1,6 +1,8 @@
 # Lyra
 A strong c++ chess engine.
 
+### [Web Demo](https://hin-yu-evan-fung.github.io/Lyra-UI) - [Source](https://github.com/Hin-Yu-Evan-Fung/Lyra-UI)
+
 ### Move generation
 * Fancy Magic Bitboards (PEXT)
 * Fully legal move generator (Up to 950 Mnps on i5-13400F with bulk counting)

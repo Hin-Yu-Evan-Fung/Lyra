@@ -80,7 +80,7 @@ void Worker::aspwin(StackEntry *se) {
       r     = 0;
     } else if (val >= beta) {
       beta = std::min(val + window, EvalInf);
-      r += !is_terminal(val);
+      r += r < depth_ && !is_terminal(val);
     } else {
       break;
     }

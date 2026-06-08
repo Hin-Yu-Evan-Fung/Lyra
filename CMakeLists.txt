@@ -9,45 +9,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_PEXT -DTUNE -Wall -flto -fno-rtti -msse2 -msse3 -msse4 -msse4.1 -mpopcnt -mavx2 -mbmi -mbmi2 -mmmx -funroll-loops -finline -fomit-frame-pointer")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O3 -g -fsanitize=undefined,address")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -g")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
-include_directories(include)
-include_directories(nnue)
-set(
-    SOURCES 
-    src/bitboard.cpp
-    src/board.cpp
-    src/move.cpp
-    src/thread.cpp
-    src/movepick.cpp
-    src/clock.cpp
-    src/perft.cpp
-    src/search.cpp
-    src/search_utils.cpp
-    src/tt.cpp
-    src/engine.cpp
-    src/uci.cpp
-    nnue/network.cpp
-)
+include_directories(src/cli src/core src/nnue)
 
+file (GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "src/core/*.cpp")
+file (GLOB_RECURSE NNUE_SOURCES CONFIGURE_DEPENDS "src/nnue/*.cpp")
+file (GLOB_RECURSE CLI_SOURCES CONFIGURE_DEPENDS "src/cli/*.cpp")
 
-add_library(LyraLib STATIC ${SOURCES})
-target_compile_definitions(LyraLib PRIVATE NETWORK_PATH="${CMAKE_SOURCE_DIR}/data/big.nnue")
-add_executable(Lyra src/main.cpp)
+add_library(LyraLib STATIC ${CORE_SOURCES} ${NNUE_SOURCES})
+include_directories(LyraLib PUBLIC src/core src/nnue)
+target_compile_definitions(LyraLib PRIVATE NETWORK_PATH="${CMAKE_SOURCE_DIR}/src/weights/big.nnue")
+
+add_executable(Lyra ${CLI_SOURCES})
 target_link_libraries(Lyra PRIVATE LyraLib)
 
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG        v1.15.2
-)
-FetchContent_MakeAvailable(googletest) # This line is mandatory to actually load GTest
-
-enable_testing()
-
-file(GLOB GTEST_SRC "test/*.cpp")
-add_executable(LyraTests ${GTEST_SRC})
-target_link_libraries(LyraTests PRIVATE LyraLib GTest::gtest_main)
-
-include(GoogleTest)
-gtest_discover_tests(LyraTests)
+add_subdirectory(test)

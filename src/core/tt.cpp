@@ -19,8 +19,8 @@ namespace Lyra {
 void TT::resize(size_t mb) {
   n_entries_ = calc_no_of_entries(mb);
 
-  std::free(entries_);
-  entries_ = static_cast<TTEntry *>(std::aligned_alloc(32, n_entries_ * sizeof(TTEntry)));
+  delete[] entries_;
+  entries_ = new TTEntry[n_entries_];
 }
 
 void TT::clear() {

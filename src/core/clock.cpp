@@ -3,6 +3,10 @@
 #include "defs.hpp"
 #include "move.hpp"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include <atomic>
 
 namespace Lyra {
@@ -88,15 +92,20 @@ bool Clock::stop_iter(Depth depth, Depth last_best_move_depth, Eval avg_eval, Ev
 bool Clock::stop(U64 nodes) {
   U64 searched = nodes - total_nodes.load(std::memory_order::relaxed);
 
-  if (searched >= ClockFrequency) {
+  if (searched >= PollingPeriod) {
     total_nodes.fetch_add(searched);
+
+#ifdef __EMSCRIPTEN__
+    emscripten_sleep(0);
+#endif
+
     if (stop_.load(std::memory_order::relaxed)) return true;
   }
 
   bool stop = false;
 
   // Prevent polling too frequently
-  if (searched >= ClockFrequency) {
+  if (searched >= PollingPeriod) {
     switch (type_) {
     case TCType::Infinite: return false;
     case TCType::Fixed: stop = elapsed() > tc_.move_time; break;

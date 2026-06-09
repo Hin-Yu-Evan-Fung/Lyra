@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <memory>
 
 namespace Lyra {
 
@@ -27,10 +28,11 @@ void Worker::start(TimeControl tc) {
     tt_.incr_age();
   }
 
-  StackEntry  stack[MaxDepth + StackOffset]{};
-  StackEntry *se = stack + StackOffset;
+  std::unique_ptr<StackEntry[]> stack = std::make_unique<StackEntry[]>(MaxDepth + StackOffset);
 
-  for (int i = 1; i <= StackOffset; i++) (se - i)->cont = &hist_cont_[wP][A1];
+  StackEntry *se = stack.get() + StackOffset;
+
+  for (int i = 1; i <= StackOffset; i++) (se - i)->cont = &hist_cont_->at(wP)[A1];
 
   while (should_search_deeper()) {
 
@@ -252,7 +254,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
     const bool    is_cap       = MoveUtils::is_capture(move);
     const U64     cached_nodes = nodes_;
     const PieceTo p            = board_.piece_to(move);
-    const Eval    hist         = is_cap ? 0 : hist_quiet_[p.pc][p.to];
+    const Eval    hist         = is_cap ? 0 : (*hist_quiet_)[p.pc][p.to];
     Depth         r            = lmr_reduction(depth, move_count);
     Depth         new_depth    = depth - 1 + in_check;
 
@@ -415,7 +417,7 @@ Eval Worker::negamax(StackEntry *se, Eval alpha, Eval beta, Depth depth, bool cu
   const Bound bound = best >= beta ? Bound::Lower : (pv && best_move) ? Bound::Exact : Bound::Upper;
 
   if (!in_check && !MoveUtils::is_capture(best_move) && can_use_bound(bound, best, se->eval))
-    update_hist_corr(hist_corr_, board_, depth_, best, se->eval);
+    update_hist_corr(hist_corr_.get(), board_, depth_, best, se->eval);
 
   /********************************\
   |          Write to TT           |

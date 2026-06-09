@@ -25,16 +25,16 @@ constexpr void hist_gravity(Eval &hist, Eval bonus) {
   hist += bonus - hist * std::abs(bonus) / Max;
 }
 
-constexpr void update_hist_quiet(HistQuiet &hist, const Board &board, Move move, Eval bonus) {
+constexpr void update_hist_quiet(HistQuiet *hist, const Board &board, Move move, Eval bonus) {
   const PieceTo p = board.piece_to(move);
-  hist_gravity<HistMax>(hist[p.pc][p.to], bonus);
+  hist_gravity<HistMax>((*hist)[p.pc][p.to], bonus);
 }
 
-constexpr void update_hist_corr(HistCorr &hist, const Board &board, Depth depth, Eval best,
+constexpr void update_hist_corr(HistCorr *hist, const Board &board, Depth depth, Eval best,
                                 Eval eval) {
   const Eval MaxDiff = CorrHistMax / 4;
   const Eval bonus   = std::clamp((best - eval) * depth / 8, -MaxDiff, MaxDiff);
-  hist_gravity<CorrHistMax>(hist[board.stm()][board.pawn_key() % CorrHistSize], bonus);
+  hist_gravity<CorrHistMax>((*hist)[board.stm()][board.pawn_key() % CorrHistSize], bonus);
 }
 
 } // namespace Lyra

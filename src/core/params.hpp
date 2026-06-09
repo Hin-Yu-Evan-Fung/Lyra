@@ -86,7 +86,11 @@ static constexpr std::string_view EngineVersion = "1.0";
 static constexpr size_t DefaultTTSize  = 32;
 static constexpr size_t DefaultThreads = 1;
 static constexpr int    MoveOverhead   = 50;
-static constexpr U64    ClockFrequency = 2048;
+#ifdef __EMSCRIPTEN__
+static constexpr U64 PollingPeriod = 32768;
+#else
+static constexpr U64 PollingPeriod = 2048;
+#endif
 
 // General constants
 static constexpr Depth  MaxDepth  = 256;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "search.hpp"
+#include "search_utils.hpp"
 
 #include <atomic>
 #include <condition_variable>
@@ -12,7 +13,7 @@ namespace Lyra {
 
 class Thread {
 public:
-  Thread(std::atomic_bool &stop, size_t id, TT &tt_);
+  Thread(std::atomic_bool &stop, size_t id, TT &tt);
   ~Thread();
 
   void wait();
@@ -44,7 +45,8 @@ public:
   void wait();
   void exec(std::function<void(Thread &)> func);
   void stop();
-  bool is_busy();
+
+  void register_callbacks(WorkerCallbacks callbacks);
 
   std::atomic_bool stop_; // Used by main worker and clock
 private:

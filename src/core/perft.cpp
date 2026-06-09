@@ -309,9 +309,11 @@ void run_bench(int argc, char **argv) {
 
     worker.start(tc);
 
+    Time elapsed = worker.clock().elapsed();
+
     total_nodes += worker.nodes();
-    total_time += worker.clock().elapsed();
-    total_nps += worker.nodes() * 1000 / std::max(worker.clock().elapsed(), 1UL);
+    total_time += elapsed;
+    total_nps += worker.nodes() * 1000 / (elapsed == 0 ? 1 : elapsed);
 
     total_cutoffs += worker.cutoffs_;
     total_fm_cutoffs += worker.first_move_cutoffs_;

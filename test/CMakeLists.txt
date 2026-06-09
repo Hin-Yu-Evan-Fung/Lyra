@@ -6,8 +6,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest) # This line is mandatory to actually load GTest
 
-enable_testing()
-
 file(GLOB GTEST_SRC "*.cpp")
 add_executable(LyraTests ${GTEST_SRC})
 target_link_libraries(LyraTests PRIVATE LyraLib GTest::gtest_main)

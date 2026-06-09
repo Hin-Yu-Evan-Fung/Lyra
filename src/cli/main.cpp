@@ -1,12 +1,15 @@
+#include "incbin.hpp"
 #include "network.hpp"
 #include "uci.hpp"
 
 using namespace Lyra;
 
+INCBIN(NetworkRaw, NETWORK_PATH);
+
 int main(int argc, char *argv[]) {
   BBUtils::init();
   Zobrist::init();
-  NNUE::load_network();
+  NNUE::load_network(gNetworkRawData, gNetworkRawSize);
 
   if (argc > 1) {
     std::string mode = argv[1];

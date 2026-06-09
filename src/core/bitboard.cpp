@@ -156,7 +156,7 @@ void init_magics(Square sq, BB table[], Magic entries[]) {
   Magic &m = entries[sq];
   m.mask   = naive_slider_attacks<pt>(sq, EmptyBB) & ~edge_mask_excluding(sq);
 #ifndef USE_PEXT
-  m.shift = 64 - count(m.mask);
+  m.shift = 64 - popcount(m.mask);
 #endif
   // Offset the pointer to the table and save the attacks
   m.attacks = &table[offset];

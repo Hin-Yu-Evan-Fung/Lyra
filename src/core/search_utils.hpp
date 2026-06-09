@@ -4,6 +4,8 @@
 #include "history.hpp"
 #include "params.hpp"
 #include "tt.hpp"
+
+#include <functional>
 namespace Lyra {
 
 struct PVLine {
@@ -23,6 +25,28 @@ struct StackEntry {
   Ply        ply_from_null;
   Move       move;
   Move       excl;
+};
+
+/******************************************\
+|==========================================|
+|            Search IO functions           |
+|==========================================|
+\******************************************/
+
+struct PrintInfo {
+  Depth       depth;
+  Depth       seldepth;
+  Eval        eval;
+  Time        time;
+  U64         nodes;
+  U64         nps;
+  U16         hashfull;
+  std::string pv;
+};
+
+struct WorkerCallbacks {
+  std::function<void(Move)>      on_best_move;
+  std::function<void(PrintInfo)> on_depth_finished;
 };
 
 /******************************************\

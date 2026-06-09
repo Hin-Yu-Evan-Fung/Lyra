@@ -4,6 +4,7 @@
 #include "defs.hpp"
 #include "perft.hpp"
 #include "search.hpp"
+#include "search_utils.hpp"
 #include "thread.hpp"
 
 #include <string>
@@ -36,10 +37,14 @@ public:
   void set_tt_size(size_t mb);
   void set_chess960(bool chess960);
 
+  void on_best_move(Move m) const;
+  void on_depth_finished(PrintInfo info) const;
+
 private:
-  Board      board_;
-  ThreadPool pool_;
-  TT         tt_;
+  Board           board_;
+  TT              tt_;
+  ThreadPool      pool_;
+  WorkerCallbacks callbacks_;
 };
 
 } // namespace Lyra

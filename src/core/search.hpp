@@ -12,6 +12,8 @@
 
 #include <atomic>
 #include <cmath>
+#include <memory>
+#include <vector>
 
 namespace Lyra {
 
@@ -85,9 +87,11 @@ class Worker {
 
   TT &tt_;
 
-  HistQuiet hist_quiet_;
-  HistCont  hist_cont_;
-  HistCorr  hist_corr_;
+  std::unique_ptr<HistQuiet> hist_quiet_;
+  std::unique_ptr<HistCont>  hist_cont_;
+  std::unique_ptr<HistCorr>  hist_corr_;
+
+  WorkerCallbacks callbacks_;
 
 public:
   // Stats terms
@@ -100,8 +104,13 @@ public:
       : clock_(stop)
       , stop_(stop)
       , id_(id)
-      , tt_(tt) {}
+      , tt_(tt)
+      , hist_quiet_(std::make_unique<HistQuiet>())
+      , hist_cont_(std::make_unique<HistCont>())
+      , hist_corr_(std::make_unique<HistCorr>()) {}
   bool is_main() { return id_ == 0; }
+
+  void register_callbacks(WorkerCallbacks callbacks) { callbacks_ = std::move(callbacks); }
 
   void reset(const Board &board);
   void start(TimeControl tc);
@@ -124,7 +133,7 @@ constexpr void Worker::do_move(StackEntry *se, Move move) {
 
   se->ply_from_null = ply_from_null_++;
   se->move          = move;
-  se->cont          = &hist_cont_[p.pc][p.to];
+  se->cont          = &hist_cont_->at(p.pc)[p.to];
   board_.do_move<Us>(move);
   tt_.prefetch(board_.key());
 }
@@ -144,7 +153,7 @@ constexpr void Worker::do_null_move(StackEntry *se) {
   se->ply_from_null = ply_from_null_;
   ply_from_null_    = 0;
   se->move          = NullMove;
-  se->cont          = &hist_cont_[wP][A1]; // Dummy table
+  se->cont          = &hist_cont_->at(wP)[A1]; // Dummy table
   board_.do_null_move<Us>();
   tt_.prefetch(board_.key());
 }

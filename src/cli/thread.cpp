@@ -1,5 +1,7 @@
 #include "thread.hpp"
 
+#include "search_utils.hpp"
+
 #include <functional>
 #include <mutex>
 
@@ -76,8 +78,9 @@ void ThreadPool::resize(size_t num, TT &tt) {
 
   threads_.reserve(num);
 
-  while (threads_.size() < num)
+  while (threads_.size() < num) {
     threads_.emplace_back(std::make_unique<Thread>(stop_, threads_.size(), tt));
+  }
 
   wait();
 }
@@ -90,16 +93,16 @@ void ThreadPool::wait() {
   for (auto &thread : threads_) thread->wait();
 }
 
-bool ThreadPool::is_busy() {
-  for (auto &thread : threads_)
-    if (thread->is_busy()) return true;
-  return false;
-}
-
 void ThreadPool::stop() {
   stop_ = true;
   wait();
   stop_ = false;
+}
+
+void ThreadPool::register_callbacks(WorkerCallbacks callbacks) {
+  wait();
+  for (auto &thread : threads_) thread->worker_.register_callbacks(std::move(callbacks));
+  wait();
 }
 
 } // namespace Lyra

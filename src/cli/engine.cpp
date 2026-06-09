@@ -6,12 +6,39 @@
 #include "perft.hpp"
 
 #include <atomic>
+#include <cstdio>
 
 namespace Lyra {
 
 Engine::Engine()
-    : pool_(DefaultThreads, tt_)
-    , tt_(DefaultTTSize) {}
+    : tt_(DefaultTTSize)
+    , pool_(DefaultThreads, tt_) {
+
+  callbacks_ = {
+      .on_best_move      = [this](Move m) { on_best_move(m); },
+      .on_depth_finished = [this](PrintInfo info) { on_depth_finished(info); },
+  };
+
+  pool_.register_callbacks(callbacks_);
+}
+
+/******************************************\
+|==========================================|
+|                 Callbacks                |
+|==========================================|
+\******************************************/
+
+void Engine::on_best_move(Move m) const {
+  std::println("bestmove {}", MoveUtils::format(m, false));
+  std::fflush(stdout);
+}
+
+void Engine::on_depth_finished(PrintInfo info) const {
+  std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} hashfull {} pv {}",
+               info.depth, info.seldepth, format_eval(info.eval), info.time, info.nodes, info.nps,
+               info.hashfull, info.pv);
+  std::fflush(stdout);
+}
 
 /******************************************\
 |==========================================|
@@ -77,6 +104,7 @@ void Engine::set_pos(const std::string fen, const std::vector<std::string> &move
 void Engine::set_threads(size_t num) {
   pool_.wait();
   pool_.resize(num, tt_);
+  pool_.register_callbacks(callbacks_);
 }
 
 void Engine::set_tt_size(size_t mb) {

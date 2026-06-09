@@ -6,7 +6,8 @@
 #include "params.hpp"
 #include "search.hpp"
 
-#include <print>
+#include <cstring>
+#include <iostream>
 
 namespace Lyra {
 
@@ -43,7 +44,7 @@ bool Worker::should_search_deeper() {
 
 // Returns a structure containing all the history tables for move ordering
 MOStats Worker::mostats(StackEntry *se) {
-  return {&se->killer, &hist_quiet_, {(se - 1)->cont, (se - 2)->cont}};
+  return {&se->killer, hist_quiet_.get(), {(se - 1)->cont, (se - 2)->cont}};
 }
 
 void Worker::reset(const Board &board) {
@@ -59,9 +60,9 @@ void Worker::reset(const Board &board) {
   eval_     = 0;
   avg_eval_ = 0;
 
-  hist_quiet_ = {};
-  hist_cont_  = {};
-  hist_corr_  = {};
+  std::memset(hist_quiet_.get(), 0, sizeof(HistQuiet));
+  std::memset(hist_cont_.get(), 0, sizeof(HistCont));
+  std::memset(hist_corr_.get(), 0, sizeof(HistCorr));
 
   cutoffs_            = 0;
   first_move_cutoffs_ = 0;
@@ -70,23 +71,29 @@ void Worker::reset(const Board &board) {
 }
 
 void Worker::uci_report(const PVLine &pv) {
-  std::println("info depth {} seldepth {} score {} time {} nodes {} nps {} hashfull {} pv {}",
-               depth_ + 1, seldepth_, format_eval(eval_), clock_.elapsed(), nodes_,
-               nodes_ * 1000 / std::max(clock_.elapsed(), 1UL), tt_.hashfull(),
-               pv.format(board_.chess960));
-  std::fflush(stdout);
+
+  PrintInfo info;
+
+  info.depth    = depth_ + 1;
+  info.seldepth = seldepth_;
+  info.eval     = eval_;
+  info.time     = clock_.elapsed();
+  info.nodes    = nodes_;
+  info.nps      = info.nodes * 1000 / (info.time == 0 ? 1 : info.time);
+  info.hashfull = tt_.hashfull();
+  info.pv       = pv.format(board_.chess960);
+
+  if (callbacks_.on_depth_finished) callbacks_.on_depth_finished(info);
 }
 
 void Worker::report_best_move() {
-  std::println("bestmove {}", MoveUtils::format(best_move_, board_.chess960));
-  std::fflush(stdout);
+  if (callbacks_.on_best_move) callbacks_.on_best_move(best_move_);
 }
 
 void Worker::update_hist_cont(StackEntry *se, Move move, Eval bonus) {
   for (unsigned i = 1; i <= ContSize; ++i) {
     if ((se - i)->move == NoMove) continue;
-    HistQuiet &cont = *(se - i)->cont;
-    update_hist_quiet(cont, board_, move, bonus);
+    update_hist_quiet((se - i)->cont, board_, move, bonus);
   }
 }
 
@@ -97,11 +104,11 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
 
   if (!is_capture(best)) {
     update_killer(se->killer, best);
-    update_hist_quiet(hist_quiet_, board_, best, bonus);
+    update_hist_quiet(hist_quiet_.get(), board_, best, bonus);
     update_hist_cont(se, best, bonus);
 
     for (Move m : quiets) {
-      update_hist_quiet(hist_quiet_, board_, m, -bonus);
+      update_hist_quiet(hist_quiet_.get(), board_, m, -bonus);
       update_hist_cont(se, m, -bonus);
     }
   }
@@ -109,7 +116,7 @@ void Worker::update_all_stats(StackEntry *se, Depth depth, Move best, std::vecto
 
 // Adjust eval using correction history
 Eval Worker::adjust_eval(Eval eval) const {
-  Eval pcv = hist_corr_[board_.stm()][board_.pawn_key() % CorrHistSize] / 16;
+  Eval pcv = (*hist_corr_)[board_.stm()][board_.pawn_key() % CorrHistSize] / 16;
   eval += pcv;
   return std::clamp(eval, -EvalMateBound, EvalMateBound);
 }

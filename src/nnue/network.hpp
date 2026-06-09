@@ -21,6 +21,6 @@ struct Network {
 
 extern Network network;
 
-void load_network();
+void load_network(const uint8_t *data, size_t size);
 
 } // namespace Lyra::NNUE

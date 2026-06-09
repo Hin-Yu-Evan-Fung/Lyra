@@ -46,8 +46,9 @@ constexpr BB from(File f) { return FileABB << f; }
 #ifdef USE_PEXT
 inline U64 pext(BB bb, BB mask) { return _pext_u64(bb, mask); }
 #endif
-inline Square lsb(BB bb) { return static_cast<Square>(_tzcnt_u64(bb)); }
-inline int    popcount(BB bb) { return _mm_popcnt_u64(bb); }
+
+inline Square lsb(BB bb) { return static_cast<Square>(__builtin_ctzll(bb)); }
+inline int    popcount(BB bb) { return __builtin_popcountll(bb); }
 constexpr int more_than_one(BB bb) { return (bb & (bb - 1)) != 0; }
 
 template <typename Func>

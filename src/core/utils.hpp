@@ -3,6 +3,7 @@
 #include "defs.hpp"
 #include "params.hpp"
 
+#include <bit>
 #include <chrono>
 
 #define ALWAYS_ASSERT(x)                                                                           \

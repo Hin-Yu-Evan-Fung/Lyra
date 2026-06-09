@@ -1,21 +1,20 @@
 #include "network.hpp"
 
-#include "incbin.hpp"
 #include "nnue.hpp"
 #include "utils.hpp"
 
 #include <cassert>
 #include <cstring>
+#include <iostream>
 
 namespace Lyra::NNUE {
 
 Network network;
 
-INCBIN(NetworkRaw, NETWORK_PATH);
+void load_network(const uint8_t *data, size_t size) {
+  ALWAYS_ASSERT(size == sizeof(Network));
 
-void load_network() {
-  ALWAYS_ASSERT(gNetworkRawSize == sizeof(Network));
-  std::memcpy(&network, gNetworkRawData, sizeof(Network));
+  std::memcpy(&network, data, sizeof(Network));
   nnue.init();
 }
 

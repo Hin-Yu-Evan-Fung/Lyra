@@ -43,15 +43,15 @@ if(EMSCRIPTEN)
     "-sASYNCIFY"
     "-sASYNCIFY_STACK_SIZE=65536"
     "-sEXPORTED_RUNTIME_METHODS=['HEAP8']"
-    "SHELL: --embed-file ${CMAKE_SOURCE_DIR}/src/weights/big.nnue@/big.nnue"
+    "SHELL: --embed-file ${CMAKE_SOURCE_DIR}/src/weights/vega.nnue@/vega.nnue"
   )
-  target_compile_definitions(LyraWasm PRIVATE NETWORK_PATH="/big.nnue")
+  target_compile_definitions(LyraWasm PRIVATE NETWORK_PATH="/vega.nnue")
 else()
   file(GLOB_RECURSE CLI_SOURCES CONFIGURE_DEPENDS "src/cli/*.cpp")
   include_directories(src/cli)
   add_executable(Lyra ${CLI_SOURCES})
   target_link_libraries(Lyra PRIVATE LyraLib)
-  target_compile_definitions(Lyra PRIVATE NETWORK_PATH="${CMAKE_SOURCE_DIR}/src/weights/big.nnue")
+  target_compile_definitions(Lyra PRIVATE NETWORK_PATH="${CMAKE_SOURCE_DIR}/src/weights/vega.nnue")
   enable_testing()
   add_subdirectory(test)
 endif()

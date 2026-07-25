@@ -23,22 +23,22 @@ static constexpr I32 SCALE = 400;
 |==========================================|
 \******************************************/
 
-static constexpr size_t NInBuckets  = 4;
+static constexpr size_t NInBuckets  = 8;
 static constexpr size_t NOutBuckets = 8;
 
-static constexpr size_t NFeatures = 768;
-static constexpr size_t L1        = 512;
+static constexpr size_t NFeatures = (size_t)NSquare * (size_t)NPiece;
+static constexpr size_t L1        = 1024;
 
 // clang-format off
-constexpr size_t BucketMap[64] = {
-    0,  0,  1,  1,  5,  5,  4,  4,
-    2,  2,  2,  2,  6,  6,  6,  6,
-    2,  2,  2,  2,  6,  6,  6,  6,
-    3,  3,  3,  3,  7,  7,  7,  7,
-    3,  3,  3,  3,  7,  7,  7,  7,
-    3,  3,  3,  3,  7,  7,  7,  7,
-    3,  3,  3,  3,  7,  7,  7,  7,
-    3,  3,  3,  3,  7,  7,  7,  7,
+constexpr size_t BucketMap[NSquare] = {
+    0,  1,  2,  3, 11, 10,  9,  8,
+    4,  4,  5,  5, 13, 13, 12, 12,
+    6,  6,  6,  6, 14, 14, 14, 14,
+    7,  7,  7,  7, 15, 15, 15, 15,
+    7,  7,  7,  7, 15, 15, 15, 15,
+    7,  7,  7,  7, 15, 15, 15, 15,
+    7,  7,  7,  7, 15, 15, 15, 15,
+    7,  7,  7,  7, 15, 15, 15, 15,
 };
 // clang-format on
 

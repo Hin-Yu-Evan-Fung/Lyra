@@ -2,7 +2,7 @@ EXE := Lyra
 CXX := g++
 CXXSTD := -std=c++23
 
-NETWORK_PATH = $(realpath src/weights/big.nnue)
+NETWORK_PATH = $(realpath src/weights/vega.nnue)
 
 COMMON_FLAGS := -DTUNE -DUSE_PEXT -DNETWORK_PATH=\"$(NETWORK_PATH)\" \
 	-Isrc/cli -Isrc/core -Isrc/nnue -Wall -flto -fno-rtti \

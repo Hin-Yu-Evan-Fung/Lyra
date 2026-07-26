@@ -22,6 +22,8 @@ void Clock::set(Colour stm, TimeControl tc) {
     type_ = TCType::Depth;
   else if (tc_.move_time)
     type_ = TCType::Fixed;
+  else if (tc_.nodes)
+    type_ = TCType::Nodes;
   else {
     type_ = TCType::Variable;
 

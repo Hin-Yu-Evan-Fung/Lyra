@@ -93,6 +93,8 @@ void UCI::parse_go(std::istringstream &is) {
       is >> tc.inc[Black];
     else if (token == "depth")
       is >> tc.depth;
+    else if (token == "nodes")
+      is >> tc.nodes;
     else if (token == "movestogo")
       is >> tc.moves_to_go;
     else if (token == "movetime")

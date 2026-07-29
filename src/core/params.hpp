@@ -149,7 +149,7 @@ static constexpr Eval  QFPMargin      = 300;
 static constexpr Eval  QSEEMargin     = 30;
 
 TUNABLE(LmrBaseQuiet, 768, 250, 2000, 100);
-TUNABLE(LmrMultQuiet, 4096, 1024, 6144, 400);
+TUNABLE(LmrMultQuiet, 3072, 1024, 6144, 400);
 TUNABLE(LmrMultHist, 7000, 4000, 12000, 500);
 
 }; // namespace Lyra
